@@ -1,5 +1,9 @@
+import type { Metadata } from 'next'
+import { hasLocale } from 'next-intl'
+import { routing } from '@/i18n/routing'
+import { jsonLdScript, pageMetadata, productDescription, productJsonLd } from '@/lib/seo'
 import { notFound } from 'next/navigation'
-import { setRequestLocale } from 'next-intl/server'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { getProductBySlug, getRelated } from '@/lib/catalog'
 import type { Locale } from '@/i18n/routing'
 import { t as l10n } from '@/lib/localized'
@@ -9,6 +13,22 @@ import DetailedProduct from '@/components/store/DetailedProduct'
 import SimpleProduct from '@/components/store/SimpleProduct'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
+  const { locale, slug } = await params
+  if (!hasLocale(routing.locales, locale)) return {}
+  const product = await getProductBySlug(slug)
+  if (!product) return {}
+  const tStore = await getTranslations({ locale, namespace: 'store' })
+  return pageMetadata({
+    locale,
+    path: `/p/${slug}`,
+    title: `${l10n(product.title, locale)} — ${tStore('name')}`,
+    description: productDescription(product, locale),
+    siteName: tStore('name'),
+    image: product.images[0],
+  })
+}
 
 export default async function ProductPage({ params }: { params: Promise<{ locale: string; slug: string }> }) {
   const { locale: raw, slug } = await params
@@ -29,7 +49,10 @@ export default async function ProductPage({ params }: { params: Promise<{ locale
 
   return (
     <>
-      <title>{title}</title>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(productJsonLd(product, product.variants, locale)) }}
+      />
       <Breadcrumbs locale={locale} items={crumbs} />
       {product.template === 'DETAILED' ? (
         <DetailedProduct product={product} related={related} locale={locale} />

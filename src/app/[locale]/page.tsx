@@ -1,3 +1,7 @@
+import type { Metadata } from 'next'
+import { hasLocale } from 'next-intl'
+import { routing } from '@/i18n/routing'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { getNavCategories, getNewArrivals, getSaleProducts } from '@/lib/catalog'
@@ -9,17 +13,29 @@ import ProductGrid from '@/components/store/ProductGrid'
 
 export const dynamic = 'force-dynamic'
 
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params
+  if (!hasLocale(routing.locales, locale)) return {}
+  const tStore = await getTranslations({ locale, namespace: 'store' })
+  const tSeo = await getTranslations({ locale, namespace: 'seo' })
+  return pageMetadata({
+    locale,
+    path: '/',
+    title: `${tStore('name')} — ${tStore('tagline')}`,
+    description: tSeo('homeDescription'),
+    siteName: tStore('name'),
+  })
+}
+
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params
   setRequestLocale(raw)
   const locale = raw as Locale
   const t = await getTranslations({ locale, namespace: 'home' })
-  const tStore = await getTranslations({ locale, namespace: 'store' })
   const [categories, arrivals, sale] = await Promise.all([getNavCategories(), getNewArrivals(8), getSaleProducts()])
 
   return (
     <>
-      <title>{`${tStore('name')} - ${tStore('tagline')}`}</title>
       <HeroBanner locale={locale} />
 
       <div className="mx-auto max-w-7xl space-y-16 px-4 py-14 sm:px-6 lg:space-y-20 lg:px-8 lg:py-20">

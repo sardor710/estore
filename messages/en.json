@@ -153,5 +153,10 @@
       "CANCELLED": "Cancelled"
     },
     "backToShop": "Continue shopping"
+  },
+  "seo": {
+    "homeDescription": "Chargers, power banks, audio and smart gadgets. Delivery across Uzbekistan.",
+    "categoryDescription": "{name} — buy in Uzbekistan with prices in UZS, original products and delivery.",
+    "saleDescription": "Discounted electronics with prices in UZS and delivery across Uzbekistan."
   }
 }

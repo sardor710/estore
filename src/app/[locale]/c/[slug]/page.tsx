@@ -1,3 +1,7 @@
+import type { Metadata } from 'next'
+import { hasLocale } from 'next-intl'
+import { routing } from '@/i18n/routing'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
@@ -15,6 +19,24 @@ const SORTS: { key: SortKey; label: 'sortNew' | 'sortPriceAsc' | 'sortPriceDesc'
   { key: 'price-asc', label: 'sortPriceAsc' },
   { key: 'price-desc', label: 'sortPriceDesc' },
 ]
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
+  const { locale, slug } = await params
+  if (!hasLocale(routing.locales, locale)) return {}
+  const page = await getCategoryPage(slug, { sort: 'new' })
+  if (!page) return {}
+  const tStore = await getTranslations({ locale, namespace: 'store' })
+  const tSeo = await getTranslations({ locale, namespace: 'seo' })
+  const name = l10n(page.category.name, locale)
+  return pageMetadata({
+    locale,
+    path: `/c/${slug}`,
+    title: `${name} — ${tStore('name')}`,
+    description: tSeo('categoryDescription', { name }),
+    siteName: tStore('name'),
+    image: page.products.find((p) => p.image)?.image ?? undefined,
+  })
+}
 
 export default async function CategoryPage({
   params,
@@ -41,7 +63,6 @@ export default async function CategoryPage({
 
   return (
     <>
-      <title>{name}</title>
       <Breadcrumbs locale={locale} items={crumbs} />
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">

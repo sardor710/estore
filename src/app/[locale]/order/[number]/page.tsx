@@ -1,3 +1,7 @@
+import type { Metadata } from 'next'
+import { hasLocale } from 'next-intl'
+import { routing } from '@/i18n/routing'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
@@ -9,6 +13,14 @@ import { path } from '@/lib/paths'
 export const dynamic = 'force-dynamic'
 
 /** Public thank-you page. Deliberately exposes ONLY the number and status, never customer data. */
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; number: string }> }): Promise<Metadata> {
+  const { locale, number } = await params
+  if (!hasLocale(routing.locales, locale)) return {}
+  const t = await getTranslations({ locale, namespace: 'order' })
+  const meta = pageMetadata({ locale, path: `/order/${number}`, title: t('title') })
+  return { ...meta, robots: { index: false, follow: false } }
+}
+
 export default async function OrderPage({ params }: { params: Promise<{ locale: string; number: string }> }) {
   const { locale: raw, number: rawNumber } = await params
   setRequestLocale(raw)
@@ -21,7 +33,6 @@ export default async function OrderPage({ params }: { params: Promise<{ locale: 
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">
-      <title>{t('title')}</title>
       <CheckCircle2 size={56} className="mx-auto text-emerald-600" aria-hidden />
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-neutral-900">{t('title')}</h1>
       <p className="mt-2 text-neutral-600">{t('thanks')}</p>

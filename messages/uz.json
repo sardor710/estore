@@ -153,5 +153,10 @@
       "CANCELLED": "Bekor qilindi"
     },
     "backToShop": "Xaridni davom ettirish"
+  },
+  "seo": {
+    "homeDescription": "Zaryadlovchi qurilmalar, quvvat banklari, audio va aqlli gadjetlar. Oʻzbekiston boʻylab yetkazib berish.",
+    "categoryDescription": "{name} — Oʻzbekistonda narxlar soʻmda, original mahsulotlar va yetkazib berish bilan xarid qiling.",
+    "saleDescription": "Chegirmadagi elektronika mahsulotlari — soʻmda narxlar, Oʻzbekiston boʻylab yetkazib berish."
   }
 }

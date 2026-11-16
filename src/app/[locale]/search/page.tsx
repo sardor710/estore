@@ -1,3 +1,7 @@
+import type { Metadata } from 'next'
+import { hasLocale } from 'next-intl'
+import { routing } from '@/i18n/routing'
+import { pageMetadata } from '@/lib/seo'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { Search } from 'lucide-react'
 import { searchProducts } from '@/lib/catalog'
@@ -6,6 +10,14 @@ import { path } from '@/lib/paths'
 import ProductGrid from '@/components/store/ProductGrid'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params
+  if (!hasLocale(routing.locales, locale)) return {}
+  const t = await getTranslations({ locale, namespace: 'search' })
+  const meta = pageMetadata({ locale, path: '/search', title: t('title') })
+  return meta
+}
 
 export default async function SearchPage({
   params,
@@ -25,7 +37,6 @@ export default async function SearchPage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-      <title>{t('title')}</title>
       <h1 className="text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">{t('title')}</h1>
       <form
         action={path(locale, '/search')}
