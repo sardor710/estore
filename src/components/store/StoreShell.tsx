@@ -3,6 +3,7 @@ import { getNavCategories } from '@/lib/catalog'
 import type { Locale } from '@/i18n/routing'
 import Navbar from './Navbar'
 import Footer from './Footer'
+import CartDrawer from './CartDrawer'
 
 /** Header + footer chrome shared by every storefront page. */
 export default async function StoreShell({ locale, children }: { locale: Locale; children: ReactNode }) {
@@ -12,6 +13,7 @@ export default async function StoreShell({ locale, children }: { locale: Locale;
       <Navbar locale={locale} categories={categories} />
       <main>{children}</main>
       <Footer locale={locale} categories={categories} />
+      <CartDrawer locale={locale} />
     </>
   )
 }

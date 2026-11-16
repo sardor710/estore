@@ -33,8 +33,8 @@ export type CardProduct = {
   compareAtUzs: number | null
   hasMultiplePrices: boolean
   inStock: boolean
-  /** String id of the first in-stock variant (cheapest first); null when sold out */
-  quickAddVariantId: string | null
+  /** Id of the first in-stock variant (cheapest first); null when sold out */
+  quickAddVariantId: number | null
   createdAt: Date
 }
 
@@ -106,7 +106,7 @@ function toCard(p: ProductWithVariants): CardProduct {
     compareAtUzs: cheapest && cheapest.compareAtUzs != null && cheapest.compareAtUzs > cheapest.priceUzs ? cheapest.compareAtUzs : null,
     hasMultiplePrices: vs.some((v) => v.priceUzs !== cheapest?.priceUzs),
     inStock: Boolean(firstInStock),
-    quickAddVariantId: firstInStock ? String(firstInStock.id) : null,
+    quickAddVariantId: firstInStock ? firstInStock.id : null,
     createdAt: p.createdAt,
   }
 }

@@ -9,7 +9,7 @@ import type { CategoryNode } from '@/lib/catalog'
 import type { Locale } from '@/i18n/routing'
 import { t as l10n } from '@/lib/localized'
 import { path } from '@/lib/paths'
-import { useCart } from '@/lib/cart/useCart'
+import { useCart, useCartDrawer } from '@/lib/cart/useCart'
 import LangSwitcher from './LangSwitcher'
 
 export default function Navbar({ locale, categories }: { locale: Locale; categories: CategoryNode[] }) {
@@ -17,6 +17,7 @@ export default function Navbar({ locale, categories }: { locale: Locale; categor
   const tStore = useTranslations('store')
   const router = useRouter()
   const { count } = useCart()
+  const { setOpen: setCartOpen } = useCartDrawer()
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [q, setQ] = useState('')
@@ -118,6 +119,7 @@ export default function Navbar({ locale, categories }: { locale: Locale; categor
             type="button"
             className="relative rounded-full p-2 text-neutral-800 hover:bg-neutral-100"
             aria-label={`${t('cart')} (${count})`}
+            onClick={() => setCartOpen(true)}
           >
             <ShoppingBag size={20} />
             {count > 0 && (

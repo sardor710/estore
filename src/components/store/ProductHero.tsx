@@ -57,7 +57,7 @@ export default function ProductHero({ locale, template, title, subtitle, shortSp
 
   const addToCart = () => {
     if (!variant || !inStock) return
-    add(String(variant.id), qty)
+    add(variant.id, qty, variant.stock)
     setAdded(true)
     setTimeout(() => setAdded(false), 1800)
   }
