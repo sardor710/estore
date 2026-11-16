@@ -258,15 +258,60 @@ describe('ClaudeTranslator', () => {
     const tr = new ClaudeTranslator({ client: fakeClient((t) => t.slice(1)) as never })
     await expect(tr.translate(['a', 'b'], 'ru')).rejects.toBeInstanceOf(TranslationError)
   })
-  it('refusal / max_tokens / non-JSON throw TranslationError', async () => {
-    for (const resp of [
-      { stop_reason: 'refusal', content: [] },
-      { stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"translations":["x"' }] },
-      { stop_reason: 'end_turn', content: [{ type: 'text', text: 'nope' }] },
-    ]) {
+  it('refusal / max_tokens / non-JSON throw TranslationError (valid JSON, so only stop_reason can fail)', async () => {
+    const valid = [{ type: 'text', text: JSON.stringify({ translations: ['x'] }) }]
+    const cases: [unknown, RegExp][] = [
+      [{ stop_reason: 'refusal', content: valid }, /refused/],
+      [{ stop_reason: 'max_tokens', content: valid }, /cut off|too long/],
+      [{ stop_reason: 'end_turn', content: [{ type: 'text', text: 'nope' }] }, /invalid JSON|too long/],
+    ]
+    for (const [resp, re] of cases) {
       const tr = new ClaudeTranslator({ client: { messages: { create: async () => resp } } as never })
+      await expect(tr.translate(['a'], 'uz')).rejects.toThrow(re)
       await expect(tr.translate(['a'], 'uz')).rejects.toBeInstanceOf(TranslationError)
     }
+  })
+  it('a batch cut off at max_tokens is split in half and retried', async () => {
+    const calls: string[][] = []
+    const client = {
+      messages: {
+        create: async (req: any) => {
+          const texts = JSON.parse(req.messages[0].content) as string[]
+          calls.push(texts)
+          const ok = JSON.stringify({ translations: texts.map((s) => `~${s}`) })
+          return { stop_reason: texts.length > 1 ? 'max_tokens' : 'end_turn', content: [{ type: 'text', text: ok }] }
+        },
+      },
+    }
+    const out = await new ClaudeTranslator({ client: client as never }).translate(['a', 'b', 'c'], 'ru')
+    expect(out).toEqual(['~a', '~b', '~c'])
+    expect(calls.map((c) => c.length)).toEqual([3, 1, 2, 1, 1])
+  })
+  it('a single HTML string that still overflows is split at top-level blocks and joined', async () => {
+    const html = '<h2>Title</h2>\n<p>One <b>bold</b></p><ul><li>x</li><li>y</li></ul><p>Two</p>'
+    const client = {
+      messages: {
+        create: async (req: any) => {
+          const texts = JSON.parse(req.messages[0].content) as string[]
+          const tooLong = texts.some((s) => s.length > 30)
+          return { stop_reason: tooLong ? 'max_tokens' : 'end_turn', content: [{ type: 'text', text: JSON.stringify({ translations: texts.map((s) => s.toUpperCase()) }) }] }
+        },
+      },
+    }
+    const out = await new ClaudeTranslator({ client: client as never }).translate([html], 'uz')
+    expect(out).toEqual([html.toUpperCase()])
+  })
+  it('an unsplittable string that keeps overflowing throws TranslationError', async () => {
+    const client = { messages: { create: async () => ({ stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"translations":["x"]}' }] }) } }
+    await expect(new ClaudeTranslator({ client: client as never }).translate(['<p>only one block</p>'], 'uz')).rejects.toBeInstanceOf(TranslationError)
+  })
+  it('uses a char cap of ~7000 per request and max_tokens within the non-streaming limit', async () => {
+    const c = fakeClient((t) => t)
+    const s = 'x'.repeat(3000)
+    await new ClaudeTranslator({ client: c as never }).translate([s, s, s], 'uz')
+    expect(c.calls.map((x) => JSON.parse(x.messages[0].content).length)).toEqual([2, 1])
+    expect(c.calls[0].max_tokens).toBeGreaterThanOrEqual(16000)
+    expect(c.calls[0].max_tokens).toBeLessThanOrEqual(21000)
   })
   it('empty input makes no request', async () => {
     const c = fakeClient((t) => t)
