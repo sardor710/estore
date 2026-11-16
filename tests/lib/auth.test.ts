@@ -32,6 +32,30 @@ describe('checkCredentials', () => {
     expect(await checkCredentials('owner', 'correct horse')).toBe(false)
     expect(await checkCredentials('owner', '')).toBe(false)
   })
+  it('fails closed on .env.example placeholders and short passwords', async () => {
+    for (const pw of ['change-me', 'CHANGE-ME', 'changeme', 'password', 'short9chr']) {
+      process.env.ADMIN_PASSWORD = pw
+      expect(isAdminConfigured(), pw).toBe(false)
+      expect(await checkCredentials('owner', pw)).toBe(false)
+    }
+    process.env.ADMIN_PASSWORD = 'correct horse'
+    for (const secret of ['change-me-to-a-long-random-string', 'replace-with-a-long-random-string-of-48-chars']) {
+      process.env.SESSION_SECRET = secret
+      expect(isAdminConfigured(), secret).toBe(false)
+      await expect(createSession('owner')).rejects.toThrow()
+    }
+    process.env.SESSION_SECRET = SECRET
+    expect(isAdminConfigured()).toBe(true)
+  })
+  it('.env.example itself does not configure the admin', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { parse } = await import('dotenv')
+    const ex = parse(readFileSync('.env.example', 'utf8'))
+    process.env.ADMIN_USER = ex.ADMIN_USER
+    process.env.ADMIN_PASSWORD = ex.ADMIN_PASSWORD
+    process.env.SESSION_SECRET = ex.SESSION_SECRET
+    expect(isAdminConfigured()).toBe(false)
+  })
 })
 
 describe('session token', () => {

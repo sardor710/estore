@@ -26,11 +26,11 @@ Demo products are for local development only. They never appear in the sitemap a
 |---|---|
 | `DATABASE_URL` | Prisma connection string, e.g. `file:./dev.db` for SQLite. |
 | `ADMIN_USER` | Admin login name. |
-| `ADMIN_PASSWORD` | Admin password. Choose a strong one. |
-| `SESSION_SECRET` | Secret used to sign admin sessions. At least 32 random characters. |
+| `ADMIN_PASSWORD` | Admin password, at least 10 characters. Example values such as `change-me` are rejected and the admin stays locked ("Admin not configured"). |
+| `SESSION_SECRET` | Secret used to sign admin sessions. At least 32 random characters; example values are rejected. Generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 | `ANTHROPIC_API_KEY` | Used to translate products. Create a key at https://console.anthropic.com (Settings, API keys). Translation uses the model `claude-haiku-5-5`. Without it, translation is unavailable. |
 | `SITE_URL` | Public origin of the shop, e.g. `https://shop.example.uz`. Must be the production origin: it is used for canonical URLs, hreflang and the sitemap. |
-| `TRUST_PROXY` | Set to `1` only when running behind a reverse proxy that overwrites `X-Forwarded-For`. It is used by the admin login throttle. Leave empty otherwise. |
+| `TRUST_PROXY` | Set to `1` only when running behind a reverse proxy that overwrites `X-Forwarded-For`. It is used by the admin login and order throttles. Leave empty otherwise. |
 
 ## Running
 
