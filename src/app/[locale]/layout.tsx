@@ -5,7 +5,11 @@ import { setRequestLocale } from 'next-intl/server'
 import { routing } from '@/i18n/routing'
 import StoreShell from '@/components/store/StoreShell'
 import type { Locale } from '@/i18n/routing'
+import type { Metadata } from 'next'
+import { SITE_URL } from '@/lib/seo'
 import '../globals.css'
+
+export const metadata: Metadata = { metadataBase: new URL(SITE_URL) }
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }))

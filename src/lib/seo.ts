@@ -95,17 +95,17 @@ export function productJsonLd(product: LdProduct, variants: LdVariant | LdVarian
     name: l10n(product.title, locale),
     ...(description ? { description } : {}),
     url,
-    ...(product.images.length ? { image: product.images } : {}),
+    ...(product.images.length ? { image: product.images.map((i) => new URL(i, SITE_URL).href) } : {}),
     ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
-    sku: list[0]?.sku,
-    offers: list.map((v) => ({
+    ...(list.length ? { sku: list[0].sku } : {}),
+    ...(list.length ? { offers: list.map((v) => ({
       '@type': 'Offer',
       sku: v.sku,
       url,
       price: String(v.priceUzs),
       priceCurrency: 'UZS',
       availability: v.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-    })),
+    })) } : {}),
   }
 }
 

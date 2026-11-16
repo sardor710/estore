@@ -66,6 +66,18 @@ describe('productJsonLd', () => {
   })
 })
 
+describe('productJsonLd edge cases', () => {
+  it('absolutizes relative images', () => {
+    const ld = productJsonLd({ ...product, images: ['/uploads/a.jpg', 'https://cdn.x/b.jpg'] }, [{ sku: 'A', priceUzs: 1, stock: 1 }], 'en') as any
+    expect(ld.image).toEqual([SITE_URL + '/uploads/a.jpg', 'https://cdn.x/b.jpg'])
+  })
+  it('omits offers and sku with no variants', () => {
+    const ld = productJsonLd(product, [], 'en') as any
+    expect('offers' in ld).toBe(false)
+    expect('sku' in ld).toBe(false)
+  })
+})
+
 describe('sitemap', () => {
   it('excludes DRAFT and demo, includes 3 locales', async () => {
     const cat = await prisma.category.create({ data: { slug: 'chargers', template: 'DETAILED', name: { en: 'c' } } })
