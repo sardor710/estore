@@ -9,7 +9,7 @@ import { prisma } from '@/lib/db'
 const saved = { ...process.env }
 beforeEach(() => {
   process.env.ADMIN_USER = 'owner'
-  process.env.ADMIN_PASSWORD = 'pw'
+  process.env.ADMIN_PASSWORD = 'correct horse battery'
   process.env.SESSION_SECRET = 'z'.repeat(40)
   process.env.SITE_URL = 'http://localhost:3000'
 })
