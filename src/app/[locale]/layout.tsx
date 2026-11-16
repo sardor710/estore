@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import { hasLocale, NextIntlClientProvider } from 'next-intl'
 import { setRequestLocale } from 'next-intl/server'
 import { routing } from '@/i18n/routing'
+import StoreShell from '@/components/store/StoreShell'
+import type { Locale } from '@/i18n/routing'
 import '../globals.css'
 
 export function generateStaticParams() {
@@ -30,7 +32,9 @@ export default async function LocaleLayout({
         />
       </head>
       <body>
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>
+          <StoreShell locale={locale as Locale}>{children}</StoreShell>
+        </NextIntlClientProvider>
       </body>
     </html>
   )

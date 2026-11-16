@@ -1,1 +1,86 @@
-{ "store": { "name": "Electronics Store", "tagline": "Chargers, audio and smart gadgets" } }
+{
+  "store": { "name": "Electronics Store", "tagline": "Chargers, audio and smart gadgets" },
+  "nav": {
+    "sale": "Sale",
+    "search": "Search",
+    "searchPlaceholder": "Search products or SKU",
+    "cart": "Cart",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "language": "Language",
+    "mainNav": "Main navigation",
+    "toHome": "Go to home page"
+  },
+  "home": {
+    "categoriesTitle": "Shop by category",
+    "newArrivals": "New arrivals",
+    "onSale": "On sale",
+    "viewAll": "View all",
+    "empty": "The catalog is being filled. Please check back soon.",
+    "heroSlide": "Go to slide {n}",
+    "heroPrev": "Previous slide",
+    "heroNext": "Next slide",
+    "hero": {
+      "chargers": { "eyebrow": "Chargers", "title": "Fast, safe charging", "text": "GaN chargers and wireless stands for your phone, laptop and watch.", "cta": "Shop chargers" },
+      "powerBanks": { "eyebrow": "Power banks", "title": "Power on the go", "text": "Portable batteries that keep your devices alive all day.", "cta": "Shop power banks" },
+      "audio": { "eyebrow": "Audio", "title": "Sound that moves with you", "text": "Earbuds, headphones and speakers for every day and every trip.", "cta": "Shop audio" }
+    }
+  },
+  "category": {
+    "sortLabel": "Sort by",
+    "sortNew": "Newest",
+    "sortPriceAsc": "Price: low to high",
+    "sortPriceDesc": "Price: high to low",
+    "count": "{count, plural, one {# product} other {# products}}",
+    "empty": "No products in this category yet.",
+    "subcategories": "Subcategories"
+  },
+  "product": {
+    "from": "from {price}",
+    "add": "Add to cart",
+    "addToCart": "Add to cart",
+    "added": "Added",
+    "quickAdd": "Add {name} to cart",
+    "outOfStock": "Out of stock",
+    "inStock": "In stock",
+    "lowStock": "Only {count} left",
+    "quantity": "Quantity",
+    "decrease": "Decrease quantity",
+    "increase": "Increase quantity",
+    "option": "Option",
+    "save": "Save {amount}",
+    "highlights": "Key features",
+    "about": "About this product",
+    "specs": "Specifications",
+    "inTheBox": "What's in the box",
+    "faq": "Questions and answers",
+    "related": "You may also like",
+    "features": "Key features",
+    "noImage": "No image",
+    "prevImage": "Previous image",
+    "nextImage": "Next image",
+    "showImage": "Show image {n}",
+    "sku": "SKU",
+    "breadcrumb": "Breadcrumb",
+    "delivery": "Delivery across Uzbekistan",
+    "original": "Original products",
+    "total": "Total"
+  },
+  "search": {
+    "title": "Search",
+    "resultsFor": "Results for \"{q}\"",
+    "none": "Nothing found for \"{q}\".",
+    "prompt": "Type a product name or SKU to search.",
+    "label": "Search the store"
+  },
+  "sale": {
+    "title": "Sale",
+    "subtitle": "Discounted products",
+    "empty": "There are no discounted products right now."
+  },
+  "footer": {
+    "about": "Original chargers, audio and smart gadgets with delivery across Uzbekistan.",
+    "shop": "Catalog",
+    "rights": "All rights reserved."
+  }
+}

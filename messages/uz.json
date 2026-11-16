@@ -1,1 +1,86 @@
-{ "store": { "name": "Elektronika doʻkoni", "tagline": "Zaryadlovchi qurilmalar, audio va aqlli gadjetlar" } }
+{
+  "store": { "name": "Electronics Store", "tagline": "Zaryadlovchilar, audio va aqlli qurilmalar" },
+  "nav": {
+    "sale": "Chegirmalar",
+    "search": "Qidirish",
+    "searchPlaceholder": "Mahsulot yoki SKU qidirish",
+    "cart": "Savat",
+    "openMenu": "Menyuni ochish",
+    "closeMenu": "Menyuni yopish",
+    "language": "Til",
+    "mainNav": "Asosiy menyu",
+    "toHome": "Bosh sahifaga oʻtish"
+  },
+  "home": {
+    "categoriesTitle": "Kategoriyalar boʻyicha xarid qiling",
+    "newArrivals": "Yangi mahsulotlar",
+    "onSale": "Chegirmada",
+    "viewAll": "Barchasini koʻrish",
+    "empty": "Katalog toʻldirilmoqda. Tez orada qaytib keling.",
+    "heroSlide": "{n}-slaydga oʻtish",
+    "heroPrev": "Oldingi slayd",
+    "heroNext": "Keyingi slayd",
+    "hero": {
+      "chargers": { "eyebrow": "Zaryadlovchilar", "title": "Tez va xavfsiz zaryad", "text": "Telefon, noutbuk va soat uchun GaN zaryadlovchilar va simsiz stendlar.", "cta": "Zaryadlovchilarni koʻrish" },
+      "powerBanks": { "eyebrow": "Power bank", "title": "Yoʻlda ham quvvat", "text": "Qurilmalaringizni kun boʻyi quvvatlab turadigan portativ akkumulyatorlar.", "cta": "Power bank koʻrish" },
+      "audio": { "eyebrow": "Audio", "title": "Siz bilan birga yuradigan tovush", "text": "Har kun va har safar uchun quloqchin, naushnik va karnaylar.", "cta": "Audioni koʻrish" }
+    }
+  },
+  "category": {
+    "sortLabel": "Saralash",
+    "sortNew": "Yangilari",
+    "sortPriceAsc": "Narx: arzonidan qimmatiga",
+    "sortPriceDesc": "Narx: qimmatidan arzoniga",
+    "count": "{count} ta mahsulot",
+    "empty": "Bu kategoriyada hozircha mahsulot yoʻq.",
+    "subcategories": "Ichki kategoriyalar"
+  },
+  "product": {
+    "from": "{price}dan",
+    "add": "Savatga qoʻshish",
+    "addToCart": "Savatga qoʻshish",
+    "added": "Qoʻshildi",
+    "quickAdd": "{name} mahsulotini savatga qoʻshish",
+    "outOfStock": "Omborda yoʻq",
+    "inStock": "Omborda bor",
+    "lowStock": "Faqat {count} dona qoldi",
+    "quantity": "Miqdor",
+    "decrease": "Miqdorni kamaytirish",
+    "increase": "Miqdorni oshirish",
+    "option": "Variant",
+    "save": "{amount} tejaysiz",
+    "highlights": "Asosiy xususiyatlar",
+    "about": "Mahsulot haqida",
+    "specs": "Texnik xususiyatlar",
+    "inTheBox": "Komplektatsiya",
+    "faq": "Savol va javoblar",
+    "related": "Sizga yoqishi mumkin",
+    "features": "Asosiy xususiyatlar",
+    "noImage": "Rasm yoʻq",
+    "prevImage": "Oldingi rasm",
+    "nextImage": "Keyingi rasm",
+    "showImage": "{n}-rasmni koʻrsatish",
+    "sku": "SKU",
+    "breadcrumb": "Sahifa yoʻli",
+    "delivery": "Oʻzbekiston boʻylab yetkazib berish",
+    "original": "Original mahsulotlar",
+    "total": "Jami"
+  },
+  "search": {
+    "title": "Qidiruv",
+    "resultsFor": "\"{q}\" boʻyicha natijalar",
+    "none": "\"{q}\" boʻyicha hech narsa topilmadi.",
+    "prompt": "Qidirish uchun mahsulot nomi yoki SKU kiriting.",
+    "label": "Doʻkondan qidirish"
+  },
+  "sale": {
+    "title": "Chegirmalar",
+    "subtitle": "Chegirmadagi mahsulotlar",
+    "empty": "Hozircha chegirmadagi mahsulotlar yoʻq."
+  },
+  "footer": {
+    "about": "Original zaryadlovchilar, audio va aqlli qurilmalar, Oʻzbekiston boʻylab yetkazib berish.",
+    "shop": "Katalog",
+    "rights": "Barcha huquqlar himoyalangan."
+  }
+}
