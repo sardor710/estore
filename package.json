@@ -10,6 +10,8 @@
     "test": "vitest run",
     "postinstall": "prisma generate",
     "db:push": "prisma generate && prisma db push",
+    "db:migrate": "prisma generate && prisma migrate dev",
+    "db:deploy": "prisma generate && prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
     "smoke": "node scripts/smoke.mjs"

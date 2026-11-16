@@ -13,10 +13,17 @@ An online electronics shop for Uzbekistan, built with Next.js 16, Prisma and SQL
 npm install
 copy .env.example .env      (Linux/macOS: cp .env.example .env)
 # edit .env and fill in the variables below
-npm run db:push             # creates the SQLite database and tables
+npm run db:deploy           # creates the SQLite database and applies prisma/migrations
 npm run seed                # base data: categories, labels, UI strings, settings
 npm run seed:demo           # optional: demo products
 ```
+
+Database schema changes go through Prisma migrations (`prisma/migrations`):
+
+- `npm run db:deploy` applies pending migrations (`prisma migrate deploy`); use it on first setup and on every deploy.
+- `npm run db:migrate` creates a new migration after you edit `prisma/schema.prisma` (development only, `prisma migrate dev`).
+- `npm run db:push` is only used by the test setup for a throwaway database.
+- A database created earlier with `db:push` that already matches the schema can be baselined once with `npx prisma migrate resolve --applied 20261117000000_init`.
 
 Demo products are for local development only. They never appear in the sitemap and should not be used in production.
 
@@ -74,11 +81,11 @@ Uzbek is the default language. URLs are `/uz`, `/ru` and `/en`; a path without a
 
 ## Deployment notes
 
-- Simplest setup: one VPS with Node and the SQLite file, run with `npm run build && npm start` under a process manager (systemd, pm2), behind nginx or Caddy with HTTPS. Set `TRUST_PROXY=1` and `SITE_URL`.
+- Simplest setup: one VPS with Node and the SQLite file, run with `npm run db:deploy && npm run build && npm start` under a process manager (systemd, pm2), behind nginx or Caddy with HTTPS. Set `TRUST_PROXY=1` and `SITE_URL`.
 - Back up the `.db` file regularly (copy it while the server is idle, or use `sqlite3 .backup`).
 - For several instances, switch the Prisma datasource to PostgreSQL.
-- The Telegram order notification is fire-and-forget, so prefer a long-running Node server over serverless.
-- The admin login throttle is kept in memory, per process.
+- The Telegram order notification runs after the response (Next.js `after()`); a long-running Node server is still the simplest host.
+- The admin login and order throttles are kept in memory, per process.
 
 ## Known limitations
 
