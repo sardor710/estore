@@ -32,19 +32,24 @@ function summary(o: NotifyOrder): string {
   ].join('\n')
 }
 
-/** Posts a plain-text order summary to Telegram. Never throws. 'skipped' when not configured. */
-export async function notifyNewOrder(order: NotifyOrder, fetchImpl: typeof fetch = fetch): Promise<NotifyResult> {
+/** Posts plain text to the configured Telegram chat. Never throws. 'skipped' when not configured. */
+export async function sendTelegramText(text: string, fetchImpl: typeof fetch = fetch): Promise<NotifyResult> {
   try {
     const { telegramBotToken, telegramChatId } = await getSettings()
     if (!telegramBotToken || !telegramChatId) return 'skipped'
     const res = await fetchImpl(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: telegramChatId, text: summary(order) }),
+      body: JSON.stringify({ chat_id: telegramChatId, text }),
       signal: AbortSignal.timeout(8000),
     })
     return res.ok ? 'sent' : 'failed'
   } catch {
     return 'failed'
   }
+}
+
+/** Posts a plain-text order summary to Telegram. Never throws. 'skipped' when not configured. */
+export async function notifyNewOrder(order: NotifyOrder, fetchImpl: typeof fetch = fetch): Promise<NotifyResult> {
+  return sendTelegramText(summary(order), fetchImpl)
 }

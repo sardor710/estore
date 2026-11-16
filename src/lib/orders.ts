@@ -184,6 +184,11 @@ const TRANSITIONS: Record<string, OrderStatus[]> = {
   CANCELLED: [],
 }
 
+/** Statuses an order may move to from `from` (stock effects are applied by setOrderStatus). */
+export function allowedTransitions(from: string): OrderStatus[] {
+  return TRANSITIONS[from] ?? []
+}
+
 class Insufficient extends Error {}
 
 export async function setOrderStatus(orderId: number, to: OrderStatus): Promise<StatusResult> {
