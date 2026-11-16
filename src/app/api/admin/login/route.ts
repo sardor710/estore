@@ -5,8 +5,10 @@ import { SESSION_COOKIE, SESSION_MAX_AGE } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
+/** X-Forwarded-For is client-controlled; only honour it behind a trusted proxy (TRUST_PROXY=1). */
 function clientIp(req: NextRequest): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'local'
+  if (process.env.TRUST_PROXY !== '1') return 'shared'
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'shared'
 }
 
 export async function POST(req: NextRequest) {

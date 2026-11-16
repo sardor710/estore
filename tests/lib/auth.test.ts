@@ -100,3 +100,37 @@ describe('attemptLogin', () => {
     expect((await attemptLogin({ user: 'owner', password: 'correct horse', ip: '4.4.4.4', now: t0 + 61_000 })).status).toBe(200)
   })
 })
+
+describe('attemptLogin hardening', () => {
+  it('rotating X-Forwarded-For without TRUST_PROXY still hits 429 after 5 (route key is constant)', async () => {
+    delete process.env.TRUST_PROXY
+    const { POST } = await import('@/app/api/admin/login/route')
+    const { NextRequest } = await import('next/server')
+    const hit = (xff: string, password: string) =>
+      POST(new NextRequest('http://localhost:3000/api/admin/login', {
+        method: 'POST',
+        headers: { origin: 'http://localhost:3000', host: 'localhost:3000', 'x-forwarded-for': xff, 'content-type': 'application/json' },
+        body: JSON.stringify({ user: 'owner', password }),
+      }))
+    for (let i = 0; i < 5; i++) expect((await hit(`9.9.9.${i}`, 'bad')).status).toBe(401)
+    expect((await hit('9.9.9.99', 'bad')).status).toBe(429)
+    expect((await hit('9.9.9.100', 'correct horse')).status).toBe(429)
+  })
+  it('10 concurrent wrong attempts: at most 5 are evaluated, the rest get 429', async () => {
+    const rs = await Promise.all(Array.from({ length: 10 }, () => attemptLogin({ user: 'owner', password: 'bad', ip: 'c' })))
+    expect(rs.filter((r) => r.status === 401).length).toBe(5)
+    expect(rs.filter((r) => r.status === 429).length).toBe(5)
+  })
+  it('a successful login does not consume the budget', async () => {
+    for (let i = 0; i < 8; i++) expect((await attemptLogin({ user: 'owner', password: 'correct horse', ip: 's' })).status).toBe(200)
+  })
+  it('global bucket: 20 failures across many ips blocks everyone', async () => {
+    for (let i = 0; i < 20; i++) await attemptLogin({ user: 'owner', password: 'bad', ip: `g${i}` })
+    expect((await attemptLogin({ user: 'owner', password: 'correct horse', ip: 'fresh' })).status).toBe(429)
+  })
+  it('caps tracked ips', async () => {
+    const { trackedIps } = await import('@/lib/admin/login')
+    for (let i = 0; i < 10_050; i++) await attemptLogin({ user: 'owner', password: 'bad', ip: `m${i}`, now: 1000 + i * 100_000 })
+    expect(trackedIps()).toBeLessThanOrEqual(10_000)
+  })
+})

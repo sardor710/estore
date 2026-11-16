@@ -125,3 +125,23 @@ describe('updateProduct', () => {
     expect(r).toMatchObject({ ok: false, errors: { variants: expect.stringContaining('A1') } })
   })
 })
+
+describe('published product keeps the publish gate on edit', () => {
+  it('rejects a 0-price variant or no variants while PUBLISHED, DB unchanged', async () => {
+    const p = await mk('pub', [{ sku: 'P1', price: 100 }])
+    expect(await publishProduct(p.id)).toEqual({ ok: true })
+    const v = inputOf(p).variants[0]
+    const zero = await updateProduct(p.id, inputOf(p, { title: { en: 'CHANGED' }, variants: [{ ...v, priceUzs: 0 }] }))
+    expect(zero).toMatchObject({ ok: false, errors: { variants: expect.stringMatching(/price/i) } })
+    const none = await updateProduct(p.id, inputOf(p, { variants: [] }))
+    expect(none).toMatchObject({ ok: false, errors: { variants: expect.stringMatching(/variant/i) } })
+    const db = await prisma.product.findUniqueOrThrow({ where: { id: p.id }, include: { variants: true } })
+    expect(db.title).toEqual({ en: 'T' })
+    expect(db.status).toBe('PUBLISHED')
+    expect(db.variants[0].priceUzs).toBe(100)
+  })
+  it('drafts may still be saved with 0 prices', async () => {
+    const p = await mk('draft', [{ sku: 'D1', price: 0 }])
+    expect(await updateProduct(p.id, inputOf(p))).toEqual({ ok: true })
+  })
+})

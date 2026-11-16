@@ -107,6 +107,11 @@ export async function updateProduct(id: number, input: ProductInput): Promise<Up
       vErrors.push(`Variant ${sku} is in an open order (NEW/CONFIRMED) and cannot be removed.`)
     }
   }
+  // A live product must stay sellable: same gate as publishing (never silently unpublish).
+  if (vErrors.length === 0 && existing.status === 'PUBLISHED') {
+    const reason = checkPublishable(variants)
+    if (reason) vErrors.push(reason)
+  }
   if (vErrors.length) errors.variants = vErrors.join(' ')
 
   if (Object.keys(errors).length) return { ok: false, errors }
