@@ -1,4 +1,4 @@
-// Ported from legacy/src/data/products.js (Vite demo). Used only by prisma/seed-demo.ts.
+// Ported from the former Vite demo catalogue. Used only by prisma/seed-demo.ts.
 export type DemoProduct = {
   id: string
   handle: string

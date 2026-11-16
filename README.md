@@ -60,7 +60,7 @@ Notes:
 
 ## Orders
 
-Customers check out without an account. Each order has a status: new, confirmed, completed or cancelled. Stock is decremented when you Confirm an order, and restored if a confirmed order is Cancelled. Cancelling an order that was never confirmed does not change stock.
+Customers check out without an account. Each order has a status: NEW, CONFIRMED, DELIVERED or CANCELLED. Stock is decremented when you Confirm an order, and restored if a confirmed order is Cancelled. Cancelling an order that was never confirmed does not change stock.
 
 ### Telegram notifications
 
