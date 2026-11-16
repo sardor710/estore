@@ -1,0 +1,11 @@
+node_modules/
+.next/
+dist/
+.vite/
+*.db
+*.db-journal
+.env
+.env.local
+outputs/
+.vibeskills/
+.superpowers/

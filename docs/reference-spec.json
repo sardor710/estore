@@ -1,0 +1,224 @@
+{
+  "brand": {
+    "name": "NOMAD",
+    "tagline": "Gear built to go the distance",
+    "logo_svg_viewbox": "0 0 141 26",
+    "fonts": {
+      "primary": "Gotham, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
+      "heading": "Gotham-Bold, sans-serif",
+      "body": "Gotham-Book, sans-serif"
+    },
+    "colors": {
+      "background": "#FFFFFF",
+      "surface": "#F5F5F7",
+      "surface_alt": "#EBEBED",
+      "text_primary": "#000000",
+      "text_secondary": "#6E6E73",
+      "text_muted": "#86868B",
+      "accent": "#0048FF",
+      "accent_orange": "#FF5A00",
+      "leather_brown": "#8B5A2B",
+      "leather_black": "#1C1C1E",
+      "border": "#E5E5E7"
+    }
+  },
+  "navigation": [
+    {
+      "name": "Best Sellers",
+      "href": "/pages/best-sellers"
+    },
+    {
+      "name": "Cases",
+      "href": "/collections/cases"
+    },
+    {
+      "name": "Watch",
+      "href": "/collections/bands"
+    },
+    {
+      "name": "Charging",
+      "href": "/collections/power"
+    },
+    {
+      "name": "Tracking & Wallets",
+      "href": "/collections/wallets"
+    },
+    {
+      "name": "More Gear",
+      "href": "/collections/lifestyle-gear"
+    },
+    {
+      "name": "Sale",
+      "href": "/collections/overstock-sale",
+      "badge": "SALE"
+    }
+  ],
+  "announcements": [
+    "Free Shipping on US Orders Over $50",
+    "Shop the New iPhone 16 & Apple Watch Ultra Collections"
+  ],
+  "home_hero_assets": [
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/Nomad_-_Social_Media_Profile_Pic_-_2020_-_1000px_v2_1.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/magsafe_efc9b29d-cefd-4574-8757-769cb40deaf0.png",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/Nomad-Cables_Built_with_Kevlar-11_88e121fb-4bbe-4c0b-a18b-cb5bf2af5b4b.png",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/card_wallet_plus_dcc2a21e-aa29-47b2-91be-3ffff05a92db.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/metal-band.png",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/sport-band-stone-iphone-16-pro-max-stone-case-banner.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/iphone-16-leather-cases-collection-banner.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/Garmin_hero_2_D.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/Garmin_hero_2_m.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/brown.png",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_Featuer_Carousel_TLC.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_Featuer_Carousel_MLB.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_Featuer_Carousel_RC.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_Featuer_Carousel_CLC.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_Featuer_Carousel_MLF.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_Featuer_Carousel_SP.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_SBC_iPhone18.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_SBC_iPhoneUltra.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_SBC_AppleWatchBands.jpg",
+    "https://cdn.shopify.com/s/files/1/0384/6721/files/NOm26_IP18_SBC_Accessories.jpg"
+  ],
+  "products": {
+    "stand-one-max": {
+      "id": "stand-one-max",
+      "name": "Stand One Max",
+      "description": "Wireless charging stand in Silver, made from glass and zinc. Supports Apple Watch fast charging, MagSafe attachment, Qi wireless charging, and iPhone StandBy Mode, and is MFi certified. Delivers 25W Qi output power via Qi 2.2 and requires 40W input power through a USB-C port. Height 128 mm, length 82 mm, width 161 mm, weight 875 g. Includes a 2 m cable.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_A_0c8fb290-eac5-4e74-abf2-2ae94f67bba5.jpg?v=1762973205",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_C_6404e66a-b64c-4a82-b41a-85a00e9c9446.jpg?v=1762462660",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_F_cdad4c9d-9118-4830-a645-7e0d4c7ad20b.jpg?v=1762278088",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_G_e9104ad1-7e42-41c9-80d7-68f53d055fb9.jpg?v=1762278088",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_I_13e2bbbe-0e32-4ac4-842a-83cccc4abf2f.jpg?v=1762278088"
+      ],
+      "price": 159,
+      "currency": "USD",
+      "all_images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_A_0c8fb290-eac5-4e74-abf2-2ae94f67bba5.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_C_6404e66a-b64c-4a82-b41a-85a00e9c9446.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_F_cdad4c9d-9118-4830-a645-7e0d4c7ad20b.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_G_e9104ad1-7e42-41c9-80d7-68f53d055fb9.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504015619_I_13e2bbbe-0e32-4ac4-842a-83cccc4abf2f.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/Nomad-Cables_Built_with_Kevlar-11_88e121fb-4bbe-4c0b-a18b-cb5bf2af5b4b.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/card_wallet_plus_dcc2a21e-aa29-47b2-91be-3ffff05a92db.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/metal-band.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/sport-band-stone-iphone-16-pro-max-stone-case-banner.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/iphone-16-leather-cases-collection-banner.jpg"
+      ]
+    },
+    "card-wallet-plus": {
+      "id": "card-wallet-plus",
+      "name": "Card Wallet Plus",
+      "description": "Card wallet in black Horween leather, thermoformed with 5 card slots and one external quick access slot. Holds up to 16 cards. No pen slot. Height 14 mm, length 100 mm, width 79 mm, weight 43 g.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_Alogo.jpg?v=1752528250",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_C.jpg?v=1752528250",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_D.jpg?v=1752528250",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_E.jpg?v=1752528250",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_G.jpg?v=1752528250",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019505_Breal.jpg?v=1752528250",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_H.jpg?v=1752528250",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_E-001.jpg?v=1752528250"
+      ],
+      "price": 109,
+      "currency": "USD",
+      "all_images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_C.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_D.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_E.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_G.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019505_Breal.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_H.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856500019536_856500019536_E-001.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/Nomad-Cables_Built_with_Kevlar-11_88e121fb-4bbe-4c0b-a18b-cb5bf2af5b4b.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/card_wallet_plus_dcc2a21e-aa29-47b2-91be-3ffff05a92db.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/metal-band.png"
+      ]
+    },
+    "sport-band": {
+      "id": "sport-band",
+      "name": "Sport Band",
+      "description": "A band for Apple Watch made from FKM in Lunar Gray with Carbide hardware. Clasp type is pin and tuck. Height 4 mm, length 229 mm, width 35 mm, weight 31 g. Slim profile, waterproof. Fits wrist sizes 160 mm to 195 mm.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/sport-band-45mm-lunar-gray-front.jpg?v=1762975233",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/sport-band-45mm-lunar-gray-back.jpg?v=1762975233",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/18_6a848eb4-725f-45c6-b79e-75b258134713.png?v=1755795626",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/22.png?v=1755795626",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/sport-band-45mm-lunar-gray-closeup.jpg?v=1755795626",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/apple-watch-sport-band-45mm-lunar-gray-closeup.jpg?v=1755795626",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/sport-band-45mm-lunar-gray-full-band-front.jpg?v=1755795626",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/45mm-lunar-gray-sport-band-back.jpg?v=1755795626",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/45mm-lunar-gray-sport-band-apple-watch-side.jpg?v=1755795626",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/sport-band-45mm-lunar-gray-side.jpg?v=1755795626"
+      ],
+      "price": 69,
+      "currency": "USD",
+      "all_images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/sport-band-45mm-lunar-gray-front.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/sport-band-45mm-lunar-gray-back.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/18_6a848eb4-725f-45c6-b79e-75b258134713.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/22.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/sport-band-45mm-lunar-gray-closeup.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/apple-watch-sport-band-45mm-lunar-gray-closeup.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/sport-band-45mm-lunar-gray-full-band-front.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/45mm-lunar-gray-sport-band-back.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/45mm-lunar-gray-sport-band-apple-watch-side.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/products/sport-band-45mm-lunar-gray-side.jpg"
+      ]
+    },
+    "traditional-leather-case": {
+      "id": "traditional-leather-case",
+      "name": "Traditional Leather Case",
+      "description": "Phone case for iPhone 18 Pro Max, part of the Traditional Case series, made from Horween leather with aluminum buttons. Features a Camera Control button. Compatible with MagSafe and Qi wireless charging, wrist strap compatible, slim profile, card capacity 0. Drop protection is not rated. Color: Black.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_A_LOGO_PHONE_8f3fe8b2-d039-4077-b20c-c679bea94001.jpg?v=1788108404",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_B_LOGO_PHONE_2b85a22a-6a17-4449-9118-b6ce6107e0bb.jpg?v=1788108404",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_D_PHONE_8ec4724d-20ea-4f95-93f4-71b3e64a71af.jpg?v=1788108404",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_E_51a7cf88-1f44-45fd-812c-c17c34c5d11c.jpg?v=1788108404",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_F_PHONE_540c7608-e077-4894-978f-a61461c34666.jpg?v=1788108404",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_F_493b1253-dc35-4817-bc0e-e64ab778251a.jpg?v=1788108404",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_C_PHONE_e3f7014e-6682-46e0-977f-1cc37e199cf7.jpg?v=1788108404"
+      ],
+      "price": 89,
+      "currency": "USD",
+      "all_images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_D_PHONE_8ec4724d-20ea-4f95-93f4-71b3e64a71af.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_E_51a7cf88-1f44-45fd-812c-c17c34c5d11c.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_F_PHONE_540c7608-e077-4894-978f-a61461c34666.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_F_493b1253-dc35-4817-bc0e-e64ab778251a.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017859_C_PHONE_e3f7014e-6682-46e0-977f-1cc37e199cf7.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/Nomad-Cables_Built_with_Kevlar-11_88e121fb-4bbe-4c0b-a18b-cb5bf2af5b4b.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/card_wallet_plus_dcc2a21e-aa29-47b2-91be-3ffff05a92db.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/metal-band.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/sport-band-stone-iphone-16-pro-max-stone-case-banner.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/iphone-16-leather-cases-collection-banner.jpg"
+      ]
+    },
+    "chargekey": {
+      "id": "chargekey",
+      "name": "ChargeKey",
+      "description": "USB-C charging cable in Silver, part of the ChargeKey series. Made from nylon with zinc connectors, braided construction. Supports USB 3.1 charging with data speeds up to 10 Gbps. Cable length 0.07 m.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_A.jpg?v=1784665299",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_E.jpg?v=1784665299",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_B.jpg?v=1784665299",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_D.jpg?v=1784665299",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_C.jpg?v=1784665299"
+      ],
+      "price": 35,
+      "currency": "USD",
+      "all_images": [
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_A.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_E.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_B.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_D.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/856504017644_C.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/Nomad-Cables_Built_with_Kevlar-11_88e121fb-4bbe-4c0b-a18b-cb5bf2af5b4b.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/card_wallet_plus_dcc2a21e-aa29-47b2-91be-3ffff05a92db.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/metal-band.png",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/sport-band-stone-iphone-16-pro-max-stone-case-banner.jpg",
+        "https://cdn.shopify.com/s/files/1/0384/6721/files/iphone-16-leather-cases-collection-banner.jpg"
+      ]
+    }
+  }
+}
