@@ -274,3 +274,49 @@ describe('ClaudeTranslator', () => {
     expect(c.calls).toHaveLength(0)
   })
 })
+
+describe('translateUiMissing ICU placeholder validation', () => {
+  const mk = (en: string) => ({ en: { k: en }, uz: {}, ru: {} })
+  const run = (en: string, f: (s: string, to: string) => string) =>
+    translateUiMissing({ translator: { translate: async (t, to) => t.map((s) => f(s, to)) }, messages: mk(en) })
+
+  it('translator dropping {count} -> TranslationError and UiString unchanged', async () => {
+    await expect(run('{count} items', (s, to) => `[${to}] elementlar`)).rejects.toBeInstanceOf(TranslationError)
+    expect(await prisma.uiString.count()).toBe(0)
+  })
+  it('renamed or extra placeholder is rejected too', async () => {
+    await expect(run('Hi {name}', (s, to) => `[${to}] Salom {ism}`)).rejects.toBeInstanceOf(TranslationError)
+    await expect(run('Hi {name}', (s, to) => `[${to}] Salom {name} {x}`)).rejects.toBeInstanceOf(TranslationError)
+    expect(await prisma.uiString.count()).toBe(0)
+  })
+  it('unparseable ICU output is rejected', async () => {
+    await expect(run('Hi {name}', (s, to) => `[${to}] Salom {name`)).rejects.toBeInstanceOf(TranslationError)
+    expect(await prisma.uiString.count()).toBe(0)
+  })
+  it('one bad string rejects the whole batch', async () => {
+    const messages = { en: { a: 'Hello', b: 'Total {count}' }, uz: {}, ru: {} }
+    const tr = { translate: async (t: string[], to: string) => t.map((s) => (s.includes('{') ? 'Jami' : `[${to}] ${s}`)) }
+    await expect(translateUiMissing({ translator: tr, messages })).rejects.toBeInstanceOf(TranslationError)
+    expect(await prisma.uiString.count()).toBe(0)
+  })
+  it('placeholders kept -> stored', async () => {
+    const r = await run('Total {count}, {name}', (s, to) => `${to}: ${s}`)
+    expect(r.translated).toBe(2)
+    expect((await prisma.uiString.findUniqueOrThrow({ where: { key: 'k' } })).value).toEqual({
+      uz: 'uz: Total {count}, {name}',
+      ru: 'ru: Total {count}, {name}',
+    })
+  })
+  it('plural block: arguments kept (ru may use few/many) -> stored; dropped argument -> rejected', async () => {
+    const en = '{count, plural, one {# item} other {# items}}'
+    const ruPlural = '{count, plural, one {# товар} few {# товара} many {# товаров} other {# товара}}'
+    await run(en, (s, to) => (to === 'ru' ? ruPlural : '{count, plural, one {# mahsulot} other {# mahsulot}}'))
+    expect((await prisma.uiString.findUniqueOrThrow({ where: { key: 'k' } })).value).toEqual({
+      uz: '{count, plural, one {# mahsulot} other {# mahsulot}}',
+      ru: ruPlural,
+    })
+    await prisma.uiString.deleteMany()
+    await expect(run(en, () => '{n, plural, one {# x} other {# x}}')).rejects.toBeInstanceOf(TranslationError)
+    expect(await prisma.uiString.count()).toBe(0)
+  })
+})

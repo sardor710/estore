@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",
+    "@formatjs/icu-messageformat-parser": "^3.5.23",
     "@prisma/adapter-better-sqlite3": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "better-sqlite3": "^13.2.0",

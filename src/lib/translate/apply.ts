@@ -3,6 +3,7 @@ import { sanitizeHtml } from '@/lib/sanitize'
 import enMessages from '../../../messages/en.json'
 import uzMessages from '../../../messages/uz.json'
 import ruMessages from '../../../messages/ru.json'
+import { parse, TYPE, type MessageFormatElement } from '@formatjs/icu-messageformat-parser'
 import { getTranslator } from './claude'
 import { TranslationError, type TargetLocale, type Translator } from './types'
 
@@ -83,7 +84,12 @@ function collectProductSlots(w: Working, locale: TargetLocale): Slot[] {
 }
 
 /** Runs the translator over unique strings and validates the answer; any problem => TranslationError. */
-async function run(translator: Translator, texts: string[], to: TargetLocale): Promise<Map<string, string>> {
+async function run(
+  translator: Translator,
+  texts: string[],
+  to: TargetLocale,
+  check?: (source: string, translated: string) => void,
+): Promise<Map<string, string>> {
   const unique = [...new Set(texts)]
   const map = new Map<string, string>()
   if (unique.length === 0) return map
@@ -101,7 +107,10 @@ async function run(translator: Translator, texts: string[], to: TargetLocale): P
       `Translator returned ${Array.isArray(out) ? out.length : 'invalid'} results for ${unique.length} strings (${to})`,
     )
   }
-  unique.forEach((t, i) => map.set(t, out[i]))
+  unique.forEach((t, i) => {
+    check?.(t, out[i])
+    map.set(t, out[i])
+  })
   return map
 }
 
@@ -183,6 +192,48 @@ export async function translateProduct(
   return { status: 'done', translated }
 }
 
+/** Argument / tag names used by an ICU message (recursing into plural/select options and tags). */
+function icuArguments(message: string): Set<string> {
+  const names = new Set<string>()
+  const walk = (els: MessageFormatElement[]) => {
+    for (const el of els) {
+      if (el.type === TYPE.literal || el.type === TYPE.pound) continue
+      if (el.type === TYPE.tag) names.add(`<${el.value}>`)
+      else names.add(el.value)
+      if (el.type === TYPE.tag) walk(el.children)
+      if (el.type === TYPE.plural || el.type === TYPE.select) for (const o of Object.values(el.options)) walk(o.value)
+    }
+  }
+  walk(parse(message))
+  return names
+}
+
+/**
+ * A UI translation must parse as ICU and use exactly the argument names of its EN source
+ * ({count}, {name}, plural/select arguments, rich-text tags), otherwise next-intl would fail at render time.
+ * Plural option keywords are not compared: Russian legitimately needs few/many.
+ */
+export function assertSameIcuArguments(source: string, translated: string): void {
+  let want: Set<string>
+  try {
+    want = icuArguments(source)
+  } catch {
+    return // EN source itself is not parseable ICU; nothing to compare against
+  }
+  let got: Set<string>
+  try {
+    got = icuArguments(translated)
+  } catch (e) {
+    throw new TranslationError(`Translation is not a valid ICU message: ${JSON.stringify(translated)}`, { cause: e })
+  }
+  const same = want.size === got.size && [...want].every((n) => got.has(n))
+  if (!same) {
+    throw new TranslationError(
+      `Translation changed ICU placeholders: expected {${[...want].join(', ')}}, got {${[...got].join(', ')}} in ${JSON.stringify(translated)}`,
+    )
+  }
+}
+
 type Dict = { [k: string]: string | Dict }
 export type MessageSet = { en: Dict; uz: Dict; ru: Dict }
 
@@ -225,6 +276,7 @@ export async function translateUiMissing(
       translator,
       keys.map((k) => en[k]),
       locale,
+      assertSameIcuArguments,
     )
     for (const k of keys) (pending[k] ??= {})[locale] = map.get(en[k]) as string
     translated += keys.length
