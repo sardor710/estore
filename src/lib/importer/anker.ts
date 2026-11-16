@@ -123,7 +123,7 @@ function buildSpecs(groups: ImportedProduct['specGroups'], prev: SpecGroup[] = [
             const lKey = slugify(i.label)
             const old = prevGroup?.items.find((pi) => pi.label === lKey)
             const item: SpecItem = { label: lKey, value: i.value }
-            if (old?.valueL10n && old.value === i.value) item.valueL10n = old.valueL10n
+            if (old?.valueL10n) item.valueL10n = old.valueL10n // keep translations even if EN value changed
             return item
           })
           .filter((i) => i.label),
@@ -211,15 +211,43 @@ export async function importAnkerProduct(
   return { productId: product.id, created: true }
 }
 
-type Item = { en?: string }
-/** Keep existing (translated) item when its EN text is unchanged; otherwise EN-only new item. */
-function mergeByEn<T extends Record<string, unknown>>(fresh: T[], old: unknown, field: keyof T & string): T[] {
-  const oldArr = Array.isArray(old) ? (old as T[]) : []
-  return fresh.map((f) => {
-    const en = (f[field] as Item).en
-    return oldArr.find((o) => (o?.[field] as Item | undefined)?.en === en) ?? f
+type AnyObj = Record<string, unknown>
+const isRec = (v: unknown): v is AnyObj => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+/**
+ * Merge freshly imported items into the existing list without losing translations.
+ * Matching rule: (1) same EN text (keyOf) -> that old item; (2) otherwise, if the list length is
+ * unchanged, the old item at the same position (if not already claimed); (3) otherwise no match
+ * -> fresh EN-only item. A matched item becomes {...old, ...fresh} with every localized object
+ * field merged as {...oldField, ...freshField}, so new EN is applied and uz/ru are kept
+ * (reviewed or not; unreviewed locales get re-translated later by the translation task).
+ */
+function mergeItems<T extends AnyObj>(fresh: T[], old: unknown, keyOf: (i: AnyObj) => string | undefined): T[] {
+  const oldArr = (Array.isArray(old) ? old : []).filter(isRec)
+  const claimed = new Set<number>()
+  const match: (number | undefined)[] = fresh.map((f) => {
+    const k = keyOf(f)
+    const i = oldArr.findIndex((o, idx) => !claimed.has(idx) && k !== undefined && keyOf(o) === k)
+    if (i >= 0) claimed.add(i)
+    return i >= 0 ? i : undefined
+  })
+  const sameLen = oldArr.length === fresh.length
+  return fresh.map((f, idx) => {
+    let m = match[idx]
+    if (m === undefined && sameLen && !claimed.has(idx)) {
+      m = idx
+      claimed.add(idx)
+    }
+    if (m === undefined) return f
+    const o = oldArr[m]
+    const merged: AnyObj = { ...o, ...f }
+    for (const [k, v] of Object.entries(f)) {
+      if (isRec(v) && isRec(o[k])) merged[k] = { ...(o[k] as AnyObj), ...v }
+    }
+    return merged as T
   })
 }
+const enOf = (field: string) => (i: AnyObj) => (isRec(i[field]) ? (i[field] as { en?: string }).en : undefined)
 
 /** Re-fetch the source page and refresh images/specs/highlights/EN text. Never touches price, stock or uz/ru text. */
 export async function refreshAnkerProduct(
@@ -240,12 +268,9 @@ export async function refreshAnkerProduct(
       title: en(prod.title, p.title),
       shortSpec: en(prod.shortSpec, buildShortSpec(p.specGroups)),
       descriptionHtml: en(prod.descriptionHtml, sanitizeHtml(p.descriptionHtml)),
-      highlights: mergeByEn(buildHighlights(p), prod.highlights, 'title'),
-      sections: mergeByEn(buildSections(p), prod.sections, 'heading'),
-      inTheBox: p.inTheBox.map((t) => {
-        const old = (Array.isArray(prod.inTheBox) ? prod.inTheBox : []) as Item[]
-        return (old.find((o) => o?.en === t) ?? { en: t }) as Record<string, string>
-      }),
+      highlights: mergeItems(buildHighlights(p), prod.highlights, enOf('title')),
+      sections: mergeItems(buildSections(p), prod.sections, enOf('heading')),
+      inTheBox: mergeItems(p.inTheBox.map((en) => ({ en })), prod.inTheBox, (i) => i.en as string | undefined),
       specs: buildSpecs(p.specGroups, prod.specs as SpecGroup[]),
       images: p.images,
       sourcePriceUsd: p.variants[0].priceUsd,

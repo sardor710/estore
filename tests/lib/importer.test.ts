@@ -192,6 +192,50 @@ describe('importAnkerProduct', () => {
     expect(after.reviewed).toEqual({ uz: true, ru: false })
   })
 
+  it('refresh applies changed upstream EN but keeps uz/ru for highlights, sections, in-the-box and spec values', async () => {
+    const r = await importAnkerProduct(URL_A120F, { fetchHtml: fetchFixture })
+    const prod = await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })
+    const hl = (prod.highlights as { title: Record<string, string>; value?: string }[]).map((h, i) =>
+      i === 0 ? { ...h, title: { ...h.title, uz: 'UZ highlight' } } : h,
+    )
+    const sec = (prod.sections as { heading: Record<string, string>; body: Record<string, string> }[]).map((x, i) =>
+      i === 0 ? { ...x, heading: { ...x.heading, uz: 'UZ section' }, body: { ...x.body, uz: 'UZ body' } } : x,
+    )
+    const box = (prod.inTheBox as Record<string, string>[]).map((b) =>
+      b.en === 'welcome guide' ? { ...b, uz: 'UZ guide' } : b,
+    )
+    const specs = (prod.specs as { group: string; items: { label: string; value: string; valueL10n?: object }[] }[]).map((g) => ({
+      ...g,
+      items: g.items.map((i) => (i.label === 'total-output' ? { ...i, valueL10n: { uz: 'UZ 100W' } } : i)),
+    }))
+    await prisma.product.update({
+      where: { id: prod.id },
+      data: { highlights: hl, sections: sec, inTheBox: box, specs, reviewed: { uz: true, ru: false } },
+    })
+    const changed = fixture
+      .replaceAll('Extend Your Laptop Battery Lifespan by Up to 40%*', 'Extend Your Laptop Battery Lifespan by Up to 50%*')
+      .replaceAll('welcome guide', 'quick start guide')
+      .replace('>100W Max<', '>120W Max<')
+    expect(changed).not.toBe(fixture)
+    await refreshAnkerProduct(prod.id, { fetchHtml: async () => changed })
+    const after = await prisma.product.findUniqueOrThrow({ where: { id: prod.id } })
+    const h0 = (after.highlights as { title: Record<string, string> }[])[0]
+    expect(h0.title.en).toBe('Extend Your Laptop Battery Lifespan by Up to 50%*')
+    expect(h0.title.uz).toBe('UZ highlight')
+    const s0 = (after.sections as { heading: Record<string, string>; body: Record<string, string> }[])[0]
+    expect(s0.heading.en).toContain('50%')
+    expect(s0.heading.uz).toBe('UZ section')
+    expect(s0.body.uz).toBe('UZ body')
+    const boxAfter = after.inTheBox as Record<string, string>[]
+    expect(boxAfter.some((b) => b.en === 'quick start guide' && b.uz === 'UZ guide')).toBe(true)
+    const to = (after.specs as { items: { label: string; value: string; valueL10n?: { uz?: string } }[] }[])[0].items.find(
+      (i) => i.label === 'total-output',
+    )!
+    expect(to.value).toBe('120W Max')
+    expect(to.valueL10n?.uz).toBe('UZ 100W')
+    expect(after.reviewed).toEqual({ uz: true, ru: false })
+  })
+
   it('refresh adds a variant that appeared upstream with price 0', async () => {
     const r = await importAnkerProduct(URL_A120F, { fetchHtml: fetchFixture })
     await prisma.variant.deleteMany({ where: { sku: 'B120FJ41' } })
