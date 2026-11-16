@@ -1,12 +1,18 @@
-/**
- * Minimal allowlist-free scrubber for admin/imported description HTML.
- * Removes dangerous elements, inline event handlers and javascript: URLs.
- * Not a full sanitizer: replace with a vetted library if untrusted authors are ever allowed.
- */
+import sanitize from 'sanitize-html'
+
+/** Allowlist sanitizer for admin/imported description HTML (server-side). */
 export function sanitizeHtml(html: string): string {
-  return html
-    .replace(/<(script|style|iframe|object|embed|link|meta|form)\b[\s\S]*?(<\/\1\s*>|$)/gi, '')
-    .replace(/<(script|style|iframe|object|embed|link|meta|form)\b[^>]*>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/\s(href|src|xlink:href|action|formaction)\s*=\s*("\s*javascript:[^"]*"|'\s*javascript:[^']*'|javascript:[^\s>]+)/gi, '')
+  return sanitize(html, {
+    allowedTags: [
+      'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'h2', 'h3', 'h4',
+      'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'div',
+    ],
+    allowedAttributes: { a: ['href', 'rel'], img: ['src', 'alt'] },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    allowedSchemesByTag: { img: ['http', 'https'] },
+    allowProtocolRelative: false,
+    disallowedTagsMode: 'discard',
+    exclusiveFilter: (f) => f.tag === 'img' && !/^https?:\/\//i.test(f.attribs.src ?? ''),
+    transformTags: { a: sanitize.simpleTransform('a', { rel: 'noopener noreferrer' }) },
+  })
 }
