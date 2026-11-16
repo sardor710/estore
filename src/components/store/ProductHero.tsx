@@ -9,6 +9,7 @@ import type { Locale } from '@/i18n/routing'
 import { t as l10n } from '@/lib/localized'
 import { formatUzs } from '@/lib/money'
 import { useCart } from '@/lib/cart/useCart'
+import { stepIndex, visibleIndex } from '@/lib/gallery'
 
 type Props = {
   locale: Locale
@@ -39,6 +40,13 @@ export default function ProductHero({ locale, template, title, subtitle, shortSp
   const [imageIdx, setImageIdx] = useState(0)
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
+  // Images that failed to load (e.g. 404 upstream) are hidden; the main view falls back to the next one.
+  const [broken, setBroken] = useState<ReadonlySet<number>>(() => new Set())
+  const markBroken = (i: number) => setBroken((b) => (b.has(i) ? b : new Set(b).add(i)))
+  // An image may already have failed before hydration attached onError.
+  const checkLoaded = (i: number) => (el: HTMLImageElement | null) => {
+    if (el && el.complete && el.naturalWidth === 0) markBroken(i)
+  }
 
   const variant = variants[variantIdx]
   const name = l10n(title, locale)
@@ -46,7 +54,9 @@ export default function ProductHero({ locale, template, title, subtitle, shortSp
   const inStock = Boolean(variant && variant.stock > 0)
   const maxQty = variant ? Math.max(1, Math.min(variant.stock, 99)) : 1
   const discounted = variant?.compareAtUzs != null && variant.compareAtUzs > variant.priceUzs
-  const current = images[imageIdx] ?? images[0]
+  const shownIdx = visibleIndex(images.length, broken, imageIdx)
+  const current = shownIdx === null ? undefined : images[shownIdx]
+  const working = images.length - broken.size
 
   const pick = (i: number) => {
     setVariantIdx(i)
@@ -68,23 +78,25 @@ export default function ProductHero({ locale, template, title, subtitle, shortSp
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-14">
       {/* Gallery */}
       <div className="flex flex-col-reverse gap-4 md:flex-row lg:col-span-7">
-        {images.length > 1 && (
+        {working > 1 && (
           <div className="flex shrink-0 gap-3 overflow-x-auto pb-2 md:max-h-[580px] md:flex-col md:overflow-y-auto md:pb-0">
-            {images.map((img, idx) => (
+            {images.map((img, idx) =>
+              broken.has(idx) ? null : (
               <button
                 key={img + idx}
                 type="button"
                 onClick={() => setImageIdx(idx)}
                 aria-label={t('showImage', { n: idx + 1 })}
-                aria-current={imageIdx === idx}
+                aria-current={shownIdx === idx}
                 className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-neutral-100 p-1.5 transition-all sm:h-20 sm:w-20 ${
-                  imageIdx === idx ? 'ring-2 ring-black ring-offset-2' : 'opacity-60 hover:opacity-100'
+                  shownIdx === idx ? 'ring-2 ring-black ring-offset-2' : 'opacity-60 hover:opacity-100'
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img} alt="" className="h-full w-full object-contain" loading="lazy" />
+                <img src={img} alt="" className="h-full w-full object-contain" loading="lazy" ref={checkLoaded(idx)} onError={() => markBroken(idx)} />
               </button>
-            ))}
+              ),
+            )}
           </div>
         )}
         <div className="group relative flex aspect-square flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#f5f5f7] p-6 sm:p-10">
@@ -96,18 +108,21 @@ export default function ProductHero({ locale, template, title, subtitle, shortSp
           {current ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
+              key={shownIdx}
               src={current}
               alt={name}
+              ref={shownIdx === null ? undefined : checkLoaded(shownIdx)}
+              onError={() => shownIdx !== null && markBroken(shownIdx)}
               className="h-full w-full object-contain object-center transition-transform duration-500 ease-out group-hover:scale-105"
             />
           ) : (
             <span className="text-sm text-neutral-400">{t('noImage')}</span>
           )}
-          {images.length > 1 && (
+          {working > 1 && shownIdx !== null && (
             <>
               <button
                 type="button"
-                onClick={() => setImageIdx((imageIdx - 1 + images.length) % images.length)}
+                onClick={() => setImageIdx(stepIndex(images.length, broken, shownIdx, -1) ?? shownIdx)}
                 className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-neutral-800 shadow-sm transition hover:bg-white md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                 aria-label={t('prevImage')}
               >
@@ -115,7 +130,7 @@ export default function ProductHero({ locale, template, title, subtitle, shortSp
               </button>
               <button
                 type="button"
-                onClick={() => setImageIdx((imageIdx + 1) % images.length)}
+                onClick={() => setImageIdx(stepIndex(images.length, broken, shownIdx, 1) ?? shownIdx)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-neutral-800 shadow-sm transition hover:bg-white md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                 aria-label={t('nextImage')}
               >

@@ -59,6 +59,8 @@ function textOf(html: string): string {
   return cheerio.load(`<div>${html}</div>`)('div').text().replace(/\s+/g, ' ').trim()
 }
 
+export const MAX_IMAGES = 20
+
 function absHttps(u: unknown): string | null {
   const s = isObj(u) ? asStr(u.url ?? u.src) : asStr(u)
   if (!s) return null
@@ -177,19 +179,29 @@ export function parseAnkerHtml(html: string, url: string): ImportedProduct {
     }
   })
 
-  const images: string[] = []
-  const seen = new Set<string>()
-  const addImg = (u: unknown) => {
-    const a = absHttps(u)
-    if (a && !seen.has(a)) {
-      seen.add(a)
-      images.push(a)
-    }
-  }
-  if (Array.isArray(product.images)) product.images.forEach(addImg)
-  if (images.length === 0) ldImages.forEach(addImg)
-
+  // Images: only this product's own gallery (product.images) and its variants' images, deduped by URL
+  // without query string; JSON-LD only when both are empty. Capped so a page can't flood the gallery.
   const rawVariants = Array.isArray(product.variants) ? product.variants : []
+  const keyOf = (u: string) => u.split(/[?#]/)[0]
+  const dedupe = (list: unknown[]) => {
+    const out = new Map<string, string>()
+    for (const u of list) {
+      const a = absHttps(u)
+      if (a && !out.has(keyOf(a))) out.set(keyOf(a), a)
+    }
+    return out
+  }
+  const own = dedupe(Array.isArray(product.images) ? product.images : [])
+  const variantOnly = [...dedupe(rawVariants.map((rv) => (isObj(rv) ? rv.image : null)))].filter(([k]) => !own.has(k))
+  let images: string[]
+  if (own.size === 0 && variantOnly.length === 0) images = [...dedupe(ldImages).values()].slice(0, MAX_IMAGES)
+  else {
+    // keep variant images (variants point at them) and fill the rest with the gallery, in order
+    const extra = variantOnly.slice(0, MAX_IMAGES).map(([, u]) => u)
+    images = [...[...own.values()].slice(0, MAX_IMAGES - extra.length), ...extra]
+  }
+  const byKey = new Map(images.map((u) => [keyOf(u), u]))
+
   const variants: ImportedProduct['variants'] = []
   for (const rv of rawVariants) {
     if (!isObj(rv)) continue
@@ -200,8 +212,8 @@ export function parseAnkerHtml(html: string, url: string): ImportedProduct {
     const o0 = isObj(opts[0]) ? opts[0] : null
     const vals = o0 && Array.isArray(o0.values) ? o0.values : []
     const label = isObj(vals[0]) ? asStr(vals[0].label).trim() : ''
-    const imageUrl = absHttps(rv.image) ?? undefined
-    if (imageUrl) addImg(imageUrl)
+    const rawImage = absHttps(rv.image)
+    const imageUrl = rawImage ? byKey.get(keyOf(rawImage)) : undefined
     variants.push({
       sku,
       name: label || asStr(rv.title).trim() || sku,

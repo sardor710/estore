@@ -18,6 +18,38 @@ function codeOf(fn: () => unknown): string | undefined {
   return undefined
 }
 
+const NEXT_RE = /(<script id="__NEXT_DATA__"[^>]*>)([\s\S]*?)(<\/script>)/
+const nextData = (html: string) => JSON.parse(html.match(NEXT_RE)![2])
+const urlKey = (u: unknown) => {
+  const s = typeof u === 'string' ? u : ((u as { url?: string; src?: string } | null)?.url ?? (u as { src?: string } | null)?.src ?? '')
+  return s.replace(/^\/\//, 'https://').split(/[?#]/)[0]
+}
+
+describe('parseAnkerHtml image selection (synthetic)', () => {
+  const withImages = (images: string[], variantImage: string) => {
+    const m = fixture.match(NEXT_RE)!
+    const next = JSON.parse(m[2])
+    const prod = next.props.pageProps.product
+    prod.images = images
+    prod.variants = prod.variants.map((v: Record<string, unknown>, i: number) => ({ ...v, image: i === 0 ? variantImage : undefined }))
+    return fixture.replace(m[0], () => m[1] + JSON.stringify(next).split('<').join(String.fromCharCode(92) + 'u003c') + m[3])
+  }
+  it('dedupes query variants, caps at 20 and keeps the variant image', () => {
+    const many = Array.from({ length: 60 }, (_, i) => `https://cdn.example/p/img${i % 40}.jpg?v=${i}`)
+    const p = parseAnkerHtml(withImages(many, 'https://cdn.example/p/variant.jpg?v=9'), URL_A120F)
+    expect(p.images.length).toBe(20)
+    expect(new Set(p.images.map(urlKey)).size).toBe(20)
+    expect(p.images[0]).toBe('https://cdn.example/p/img0.jpg?v=0')
+    expect(p.variants[0].imageUrl).toBeDefined()
+    expect(p.images).toContain(p.variants[0].imageUrl)
+  })
+  it('a variant image equal to a product image (other query) maps to the stored URL', () => {
+    const p = parseAnkerHtml(withImages(['https://cdn.example/a.jpg?v=1', 'https://cdn.example/b.jpg'], 'https://cdn.example/b.jpg?width=200'), URL_A120F)
+    expect(p.images).toEqual(['https://cdn.example/a.jpg?v=1', 'https://cdn.example/b.jpg'])
+    expect(p.variants[0].imageUrl).toBe('https://cdn.example/b.jpg')
+  })
+})
+
 describe('normalizeAnkerUrl', () => {
   it('accepts canonical and tidies query/hash/trailing slash/http/bare host', () => {
     const want = 'https://www.anker.com/products/x'
@@ -64,6 +96,13 @@ describe('parseAnkerHtml (A120F fixture)', () => {
     expect(p.images.length).toBeGreaterThanOrEqual(3)
     expect(new Set(p.images).size).toBe(p.images.length)
     for (const i of p.images) expect(i).toMatch(/^https:\/\//)
+  })
+  it('images come only from product.images + variant images, deduped without query, at most 20', () => {
+    const prod = nextData(fixture).props.pageProps.product
+    const own = new Set<string>([...prod.images, ...prod.variants.map((v: { image?: unknown }) => v.image)].map(urlKey))
+    expect(p.images.length).toBeLessThanOrEqual(20)
+    for (const i of p.images) expect(own.has(urlKey(i)), i).toBe(true)
+    for (const v of p.variants) if (v.imageUrl) expect(p.images).toContain(v.imageUrl)
   })
   it('highlights exclude hidden keys', () => {
     expect(p.highlights.length).toBeGreaterThanOrEqual(3)
