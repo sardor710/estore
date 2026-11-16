@@ -7,15 +7,11 @@ import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
 import { path } from '@/lib/paths'
 
-type Slide = { key: 'chargers' | 'powerBanks' | 'audio'; slug: string; image?: string; gradient: string }
+// Gradient-only slides: no third-party store images are hotlinked.
+type Slide = { key: 'chargers' | 'powerBanks' | 'audio'; slug: string; gradient: string }
 
 const SLIDES: Slide[] = [
-  {
-    key: 'chargers',
-    slug: 'chargers',
-    image: 'https://cdn.shopify.com/s/files/1/0384/6721/files/magsafe_efc9b29d-cefd-4574-8757-769cb40deaf0.png?v=1718833901&width=1800',
-    gradient: 'from-neutral-950 via-neutral-900 to-neutral-800',
-  },
+  { key: 'chargers', slug: 'chargers', gradient: 'from-neutral-950 via-neutral-900 to-neutral-800' },
   { key: 'powerBanks', slug: 'power-banks', gradient: 'from-neutral-950 via-neutral-900 to-slate-800' },
   { key: 'audio', slug: 'audio', gradient: 'from-neutral-950 via-zinc-900 to-neutral-800' },
 ]
@@ -51,14 +47,6 @@ export default function HeroBanner({ locale }: { locale: Locale }) {
             }`}
           >
             <div className={`absolute inset-0 bg-gradient-to-br ${s.gradient}`} />
-            {s.image && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={s.image}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover object-center opacity-60"
-              />
-            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
             <div className="relative mx-auto flex h-full max-w-7xl flex-col justify-end px-6 pb-16 sm:px-8 sm:pb-24">
               <div className="max-w-xl space-y-4">

@@ -131,7 +131,8 @@ export default function ProductEditor({ product, categories, initialNotice }: { 
 
       {product.isDemo ? <Notice kind="info">This is a demo product (sample data). Do not publish it for real customers.</Notice> : null}
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
-      {publishReason ? <Notice kind="warn">{status === 'PUBLISHED' ? 'This product is live, so it cannot be saved like this' : 'Cannot publish yet'}: {publishReason}</Notice> : null}
+      {/* The publish gate is shown once: skip this notice while the same reason is already the current message. */}
+      {publishReason && msg?.text !== publishReason ? <Notice kind="warn">{status === 'PUBLISHED' ? 'This product is live, so it cannot be saved like this' : 'Cannot publish yet'}: {publishReason}</Notice> : null}
 
       <Section id="tr" title="Translation">
         <div className="flex flex-wrap items-center gap-3">

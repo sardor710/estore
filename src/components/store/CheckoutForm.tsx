@@ -4,11 +4,12 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { X } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
 import { formatUzs } from '@/lib/money'
 import { path } from '@/lib/paths'
 import { normalizeUzPhone } from '@/lib/phone'
-import { useCart } from '@/lib/cart/useCart'
+import { useCart, useCartDrawer } from '@/lib/cart/useCart'
 import { useQuote } from '@/lib/cart/useQuote'
 
 type FieldErrors = Partial<Record<'name' | 'phone' | 'region' | 'address' | 'comment', string>>
@@ -17,7 +18,8 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
   const t = useTranslations('checkout')
   const tc = useTranslations('cart')
   const router = useRouter()
-  const { lines, clear } = useCart()
+  const { lines, clear, remove } = useCart()
+  const { setOpen: setCartOpen } = useCartDrawer()
   const { quote, loading, error: quoteError, reload } = useQuote(lines, locale)
   const [values, setValues] = useState({ name: '', phone: '', region: '', address: '', comment: '' })
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -183,6 +185,16 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
                   <p className="text-xs text-neutral-500">x{l.qty}</p>
                 </div>
                 {it?.available && <span className="whitespace-nowrap font-semibold">{formatUzs(it.priceUzs * l.qty, locale)}</span>}
+                {bad && (
+                  <button
+                    type="button"
+                    onClick={() => remove(l.variantId)}
+                    aria-label={tc('remove', { name: it?.title || tc('unavailable') })}
+                    className="shrink-0 rounded-full p-1.5 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900"
+                  >
+                    <X size={16} aria-hidden />
+                  </button>
+                )}
               </li>
             )
           })}
@@ -228,9 +240,9 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
           {submitting ? t('submitting') : t('submit')}
         </button>
         <p className="mt-3 text-xs text-neutral-500">{t('note')}</p>
-        <Link href={path(locale)} className="mt-3 inline-block text-xs font-semibold text-neutral-700 underline">
+        <button type="button" onClick={() => setCartOpen(true)} className="mt-3 inline-block text-xs font-semibold text-neutral-700 underline">
           {t('editCart')}
-        </Link>
+        </button>
       </aside>
     </form>
   )

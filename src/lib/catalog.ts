@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { isSellable, storefrontWhere } from '@/lib/visibility'
 import type { Locale } from '@/i18n/routing'
 import { locales } from '@/i18n/routing'
 import type { L10n } from '@/lib/localized'
@@ -115,7 +116,7 @@ const cardInclude = { variants: true } as const
 
 async function publishedCards(where: object = {}): Promise<CardProduct[]> {
   const rows = await prisma.product.findMany({
-    where: { status: 'PUBLISHED', ...where },
+    where: { ...storefrontWhere(), ...where },
     include: cardInclude,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   })
@@ -192,7 +193,7 @@ export async function getProductBySlug(
     include: { variants: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }, category: { include: { parent: true } } },
   })
   if (!row) return null
-  if (row.status !== 'PUBLISHED' && !opts.includeDraft) return null
+  if (!isSellable(row) && !opts.includeDraft) return null
 
   const specs = asArray<SpecGroup>(row.specs)
   const keys = new Set<string>()
@@ -245,7 +246,7 @@ export async function searchProducts(q: string, locale: Locale): Promise<CardPro
   const needle = q.trim().toLowerCase()
   if (!needle) return []
   const rows = await prisma.product.findMany({
-    where: { status: 'PUBLISHED' },
+    where: storefrontWhere(),
     include: cardInclude,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   })
@@ -268,7 +269,7 @@ export async function searchProducts(q: string, locale: Locale): Promise<CardPro
 
 export async function getSaleProducts(): Promise<CardProduct[]> {
   const rows = await prisma.product.findMany({
-    where: { status: 'PUBLISHED', variants: { some: { compareAtUzs: { not: null } } } },
+    where: { ...storefrontWhere(), variants: { some: { compareAtUzs: { not: null } } } },
     include: cardInclude,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   })
@@ -279,7 +280,7 @@ export async function getSaleProducts(): Promise<CardProduct[]> {
 
 export async function getNewArrivals(limit = 8): Promise<CardProduct[]> {
   const rows = await prisma.product.findMany({
-    where: { status: 'PUBLISHED' },
+    where: storefrontWhere(),
     include: cardInclude,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit,
@@ -290,7 +291,7 @@ export async function getNewArrivals(limit = 8): Promise<CardProduct[]> {
 export async function getRelated(productId: number, limit = 4): Promise<CardProduct[]> {
   const self = await prisma.product.findUnique({ where: { id: productId }, select: { categoryId: true } })
   if (!self) return []
-  const base = { status: 'PUBLISHED', id: { not: productId } }
+  const base = { ...storefrontWhere(), id: { not: productId } }
   const same = await prisma.product.findMany({
     where: { ...base, categoryId: self.categoryId },
     include: cardInclude,

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { quoteCart, createOrder } from '@/lib/orders'
 import { prisma } from '@/lib/db'
 import {
   resolveTemplate,
@@ -217,5 +218,47 @@ describe('related / new arrivals', () => {
     await new Promise((r) => setTimeout(r, 5))
     await mkProduct({ slug: 'new', categoryId: a.id })
     expect((await getNewArrivals(8)).map((p) => p.slug)).toEqual(['new', 'old'])
+  })
+})
+
+describe('demo products in production', () => {
+  async function seed() {
+    const cat = await mkCat('chargers')
+    await mkProduct({ slug: 'real', categoryId: cat.id, title: { en: 'Charger real' }, variants: [{ sku: 'R-1', priceUzs: 100, compareAtUzs: 200 }] })
+    const demo = await mkProduct({ slug: 'demo', categoryId: cat.id, title: { en: 'Charger demo' }, variants: [{ sku: 'D-1', priceUzs: 100, compareAtUzs: 200 }] })
+    await prisma.product.update({ where: { id: demo.id }, data: { isDemo: true } })
+    const real = await prisma.product.findUniqueOrThrow({ where: { slug: 'real' }, include: { variants: true } })
+    const d = await prisma.product.findUniqueOrThrow({ where: { slug: 'demo' }, include: { variants: true } })
+    return { real, demo: d }
+  }
+  const slugs = (cards: { slug: string }[]) => cards.map((c) => c.slug).sort()
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('are hidden everywhere on the storefront when NODE_ENV=production', async () => {
+    const { real, demo } = await seed()
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('SHOW_DEMO', '')
+    expect(slugs(await getNewArrivals())).toEqual(['real'])
+    expect(slugs((await getCategoryPage('chargers'))!.products)).toEqual(['real'])
+    expect(slugs(await searchProducts('charger', 'en'))).toEqual(['real'])
+    expect(slugs(await getSaleProducts())).toEqual(['real'])
+    expect(slugs(await getRelated(real.id))).toEqual([])
+    expect(await getProductBySlug('demo')).toBeNull()
+    expect(await getProductBySlug('demo', { includeDraft: true })).not.toBeNull() // admin preview
+    const q = await quoteCart([{ variantId: demo.variants[0].id, qty: 1 }], 'en')
+    expect(q.items[0].available).toBe(false)
+    const o = await createOrder({ lines: [{ variantId: demo.variants[0].id, qty: 1 }], name: 'Ali Valiyev', phone: '+998 90 123-45-67', region: 'tashkent-city', address: 'Amir Temur 1', locale: 'en' })
+    expect(o).toEqual({ ok: false, error: 'INVALID' })
+  })
+
+  it('show in development, and in production with SHOW_DEMO=1', async () => {
+    await seed()
+    expect(slugs(await getNewArrivals())).toEqual(['demo', 'real'])
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('SHOW_DEMO', '1')
+    expect(slugs(await getNewArrivals())).toEqual(['demo', 'real'])
+    expect(await getProductBySlug('demo')).not.toBeNull()
   })
 })

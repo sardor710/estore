@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { isSellable } from '@/lib/visibility'
 import { getSettings } from '@/lib/settings'
 import { locales, type Locale } from '@/i18n/routing'
 import { t, type L10n } from '@/lib/localized'
@@ -63,7 +64,7 @@ export async function quoteCart(lines: CartLine[], locale: Locale): Promise<Quot
   let total = 0
   const items = lines.map<QuoteItem>((l) => {
     const v = byId.get(l.variantId)
-    if (!v || v.product.status !== 'PUBLISHED') {
+    if (!v || !isSellable(v.product)) {
       return { variantId: l.variantId, qty: l.qty, title: '', variantName: '', image: null, priceUzs: 0, stock: 0, available: false }
     }
     total += v.priceUzs * l.qty
@@ -118,7 +119,7 @@ export async function createOrder(
         let total = 0
         const snap = lines.map((l) => {
           const v = byId.get(l.variantId)
-          if (!v || v.product.status !== 'PUBLISHED') throw new Rollback('INVALID')
+          if (!v || !isSellable(v.product)) throw new Rollback('INVALID')
           if (l.qty > v.stock) throw new Rollback('OUT_OF_STOCK')
           total += v.priceUzs * l.qty
           return {

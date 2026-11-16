@@ -41,14 +41,18 @@ export default function LoginForm({ configured }: { configured: boolean }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       {error ? <Notice kind="error">{error}</Notice> : null}
-      <label className="block">
-        <Label>Username</Label>
-        <input name="user" autoComplete="username" required className={input} />
-      </label>
-      <label className="block">
-        <Label>Password</Label>
-        <input name="password" type="password" autoComplete="current-password" required className={input} />
-      </label>
+      <div>
+        <label htmlFor="admin-user" className="block">
+          <Label>Username</Label>
+        </label>
+        <input id="admin-user" name="user" autoComplete="username" required aria-label="Username" className={input} />
+      </div>
+      <div>
+        <label htmlFor="admin-password" className="block">
+          <Label>Password</Label>
+        </label>
+        <input id="admin-password" name="password" type="password" autoComplete="current-password" required aria-label="Password" className={input} />
+      </div>
       <button type="submit" disabled={busy || !configured} className={`${btn} w-full`}>
         {busy ? 'Signing in...' : 'Sign in'}
       </button>

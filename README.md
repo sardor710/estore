@@ -25,7 +25,7 @@ Database schema changes go through Prisma migrations (`prisma/migrations`):
 - `npm run db:push` is only used by the test setup for a throwaway database.
 - A database created earlier with `db:push` that already matches the schema can be baselined once with `npx prisma migrate resolve --applied 20261117000000_init`.
 
-Demo products are for local development only. They never appear in the sitemap and should not be used in production.
+Demo products are for local development only. They never appear in the sitemap, and in production (`NODE_ENV=production`, i.e. `npm start`) they are hidden from the whole storefront (home, categories, search, sale, related, product pages) and cannot be ordered. Set `SHOW_DEMO=1` to show them in a production build anyway (e.g. a staging demo). The admin still lists them, marked Demo.
 
 ## Environment variables
 
@@ -37,6 +37,7 @@ Demo products are for local development only. They never appear in the sitemap a
 | `SESSION_SECRET` | Secret used to sign admin sessions. At least 32 random characters; example values are rejected. Generate one with `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 | `ANTHROPIC_API_KEY` | Used to translate products. Create a key at https://console.anthropic.com (Settings, API keys). Translation uses the model `claude-haiku-5-5`. Without it, translation is unavailable. |
 | `SITE_URL` | Public origin of the shop, e.g. `https://shop.example.uz`. Must be the production origin: it is used for canonical URLs, hreflang and the sitemap. |
+| `SHOW_DEMO` | Optional. `1` shows demo products in a production build (they are hidden there by default). |
 | `TRUST_PROXY` | Set to `1` only when running behind a reverse proxy that overwrites `X-Forwarded-For`. It is used by the admin login and order throttles (5 orders per 10 minutes per client IP). Leave empty otherwise; then all clients share one order bucket of 30 per 10 minutes. |
 
 ## Running
