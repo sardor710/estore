@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  slug      String     @unique
+  parentId  Int?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  template  String     @default("SIMPLE") // SIMPLE | DETAILED
+  sortOrder Int        @default(0)
+  name      Json
+  products  Product[]
+}
+
+model Product {
+  id               Int       @id @default(autoincrement())
+  slug             String    @unique
+  categoryId       Int
+  category         Category  @relation(fields: [categoryId], references: [id])
+  templateOverride String?
+  status           String    @default("DRAFT") // DRAFT | PUBLISHED
+  brand            String    @default("")
+  sourceUrl        String?   @unique
+  sourcePriceUsd   Float?
+  title            Json
+  subtitle         Json
+  shortSpec        Json
+  descriptionHtml  Json
+  sections         Json
+  highlights       Json
+  inTheBox         Json
+  faq              Json
+  specs            Json
+  images           Json
+  badge            String?
+  reviewed         Json
+  isDemo           Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  variants         Variant[]
+}
+
+model Variant {
+  id            Int      @id @default(autoincrement())
+  productId     Int
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku           String   @unique
+  name          Json
+  colorHex      String?
+  imageIndex    Int?
+  priceUzs      Int
+  compareAtUzs  Int?
+  stock         Int      @default(0)
+  sortOrder     Int      @default(0)
+}
+
+model SpecLabel {
+  key   String @id
+  label Json
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  number          Int         @unique
+  status          String      @default("NEW") // NEW | CONFIRMED | DELIVERED | CANCELLED
+  name            String
+  phone           String
+  region          String
+  address         String
+  comment         String?
+  locale          String
+  totalUzs        Int
+  paymentStatus   String      @default("UNPAID")
+  paymentProvider String?
+  createdAt       DateTime    @default(now())
+  lines           OrderLine[]
+}
+
+model OrderLine {
+  id           Int    @id @default(autoincrement())
+  orderId      Int
+  order        Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId    Int
+  sku          String
+  productTitle String
+  variantName  String
+  priceUzs     Int
+  qty          Int
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model UiString {
+  key   String @id
+  value Json
+}
