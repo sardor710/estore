@@ -1,5 +1,10 @@
 export type CartLine = { variantId: number; qty: number }
 
+export const MAX_LINE_QTY = 999
+/** DB ids are 32-bit signed ints: anything outside is not a variant (and would make the query throw). */
+export const MAX_VARIANT_ID = 2_147_483_647
+export const isVariantId = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_VARIANT_ID
+
 const isQty = (n: number) => Number.isInteger(n) && n > 0
 
 /** Adds qty to the line (creating it). `max` caps the resulting qty when the caller knows stock. */
@@ -34,8 +39,8 @@ export function sanitizeLines(raw: unknown): CartLine[] {
   for (const r of raw) {
     if (r && typeof r === 'object') {
       const { variantId, qty } = r as Record<string, unknown>
-      if (typeof variantId === 'number' && Number.isInteger(variantId) && typeof qty === 'number' && isQty(qty)) {
-        out = addItem(out, variantId, qty)
+      if (isVariantId(variantId) && typeof qty === 'number' && isQty(qty)) {
+        out = addItem(out, variantId, qty, MAX_LINE_QTY)
       }
     }
   }

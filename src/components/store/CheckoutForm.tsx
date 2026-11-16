@@ -77,9 +77,10 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
         router.replace(path(locale, `/order/${data.number}`))
         return // keep "submitting" so the empty-cart view does not flash
       }
-      const code = data.error === 'BELOW_MIN' || data.error === 'OUT_OF_STOCK' || data.error === 'INVALID' ? data.error : 'INVALID'
+      const known = ['BELOW_MIN', 'OUT_OF_STOCK', 'INVALID', 'RATE_LIMITED', 'SERVER'] as const
+      const code = known.find((k) => k === data.error) ?? (res.status >= 500 ? 'SERVER' : 'INVALID')
       setFormError(t(`errors.${code}`))
-      reload()
+      if (code !== 'RATE_LIMITED' && code !== 'SERVER') reload()
     } catch {
       setFormError(t('errors.NETWORK'))
     }

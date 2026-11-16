@@ -137,7 +137,9 @@
       "BELOW_MIN": "The order total is below the minimum order amount.",
       "OUT_OF_STOCK": "Some items are out of stock or exceed the available quantity. Please review your cart.",
       "INVALID": "Some details are invalid or an item is no longer available. Please check the form and your cart.",
-      "NETWORK": "Could not send the order. Check your connection and try again."
+      "NETWORK": "Could not send the order. Check your connection and try again.",
+      "RATE_LIMITED": "Too many orders from your network in a short time. Please wait a few minutes and try again, or call us.",
+      "SERVER": "Something went wrong on our side. Please try again in a moment."
     }
   },
   "order": {

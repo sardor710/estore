@@ -137,7 +137,9 @@
       "BELOW_MIN": "Buyurtma summasi minimal summadan kam.",
       "OUT_OF_STOCK": "Baʼzi mahsulotlar sotuvda yoʻq yoki soni yetarli emas. Savatni tekshiring.",
       "INVALID": "Baʼzi maʼlumotlar notoʻgʻri yoki mahsulot endi mavjud emas. Shakl va savatni tekshiring.",
-      "NETWORK": "Buyurtmani yuborib boʻlmadi. Ulanishni tekshirib, qayta urinib koʻring."
+      "NETWORK": "Buyurtmani yuborib boʻlmadi. Ulanishni tekshirib, qayta urinib koʻring.",
+      "RATE_LIMITED": "Qisqa vaqt ichida tarmogʻingizdan juda koʻp buyurtma yuborildi. Bir necha daqiqa kutib, qayta urinib koʻring yoki bizga qoʻngʻiroq qiling.",
+      "SERVER": "Bizning tomonda xatolik yuz berdi. Birozdan soʻng qayta urinib koʻring."
     }
   },
   "order": {

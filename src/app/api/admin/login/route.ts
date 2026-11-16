@@ -2,14 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { attemptLogin } from '@/lib/admin/login'
 import { isSameOrigin } from '@/lib/admin/csrf'
 import { SESSION_COOKIE, SESSION_MAX_AGE } from '@/lib/auth'
+import { clientKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
-
-/** X-Forwarded-For is client-controlled; only honour it behind a trusted proxy (TRUST_PROXY=1). */
-function clientIp(req: NextRequest): string {
-  if (process.env.TRUST_PROXY !== '1') return 'shared'
-  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'shared'
-}
 
 export async function POST(req: NextRequest) {
   if (!isSameOrigin(req.headers, req.method)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
@@ -17,7 +12,7 @@ export async function POST(req: NextRequest) {
   const r = await attemptLogin({
     user: typeof body?.user === 'string' ? body.user : '',
     password: typeof body?.password === 'string' ? body.password : '',
-    ip: clientIp(req),
+    ip: clientKey(req.headers),
   })
   if (r.status === 503) return NextResponse.json({ error: 'not_configured' }, { status: 503 })
   if (r.status === 429) return NextResponse.json({ error: 'too_many_attempts' }, { status: 429, headers: { 'retry-after': '60' } })

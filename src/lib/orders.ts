@@ -5,7 +5,7 @@ import { t, type L10n } from '@/lib/localized'
 import { normalizeUzPhone } from '@/lib/phone'
 import { getRegion } from '@/lib/regions'
 import { notifyNewOrder, type NotifyOrder } from '@/lib/telegram'
-import type { CartLine } from '@/lib/cart/cart'
+import { isVariantId, MAX_LINE_QTY, type CartLine } from '@/lib/cart/cart'
 
 export type OrderStatus = 'NEW' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'
 export type CreateOrderInput = {
@@ -20,7 +20,7 @@ export type CreateOrderInput = {
 export type CreateOrderResult = { ok: true; number: number } | { ok: false; error: 'INVALID' | 'OUT_OF_STOCK' | 'BELOW_MIN' }
 export type StatusResult = { ok: true } | { ok: false; error: 'INSUFFICIENT_STOCK' | 'BAD_TRANSITION' }
 
-export const MAX_LINE_QTY = 999
+export { MAX_LINE_QTY }
 export const FIRST_ORDER_NUMBER = 1001
 
 const asL10n = (v: unknown): L10n => (v && typeof v === 'object' && !Array.isArray(v) ? (v as L10n) : {})
@@ -32,8 +32,8 @@ function cleanLines(raw: unknown): CartLine[] | null {
   for (const l of raw) {
     const v = (l as CartLine | null)?.variantId
     const q = (l as CartLine | null)?.qty
-    if (typeof v !== 'number' || !Number.isInteger(v) || typeof q !== 'number' || !Number.isInteger(q) || q < 1 || q > MAX_LINE_QTY) return null
-    merged.set(v, (merged.get(v) ?? 0) + q)
+    if (!isVariantId(v) || typeof q !== 'number' || !Number.isInteger(q) || q < 1 || q > MAX_LINE_QTY) return null
+    merged.set(v, Math.min(MAX_LINE_QTY, (merged.get(v) ?? 0) + q))
   }
   return [...merged].map(([variantId, qty]) => ({ variantId, qty }))
 }
