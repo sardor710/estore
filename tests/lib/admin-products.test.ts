@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/db'
-import { publishProduct, unpublishProduct, updateProduct, checkPublishable, type ProductInput } from '@/lib/admin/products'
+import { publishProduct, unpublishProduct, updateProduct as rawUpdate, checkPublishable, baselineOf, type ProductInput } from '@/lib/admin/products'
+
+// Most tests edit with a fresh baseline (what the editor would have just loaded).
+const updateProduct = async (id: number, input: ProductInput) => rawUpdate(id, input, await baselineOf(id))
 
 async function mk(slug: string, variants: { sku: string; price: number; stock?: number }[]) {
   const cat = (await prisma.category.findFirst()) ?? (await prisma.category.create({ data: { slug: 'c', name: { en: 'c' } } }))
@@ -143,5 +146,56 @@ describe('published product keeps the publish gate on edit', () => {
   it('drafts may still be saved with 0 prices', async () => {
     const p = await mk('draft', [{ sku: 'D1', price: 0 }])
     expect(await updateProduct(p.id, inputOf(p))).toEqual({ ok: true })
+  })
+})
+
+describe('optimistic concurrency (stale editor)', () => {
+  it('rejects a save whose baseline stock is stale after an order confirm; stock stays', async () => {
+    const { setOrderStatus } = await import('@/lib/orders')
+    const p = await mk('conc', [{ sku: 'C1', price: 100, stock: 5 }])
+    const base = await baselineOf(p.id) // editor opened: stock 5
+    const order = await prisma.order.create({
+      data: {
+        number: 1001, name: 'n', phone: 'p', region: 'r', address: 'a', locale: 'uz', totalUzs: 200,
+        lines: { create: [{ variantId: p.variants[0].id, sku: 'C1', productTitle: 't', variantName: 'v', priceUzs: 100, qty: 2 }] },
+      },
+    })
+    expect(await setOrderStatus(order.id, 'CONFIRMED')).toEqual({ ok: true })
+    const r = await rawUpdate(p.id, inputOf(p, { title: { en: 'Edited' } }), base) // still says stock 5
+    expect(r).toMatchObject({ ok: false, errors: { _: expect.stringMatching(/stock changed.*reload/i) } })
+    const db = await prisma.product.findUniqueOrThrow({ where: { id: p.id }, include: { variants: true } })
+    expect(db.variants[0].stock).toBe(3)
+    expect(db.title).toEqual({ en: 'T' }) // whole save rolled back
+  })
+
+  it('rejects a save after the product changed elsewhere (refresh added a variant); variant kept', async () => {
+    const p = await mk('conc2', [{ sku: 'R1', price: 100, stock: 1 }])
+    const base = await baselineOf(p.id)
+    await new Promise((r) => setTimeout(r, 5))
+    // what an importer refresh does: update the product and add a variant
+    await prisma.product.update({ where: { id: p.id }, data: { images: ['https://img/a.jpg', 'https://img/b.jpg', 'https://img/c.jpg'] } })
+    await prisma.variant.create({ data: { productId: p.id, sku: 'R2', name: { en: 'R2' }, priceUzs: 0, stock: 0, sortOrder: 1 } })
+    const r = await rawUpdate(p.id, inputOf(p), base) // stale payload without R2
+    expect(r).toMatchObject({ ok: false, errors: { _: expect.stringMatching(/changed since you opened it.*reload/i) } })
+    const db = await prisma.product.findUniqueOrThrow({ where: { id: p.id }, include: { variants: true } })
+    expect(db.variants.map((v) => v.sku).sort()).toEqual(['R1', 'R2'])
+  })
+
+  it('rejects a save without a baseline', async () => {
+    const p = await mk('conc3', [{ sku: 'N1', price: 100 }])
+    expect(await rawUpdate(p.id, inputOf(p), undefined as never)).toMatchObject({ ok: false, errors: { _: expect.any(String) } })
+  })
+
+  it('a normal save works and the next save needs the fresh baseline', async () => {
+    const p = await mk('conc4', [{ sku: 'K1', price: 100, stock: 5 }])
+    const base = await baselineOf(p.id)
+    const v = inputOf(p).variants[0]
+    expect(await rawUpdate(p.id, inputOf(p, { variants: [{ ...v, stock: 9 }] }), base)).toEqual({ ok: true })
+    expect((await prisma.variant.findUniqueOrThrow({ where: { id: v.id! } })).stock).toBe(9)
+    // reusing the old baseline is now stale
+    expect(await rawUpdate(p.id, inputOf(p, { variants: [{ ...v, stock: 1 }] }), base)).toMatchObject({ ok: false })
+    const fresh = await baselineOf(p.id)
+    expect(fresh.stock[v.id!]).toBe(9)
+    expect(await rawUpdate(p.id, inputOf(p, { variants: [{ ...v, stock: 1 }] }), fresh)).toEqual({ ok: true })
   })
 })

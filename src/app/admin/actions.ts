@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin/session'
-import { publishProduct, unpublishProduct, updateProduct, type ProductInput } from '@/lib/admin/products'
+import { publishProduct, unpublishProduct, updateProduct, type EditBaseline, type ProductInput } from '@/lib/admin/products'
 import { loadEditorProduct, type EditorProduct } from '@/lib/admin/product-view'
 import { saveSpecLabels, saveUiStrings, type SpecLabelRow } from '@/lib/admin/translations'
 import { createCategory, updateCategory, type CategoryInput } from '@/lib/admin/categories'
@@ -22,12 +22,17 @@ function refreshStorefront() {
 // ---------- products ----------
 
 export type SaveProductResult =
-  | { ok: true; updatedAt: string; labels: Record<string, L10n> }
+  | { ok: true; fresh: EditorProduct }
   | { ok: false; errors: Record<string, string> }
 
-export async function saveProductAction(id: number, input: ProductInput, labels: Record<string, L10n>): Promise<SaveProductResult> {
+export async function saveProductAction(
+  id: number,
+  input: ProductInput,
+  labels: Record<string, L10n>,
+  baseline: EditBaseline,
+): Promise<SaveProductResult> {
   await requireAdmin()
-  const r = await updateProduct(id, input)
+  const r = await updateProduct(id, input, baseline)
   if (!r.ok) return r
   const rows: SpecLabelRow[] = Object.entries(labels).map(([key, label]) => ({ key, label }))
   if (rows.length) {
@@ -35,15 +40,18 @@ export async function saveProductAction(id: number, input: ProductInput, labels:
     if (!l.ok) return { ok: false, errors: { specs: l.error } }
   }
   refreshStorefront()
+  // The editor continues from what is now in the DB (new updatedAt and stock baseline).
   const fresh = await loadEditorProduct(id)
-  return { ok: true, updatedAt: fresh?.updatedAt ?? '', labels: fresh?.labels ?? labels }
+  if (!fresh) return { ok: false, errors: { _: 'Product not found.' } }
+  return { ok: true, fresh }
 }
 
-export async function publishAction(id: number, publish: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function publishAction(id: number, publish: boolean): Promise<{ ok: true; fresh: EditorProduct | null } | { ok: false; error: string }> {
   await requireAdmin()
   const r = publish ? await publishProduct(id) : await unpublishProduct(id)
-  if (r.ok) refreshStorefront()
-  return r
+  if (!r.ok) return r
+  refreshStorefront()
+  return { ok: true, fresh: await loadEditorProduct(id) }
 }
 
 export type TranslateActionResult =

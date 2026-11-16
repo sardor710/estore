@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import { sanitizeHtml } from '@/lib/sanitize'
 import type { L10n } from '@/lib/localized'
 import type { FaqItem, Highlight, Section, SpecGroup } from '@/lib/catalog'
-import { SLUG_RE, checkPublishable, cleanL10n, isHttpUrl, type ActionResult, type ProductInput, type UpdateResult } from './products-shared'
+import { SLUG_RE, STALE_PRODUCT, STALE_STOCK, checkPublishable, cleanL10n, isHttpUrl, type ActionResult, type EditBaseline, type ProductInput, type UpdateResult } from './products-shared'
 
 export * from './products-shared'
 
@@ -50,10 +50,28 @@ function cleanSpecs(v: unknown): SpecGroup[] {
   }))
 }
 
-export async function updateProduct(id: number, input: ProductInput): Promise<UpdateResult> {
+/** The baseline an editor gets when it (re)loads a product. */
+export async function baselineOf(id: number): Promise<EditBaseline> {
+  const p = await prisma.product.findUnique({ where: { id }, select: { updatedAt: true, variants: { select: { id: true, stock: true } } } })
+  return { updatedAt: p?.updatedAt.toISOString() ?? '', stock: Object.fromEntries((p?.variants ?? []).map((v) => [v.id, v.stock])) }
+}
+
+class Stale extends Error {}
+
+function validBaseline(b: unknown): b is EditBaseline {
+  return Boolean(b) && typeof (b as EditBaseline).updatedAt === 'string' && Boolean((b as EditBaseline).stock) && typeof (b as EditBaseline).stock === 'object'
+}
+
+export async function updateProduct(id: number, input: ProductInput, baseline: EditBaseline): Promise<UpdateResult> {
   const errors: Record<string, string> = {}
   const existing = await prisma.product.findUnique({ where: { id }, include: { variants: true } })
   if (!existing) return { ok: false, errors: { _: 'Product not found.' } }
+  if (!validBaseline(baseline) || existing.updatedAt.toISOString() !== baseline.updatedAt) return { ok: false, errors: { _: STALE_PRODUCT } }
+  const baseStock = (vid: number): number | undefined => {
+    const s = (baseline.stock as Record<string, unknown>)[String(vid)]
+    return isInt(s) ? s : undefined
+  }
+  if (existing.variants.some((v) => baseStock(v.id) !== v.stock)) return { ok: false, errors: { _: STALE_STOCK } }
 
   const slug = str(input.slug).trim()
   if (!SLUG_RE.test(slug)) errors.slug = 'Slug may contain only a-z, 0-9 and single dashes.'
@@ -124,49 +142,68 @@ export async function updateProduct(id: number, input: ProductInput): Promise<Up
 
   const badge = typeof input.badge === 'string' && input.badge.trim() ? input.badge.trim() : null
 
-  await prisma.$transaction(async (tx) => {
-    await tx.product.update({
-      where: { id },
-      data: {
-        slug,
-        categoryId: input.categoryId,
-        templateOverride: input.templateOverride,
-        brand: str(input.brand).trim(),
-        badge,
-        title: cleanL10n(input.title),
-        subtitle: cleanL10n(input.subtitle),
-        shortSpec: cleanL10n(input.shortSpec),
-        descriptionHtml,
-        sections: cleanSections(input.sections),
-        highlights: cleanHighlights(input.highlights),
-        inTheBox: (Array.isArray(input.inTheBox) ? input.inTheBox : []).map(cleanL10n).filter((x) => Object.keys(x).length),
-        faq: (Array.isArray(input.faq) ? input.faq : []).map((f) => ({ q: cleanL10n(f?.q), a: cleanL10n(f?.a) })),
-        specs: cleanSpecs(input.specs),
-        images,
-        reviewed: { uz: input.reviewed?.uz === true, ru: input.reviewed?.ru === true },
-      },
-    })
-    if (removed.length) await tx.variant.deleteMany({ where: { id: { in: removed.map((r) => r.id) } } })
-    // SKUs may be swapped between variants of this product: park changed ones first to dodge the unique index.
-    for (const [i, v] of variants.entries()) {
-      if (v.id === undefined) continue
-      const cur = existing.variants.find((e) => e.id === v.id)
-      if (cur && cur.sku !== v.sku.trim()) await tx.variant.update({ where: { id: v.id }, data: { sku: `__tmp_${id}_${v.id}_${i}` } })
-    }
-    for (const [i, v] of variants.entries()) {
-      const data = {
-        sku: v.sku.trim(),
-        name: cleanL10n(v.name),
-        priceUzs: v.priceUzs,
-        compareAtUzs: v.compareAtUzs,
-        stock: v.stock,
-        colorHex: v.colorHex,
-        imageIndex: v.imageIndex,
-        sortOrder: i,
+  // The baseline checks above are re-done atomically here: anything that moved in between rolls the whole save back.
+  const expectStock = (vid: number): number => {
+    const s = baseStock(vid)
+    if (s === undefined) throw new Stale(STALE_STOCK)
+    return s
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const moved = await tx.product.updateMany({
+        where: { id, updatedAt: new Date(baseline.updatedAt) },
+        data: {
+          slug,
+          categoryId: input.categoryId,
+          templateOverride: input.templateOverride,
+          brand: str(input.brand).trim(),
+          badge,
+          title: cleanL10n(input.title),
+          subtitle: cleanL10n(input.subtitle),
+          shortSpec: cleanL10n(input.shortSpec),
+          descriptionHtml,
+          sections: cleanSections(input.sections),
+          highlights: cleanHighlights(input.highlights),
+          inTheBox: (Array.isArray(input.inTheBox) ? input.inTheBox : []).map(cleanL10n).filter((x) => Object.keys(x).length),
+          faq: (Array.isArray(input.faq) ? input.faq : []).map((f) => ({ q: cleanL10n(f?.q), a: cleanL10n(f?.a) })),
+          specs: cleanSpecs(input.specs),
+          images,
+          reviewed: { uz: input.reviewed?.uz === true, ru: input.reviewed?.ru === true },
+          updatedAt: new Date(),
+        },
+      })
+      if (moved.count !== 1) throw new Stale(STALE_PRODUCT)
+      for (const r of removed) {
+        const gone = await tx.variant.deleteMany({ where: { id: r.id, stock: expectStock(r.id) } })
+        if (gone.count !== 1) throw new Stale(STALE_STOCK)
       }
-      if (v.id !== undefined) await tx.variant.update({ where: { id: v.id }, data })
-      else await tx.variant.create({ data: { ...data, productId: id } })
-    }
-  })
+      // SKUs may be swapped between variants of this product: park changed ones first to dodge the unique index.
+      for (const [i, v] of variants.entries()) {
+        if (v.id === undefined) continue
+        const cur = existing.variants.find((e) => e.id === v.id)
+        if (cur && cur.sku !== v.sku.trim()) await tx.variant.update({ where: { id: v.id }, data: { sku: `__tmp_${id}_${v.id}_${i}` } })
+      }
+      for (const [i, v] of variants.entries()) {
+        const data = {
+          sku: v.sku.trim(),
+          name: cleanL10n(v.name),
+          priceUzs: v.priceUzs,
+          compareAtUzs: v.compareAtUzs,
+          stock: v.stock,
+          colorHex: v.colorHex,
+          imageIndex: v.imageIndex,
+          sortOrder: i,
+        }
+        if (v.id !== undefined) {
+          // Absolute stock write only if nobody (e.g. an order confirm) changed it since the editor loaded.
+          const w = await tx.variant.updateMany({ where: { id: v.id, productId: id, stock: baseStock(v.id) }, data })
+          if (w.count !== 1) throw new Stale(STALE_STOCK)
+        } else await tx.variant.create({ data: { ...data, productId: id } })
+      }
+    })
+  } catch (e) {
+    if (e instanceof Stale) return { ok: false, errors: { _: e.message } }
+    throw e
+  }
   return { ok: true }
 }

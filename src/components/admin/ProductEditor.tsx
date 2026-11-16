@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ExternalLink, Languages } from 'lucide-react'
 import { publishAction, saveProductAction, translateProductAction } from '@/app/admin/actions'
 import type { ProductInput } from '@/lib/admin/products-shared'
-import { checkPublishable } from '@/lib/admin/products-shared'
+import { baselineFromEditor, checkPublishable, type EditBaseline } from '@/lib/admin/products-shared'
 import type { EditorProduct } from '@/lib/admin/product-view'
 import type { L10n } from '@/lib/localized'
 import { Badge, btn, btnGhost, card, input, Label, Notice } from './ui'
@@ -43,6 +43,8 @@ export default function ProductEditor({ product, categories, initialNotice }: { 
   const [dirty, setDirty] = useState(false)
   const [force, setForce] = useState(false)
   const [pending, start] = useTransition()
+  // What this editor loaded: saves are rejected when the product or its stock changed since.
+  const [base, setBase] = useState<EditBaseline>(() => baselineFromEditor(product))
 
   const patch = (p: Partial<ProductInput>) => {
     setData((d) => ({ ...d, ...p }))
@@ -50,45 +52,47 @@ export default function ProductEditor({ product, categories, initialNotice }: { 
   }
   const publishReason = checkPublishable(data.variants)
 
-  function save(after?: () => void) {
+  /** Continue from the DB state (after a save, publish or translation). */
+  function applyFresh(f: EditorProduct) {
+    setData(f.input)
+    setLabels(f.labels)
+    setStatus(f.status)
+    setBase(baselineFromEditor(f))
+    setDirty(false)
+  }
+
+  /** Saves; on failure shows `failText` (or the server's stale-data message) and returns false. */
+  async function saveNow(failText: string): Promise<boolean> {
+    const r = await saveProductAction(product.id, data, labels, base)
+    if (!r.ok) {
+      setErrors(r.errors)
+      setMsg({ kind: 'error', text: r.errors._ ?? failText })
+      return false
+    }
+    setErrors({})
+    applyFresh(r.fresh)
+    return true
+  }
+
+  function save() {
     setMsg(null)
     start(async () => {
-      const r = await saveProductAction(product.id, data, labels)
-      if (!r.ok) {
-        setErrors(r.errors)
-        setMsg({ kind: 'error', text: 'Not saved. Fix the highlighted problems.' })
-        return
-      }
-      setErrors({})
-      setLabels(r.labels)
-      setDirty(false)
-      setMsg({ kind: 'ok', text: 'Saved.' })
-      after?.()
+      if (await saveNow('Not saved. Fix the highlighted problems.')) setMsg({ kind: 'ok', text: 'Saved.' })
     })
   }
 
   function togglePublish() {
     const publish = status !== 'PUBLISHED'
-    const run = async () => {
-      const r = await publishAction(product.id, publish)
-      if (!r.ok) return setMsg({ kind: 'error', text: r.error })
-      setStatus(publish ? 'PUBLISHED' : 'DRAFT')
-      setMsg({ kind: 'ok', text: publish ? 'Published. The product is now visible in the store.' : 'Unpublished. The product is hidden from the store.' })
-    }
     if (publish && publishReason) return setMsg({ kind: 'error', text: publishReason })
     setMsg(null)
     // Save first so what is published is what is on screen.
     start(async () => {
-      if (dirty) {
-        const r = await saveProductAction(product.id, data, labels)
-        if (!r.ok) {
-          setErrors(r.errors)
-          return setMsg({ kind: 'error', text: 'Not saved, so not published. Fix the highlighted problems.' })
-        }
-        setErrors({})
-        setDirty(false)
-      }
-      await run()
+      if (dirty && !(await saveNow('Not saved, so not published. Fix the highlighted problems.'))) return
+      const r = await publishAction(product.id, publish)
+      if (!r.ok) return setMsg({ kind: 'error', text: r.error })
+      if (r.fresh) applyFresh(r.fresh)
+      else setStatus(publish ? 'PUBLISHED' : 'DRAFT')
+      setMsg({ kind: 'ok', text: publish ? 'Published. The product is now visible in the store.' : 'Unpublished. The product is hidden from the store.' })
     })
   }
 
@@ -96,21 +100,11 @@ export default function ProductEditor({ product, categories, initialNotice }: { 
     if (force && !window.confirm('Overwrite ALL uz and ru texts (including ones marked reviewed) from English?')) return
     setMsg(null)
     start(async () => {
-      if (dirty) {
-        const s = await saveProductAction(product.id, data, labels)
-        if (!s.ok) {
-          setErrors(s.errors)
-          return setMsg({ kind: 'error', text: 'Save your changes first (there are validation errors).' })
-        }
-        setDirty(false)
-      }
+      if (dirty && !(await saveNow('Save your changes first (there are validation errors).'))) return
       const r = await translateProductAction(product.id, force)
       if (!r.ok) return setMsg({ kind: 'error', text: `Translation failed: ${r.message}` })
       if (r.status === 'not_configured') return setMsg({ kind: 'warn', text: 'Translation not configured. Set ANTHROPIC_API_KEY in .env and restart the server.' })
-      if (r.fresh) {
-        setData(r.fresh.input)
-        setLabels(r.fresh.labels)
-      }
+      if (r.fresh) applyFresh(r.fresh)
       setMsg({ kind: 'ok', text: r.translated ? `Translated ${r.translated} strings from English into uz/ru (reviewed languages were kept).` : 'Nothing to translate: uz and ru are both marked reviewed.' })
     })
   }

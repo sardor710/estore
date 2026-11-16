@@ -34,6 +34,12 @@ export type ProductInput = {
   variants: VariantInput[]
 }
 
+/** What the editor loaded: the save is rejected if the product or any variant's stock changed since. */
+export type EditBaseline = { updatedAt: string; stock: Record<number, number> }
+
+export const STALE_PRODUCT = 'This product was changed since you opened it (another tab, import refresh or translation). Reload the page to get the latest version, then redo your edits.'
+export const STALE_STOCK = 'Stock changed since you opened this product (for example an order was confirmed). Reload the page to see the current stock, then redo your edits.'
+
 export type ActionResult = { ok: true } | { ok: false; error: string }
 export type UpdateResult = { ok: true } | { ok: false; errors: Record<string, string> }
 
@@ -70,3 +76,10 @@ export function checkPublishable(variants: { priceUzs: number }[]): string | nul
   return null
 }
 
+
+/** Baseline for an editor that just loaded this product. */
+export function baselineFromEditor(p: { updatedAt: string; input: { variants: { id?: number; stock: number }[] } }): EditBaseline {
+  const stock: Record<number, number> = {}
+  for (const v of p.input.variants) if (v.id !== undefined) stock[v.id] = v.stock
+  return { updatedAt: p.updatedAt, stock }
+}
