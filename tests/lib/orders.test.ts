@@ -196,11 +196,15 @@ describe('promotions', () => {
     expect(o.lines[0]).toMatchObject({ priceUzs: 1_290_000, originalPriceUzs: 1_290_000, discountUzs: 0, promotionId: null })
   })
 
-  it('quoteCart matches createOrder', async () => {
+  it('quoteCart matches createOrder and reports the original price (equal without a promo, 0 when unavailable)', async () => {
     const v = await mkVariant({ sku: 'PR3', price: 1_290_000, stock: 5 })
     await categoryPromo()
-    const q = await quoteCart([{ variantId: v.id, qty: 2 }], 'en')
-    expect(q.items[0].priceUzs).toBe(1_161_000)
-    expect(q.totalUzs).toBe(2 * 1_161_000)
+    const plain = await mkVariant({ sku: 'PR3B', price: 50_000, stock: 5 })
+    await prisma.product.update({ where: { id: plain.productId }, data: { categoryId: (await prisma.category.create({ data: { slug: 'other', name: { en: 'o' } } })).id } })
+    const q = await quoteCart([{ variantId: v.id, qty: 2 }, { variantId: plain.id, qty: 1 }, { variantId: 424242, qty: 1 }], 'en')
+    expect(q.items[0]).toMatchObject({ priceUzs: 1_161_000, originalUzs: 1_290_000 })
+    expect(q.items[1]).toMatchObject({ priceUzs: 50_000, originalUzs: 50_000 })
+    expect(q.items[2]).toMatchObject({ available: false, priceUzs: 0, originalUzs: 0 })
+    expect(q.totalUzs).toBe(2 * 1_161_000 + 50_000)
   })
 })

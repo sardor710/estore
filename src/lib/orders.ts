@@ -50,6 +50,8 @@ export type QuoteItem = {
   image: string | null
   /** Effective (after promotion) unit price */
   priceUzs: number
+  /** Unit price before promotions: equal to priceUzs without a promotion, 0 for unavailable items */
+  originalUzs: number
   stock: number
   available: boolean
 }
@@ -68,17 +70,18 @@ export async function quoteCart(lines: CartLine[], locale: Locale): Promise<Quot
   const items = lines.map<QuoteItem>((l) => {
     const v = byId.get(l.variantId)
     if (!v || !isSellable(v.product)) {
-      return { variantId: l.variantId, qty: l.qty, title: '', variantName: '', image: null, priceUzs: 0, stock: 0, available: false }
+      return { variantId: l.variantId, qty: l.qty, title: '', variantName: '', image: null, priceUzs: 0, originalUzs: 0, stock: 0, available: false }
     }
-    const unit = price(v).priceUzs
-    total += unit * l.qty
+    const p = price(v)
+    total += p.priceUzs * l.qty
     return {
       variantId: v.id,
       qty: l.qty,
       title: t(asL10n(v.product.title), locale),
       variantName: t(asL10n(v.name), locale),
       image: firstImage(v.product.images),
-      priceUzs: unit,
+      priceUzs: p.priceUzs,
+      originalUzs: p.originalUzs,
       stock: v.stock,
       available: true,
     }

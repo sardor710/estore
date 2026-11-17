@@ -58,7 +58,8 @@ export async function saveBrand(input: BrandInput, actor: Staff): Promise<BrandR
   const slug = rawSlug || slugify(name)
   if (!SLUG_RE.test(slug)) return { ok: false, error: 'Slug may contain only a-z, 0-9 and single dashes.' }
   const logoUrl = typeof input?.logoUrl === 'string' ? input.logoUrl.trim() : ''
-  if (logoUrl && !isHttpUrl(logoUrl) && !/^\/uploads\/[\w./-]+$/.test(logoUrl)) {
+  // /uploads/ paths: word characters, dots, dashes and slashes only, never a ".." segment.
+  if (logoUrl && !isHttpUrl(logoUrl) && !(/^\/uploads\/[\w./-]+$/.test(logoUrl) && !logoUrl.includes('..'))) {
     return { ok: false, error: 'Logo must be an http(s) URL or an /uploads/... path.' }
   }
   const sortOrder = Number.isInteger(input?.sortOrder) ? input.sortOrder : 0

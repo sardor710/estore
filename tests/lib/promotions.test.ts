@@ -126,6 +126,9 @@ describe('admin brands', () => {
     expect(await saveBrand({ name: 'SOUNDCORE', slug: 'other', logoUrl: '', sortOrder: 0 }, actor)).toMatchObject({ ok: false })
     expect(await saveBrand({ name: 'X', slug: 'Bad Slug', logoUrl: '', sortOrder: 0 }, actor)).toMatchObject({ ok: false })
     expect(await saveBrand({ name: 'X', slug: '', logoUrl: 'javascript:alert(1)', sortOrder: 0 }, actor)).toMatchObject({ ok: false })
+    expect(await saveBrand({ name: 'X', slug: '', logoUrl: '/uploads/../.env', sortOrder: 0 }, actor)).toMatchObject({ ok: false })
+    expect(await saveBrand({ name: 'X', slug: '', logoUrl: '/uploads/2026/11/a..b/../x.png', sortOrder: 0 }, actor)).toMatchObject({ ok: false })
+    expect(await prisma.brand.count()).toBe(1)
 
     await mkProduct(root.id, 'p1', id)
     expect((await listBrands()).map((b) => [b.name, b.productCount])).toEqual([['Soundcore', 1]])

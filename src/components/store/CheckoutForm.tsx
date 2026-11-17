@@ -184,7 +184,12 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
                   {it?.variantName && <p className="text-xs text-neutral-500">{it.variantName}</p>}
                   <p className="text-xs text-neutral-500">x{l.qty}</p>
                 </div>
-                {it?.available && <span className="whitespace-nowrap font-semibold">{formatUzs(it.priceUzs * l.qty, locale)}</span>}
+                {it?.available && (
+                  <span className="flex flex-col items-end whitespace-nowrap leading-tight">
+                    <span className="font-semibold">{formatUzs(it.priceUzs * l.qty, locale)}</span>
+                    {it.originalUzs > it.priceUzs && <s className="text-xs text-neutral-400">{formatUzs(it.originalUzs * l.qty, locale)}</s>}
+                  </span>
+                )}
                 {bad && (
                   <button
                     type="button"

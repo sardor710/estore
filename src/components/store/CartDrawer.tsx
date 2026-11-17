@@ -139,7 +139,12 @@ export default function CartDrawer({ locale }: { locale: Locale }) {
                         )}
                         <div className="flex items-center gap-2">
                           {it?.available && (
-                            <span className="text-sm font-bold text-neutral-900">{formatUzs(it.priceUzs * l.qty, locale)}</span>
+                            <span className="flex flex-col items-end leading-tight">
+                              <span className="text-sm font-bold text-neutral-900">{formatUzs(it.priceUzs * l.qty, locale)}</span>
+                              {it.originalUzs > it.priceUzs && (
+                                <s className="text-xs text-neutral-400">{formatUzs(it.originalUzs * l.qty, locale)}</s>
+                              )}
+                            </span>
                           )}
                           <button
                             type="button"
