@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/db'
-import { createUser, ensureBootstrapAdmin, resetPassword, updateUser, LAST_ADMIN_ERROR } from '@/lib/admin/users'
+import { changeOwnPassword, createUser, ensureBootstrapAdmin, resetPassword, updateUser, LAST_ADMIN_ERROR } from '@/lib/admin/users'
 import { verifyPassword } from '@/lib/password'
 import type { Staff } from '@/lib/admin/session'
 
@@ -111,5 +111,36 @@ describe('resetPassword', () => {
     expect((await resetPassword(admin.id, 'short', system)).ok).toBe(false)
     expect((await resetPassword(424242, 'long enough password', system)).ok).toBe(false)
     expect((await prisma.adminUser.findUniqueOrThrow({ where: { id: admin.id } })).sessionVersion).toBe(0)
+  })
+})
+
+describe('changeOwnPassword', () => {
+  async function editor() {
+    await createUser({ email: 'ed@shop.uz', name: 'Ed', role: 'BLOG_EDITOR', password: 'old password 12' }, system)
+    const u = await prisma.adminUser.findUniqueOrThrow({ where: { email: 'ed@shop.uz' } })
+    return { u, me: staffOf(u) }
+  }
+  it('wrong current password -> {ok:false}; nothing changes', async () => {
+    const { u, me } = await editor()
+    const r = await changeOwnPassword(me, { current: 'not my password', password: 'new password 12', confirm: 'new password 12' })
+    expect(r).toEqual({ ok: false, error: 'Current password is wrong.' })
+    const after = await prisma.adminUser.findUniqueOrThrow({ where: { id: u.id } })
+    expect(after.sessionVersion).toBe(u.sessionVersion)
+    expect(await verifyPassword('old password 12', after.passwordHash)).toBe(true)
+  })
+  it('success -> new password verifies, sessionVersion + 1, activity logged', async () => {
+    const { u, me } = await editor()
+    expect(await changeOwnPassword(me, { current: 'old password 12', password: 'new password 12', confirm: 'new password 12' })).toEqual({ ok: true })
+    const after = await prisma.adminUser.findUniqueOrThrow({ where: { id: u.id } })
+    expect(await verifyPassword('new password 12', after.passwordHash)).toBe(true)
+    expect(await verifyPassword('old password 12', after.passwordHash)).toBe(false)
+    expect(after.sessionVersion).toBe(u.sessionVersion + 1)
+    expect(await prisma.activityLog.count({ where: { action: 'update', entity: 'AdminUser', userId: u.id } })).toBe(1)
+  })
+  it('rejects short, mismatched or unchanged new passwords', async () => {
+    const { me } = await editor()
+    expect((await changeOwnPassword(me, { current: 'old password 12', password: 'short', confirm: 'short' })).ok).toBe(false)
+    expect((await changeOwnPassword(me, { current: 'old password 12', password: 'new password 12', confirm: 'new password 13' })).ok).toBe(false)
+    expect((await changeOwnPassword(me, { current: 'old password 12', password: 'old password 12', confirm: 'old password 12' })).ok).toBe(false)
   })
 })

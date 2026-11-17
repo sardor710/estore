@@ -47,6 +47,7 @@ describe('permissionForPath()', () => {
   })
   it('no permission for login, unknown or look-alike paths', () => {
     expect(permissionForPath('/admin/login')).toBeNull()
+    expect(permissionForPath('/admin/account')).toBeNull()
     expect(permissionForPath('/admin/productsx')).toBeNull()
     expect(permissionForPath('/uz/products')).toBeNull()
   })
@@ -76,8 +77,14 @@ describe('every (panel) page checks its permission', () => {
   it('found the panel pages', () => {
     expect(nested.length).toBeGreaterThan(5)
   })
+  // Pages every signed-in role may open (own account): authentication only, explicitly listed here.
+  const SESSION_ONLY = new Set(['/admin/account'])
   it.each(nested)('%s', (file) => {
     const route = '/admin/' + relative(root, file).split(sep).slice(0, -1).join('/')
+    if (SESSION_ONLY.has(route)) {
+      expect(readFileSync(file, 'utf8')).toContain('await requireStaff()')
+      return
+    }
     const perm = permissionForPath(route)
     expect(perm, route).not.toBeNull()
     expect(readFileSync(file, 'utf8')).toContain(`requirePermission('${perm}')`)

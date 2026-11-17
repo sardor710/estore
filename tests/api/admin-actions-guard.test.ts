@@ -16,6 +16,8 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
 const { publishAction, saveSettingsAction, setOrderStatusAction, testTelegramAction, saveUiAction } = await import('@/app/admin/actions')
 const { createUserAction, resetPasswordAction, updateUserAction } = await import('@/app/admin/actions/users')
+const { changeOwnPasswordAction } = await import('@/app/admin/actions/account')
+const { hashPassword } = await import('@/lib/password')
 
 const saved = { ...process.env }
 beforeEach(() => {
@@ -84,5 +86,20 @@ describe('server actions enforce permissions server-side', () => {
     expect(jar.get(SESSION_COOKIE)).not.toBe(before)
     // The re-issued cookie is valid for the bumped sessionVersion: further actions still work.
     expect(await updateUserAction(ed.id, { active: true })).toEqual({ ok: true })
+  })
+
+  it('any role (blog editor) changes its own password; the cookie is re-issued and keeps working', async () => {
+    const ed = await signIn('BLOG_EDITOR')
+    await prisma.adminUser.update({ where: { id: ed.id }, data: { passwordHash: await hashPassword('old password 12') } })
+    expect(await changeOwnPasswordAction({ current: 'wrong one here', password: 'new password 12', confirm: 'new password 12' })).toMatchObject({ ok: false })
+    const before = jar.get(SESSION_COOKIE)
+    expect(await changeOwnPasswordAction({ current: 'old password 12', password: 'new password 12', confirm: 'new password 12' })).toEqual({ ok: true })
+    expect(jar.get(SESSION_COOKIE)).not.toBe(before)
+    const { staffFromToken } = await import('@/lib/admin/session')
+    expect(await staffFromToken(jar.get(SESSION_COOKIE))).toMatchObject({ id: ed.id, role: 'BLOG_EDITOR' })
+    expect(await staffFromToken(before)).toBeNull()
+  })
+  it('no session -> account action redirects to login', async () => {
+    await expect(changeOwnPasswordAction({ current: 'x', password: 'new password 12', confirm: 'new password 12' })).rejects.toMatchObject(REDIRECT)
   })
 })

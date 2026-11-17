@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import type { AdminUser } from '@/generated/prisma/client'
 import { MIN_PASSWORD_LENGTH } from '@/lib/auth'
-import { hashPassword } from '@/lib/password'
+import { hashPassword, verifyPassword } from '@/lib/password'
 import { isRole, ROLE_LABELS, type Role } from '@/lib/permissions'
 import { logActivity } from './activity'
 import type { Staff } from './session'
@@ -129,6 +129,29 @@ export async function updateUser(
   if (roleChanges) changes.push(`role ${target.role} -> ${patch.role}`)
   if (patch.active !== undefined && patch.active !== target.active) changes.push(patch.active ? 'enabled' : 'disabled')
   if (changes.length) await logActivity(actor, 'update', 'user', id, `Updated ${target.email}: ${changes.join(', ')}`)
+  return { ok: true }
+}
+
+/**
+ * Self-service password change for any signed-in staff member: requires the current password, bumps
+ * sessionVersion (other sessions are signed out). The caller re-issues its own cookie afterwards.
+ */
+export async function changeOwnPassword(
+  actor: Staff,
+  input: { current: string; password: string; confirm: string },
+): Promise<UserResult> {
+  const u = await prisma.adminUser.findUnique({ where: { id: actor.id } })
+  if (!u || !u.active) return { ok: false, error: 'User not found.' }
+  if (!(await verifyPassword(String(input?.current ?? ''), u.passwordHash))) return { ok: false, error: 'Current password is wrong.' }
+  const pErr = passwordError(input.password)
+  if (pErr) return { ok: false, error: pErr }
+  if (input.password !== input.confirm) return { ok: false, error: 'The new passwords do not match.' }
+  if (input.password === input.current) return { ok: false, error: 'Choose a password different from the current one.' }
+  await prisma.adminUser.update({
+    where: { id: u.id },
+    data: { passwordHash: await hashPassword(input.password), sessionVersion: { increment: 1 } },
+  })
+  await logActivity(actor, 'update', 'AdminUser', u.id, `Changed own password (${u.email})`)
   return { ok: true }
 }
 

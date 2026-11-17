@@ -16,13 +16,15 @@ import {
   Settings,
   ShieldCheck,
   Tags,
+  UserRound,
   Users,
   type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { can, permissionForPath, ROLE_LABELS, type Role } from '@/lib/permissions'
 
-type Item = { href: string; label: string; icon: LucideIcon }
+/** `always`: shown to every signed-in role (the page only requires a session). */
+type Item = { href: string; label: string; icon: LucideIcon; always?: boolean }
 type Group = { label: string | null; items: Item[] }
 
 // Each item is shown only when the role has the permission of its path (same mapping the pages enforce).
@@ -60,12 +62,14 @@ const GROUPS: Group[] = [
       { href: '/admin/settings', label: 'Settings', icon: Settings },
     ],
   },
+  { label: 'Me', items: [{ href: '/admin/account', label: 'Account', icon: UserRound, always: true }] },
 ]
 
 function visibleGroups(role: Role): Group[] {
   return GROUPS.map((g) => ({
     ...g,
     items: g.items.filter((i) => {
+      if (i.always) return true
       const p = permissionForPath(i.href)
       return p !== null && can(role, p)
     }),
