@@ -87,7 +87,7 @@ export default async function DetailedProduct({
             <h2 id="about-h" className="mb-4 text-2xl font-extrabold tracking-tight text-neutral-900">
               {t('about')}
             </h2>
-            <div className="rich" dangerouslySetInnerHTML={{ __html: description }} />
+            <div className="rich-content" dangerouslySetInnerHTML={{ __html: description }} />
           </section>
         )}
 

@@ -46,7 +46,7 @@ export default async function SimpleProduct({
           variants={product.variants}
         >
           <div className="mt-6 space-y-4">
-            {description && <div className="rich text-sm" dangerouslySetInnerHTML={{ __html: description }} />}
+            {description && <div className="rich-content text-sm" dangerouslySetInnerHTML={{ __html: description }} />}
             <div className="border-t border-neutral-100">
               {features.length > 0 && (
                 <details className={accordion} open>

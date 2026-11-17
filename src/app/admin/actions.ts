@@ -3,8 +3,6 @@
 import { revalidatePath } from 'next/cache'
 import { requirePermission } from '@/lib/admin/session'
 import { logActivity } from '@/lib/admin/activity'
-import { publishProduct, unpublishProduct, updateProduct, type EditBaseline, type ProductInput } from '@/lib/admin/products'
-import { loadEditorProduct, type EditorProduct } from '@/lib/admin/product-view'
 import { saveSpecLabels, saveUiStrings, type SpecLabelRow } from '@/lib/admin/translations'
 import { createCategory, updateCategory, type CategoryInput } from '@/lib/admin/categories'
 import { saveSettings, sendTestMessage, type SettingsInput } from '@/lib/admin/settings'
@@ -12,76 +10,17 @@ import { runImport, runRefresh, type ImportOutcome } from '@/lib/admin/import'
 import { isOrderStatus } from '@/lib/admin/orders'
 import { setOrderStatus } from '@/lib/orders'
 import { can } from '@/lib/permissions'
-import { translateProduct, translateUiMissing, TranslationError } from '@/lib/translate'
+import { translateUiMissing } from '@/lib/translate'
 import type { NotifyResult } from '@/lib/telegram'
 import type { L10n } from '@/lib/localized'
 
 // Every action re-checks the caller's permission against the DB (requirePermission) and records what it
-// changed (logActivity): the proxy and the hidden menu items are not security.
+// changed (logActivity): the proxy and the hidden menu items are not security. Product editing actions live in
+// ./actions/products.ts.
 
 /** Storefront pages (and their UI strings) must reflect admin edits. */
 function refreshStorefront() {
   revalidatePath('/', 'layout')
-}
-
-// ---------- products ----------
-
-export type SaveProductResult =
-  | { ok: true; fresh: EditorProduct }
-  | { ok: false; errors: Record<string, string> }
-
-export async function saveProductAction(
-  id: number,
-  input: ProductInput,
-  labels: Record<string, L10n>,
-  baseline: EditBaseline,
-): Promise<SaveProductResult> {
-  const staff = await requirePermission('catalog')
-  const r = await updateProduct(id, input, baseline)
-  if (!r.ok) return r
-  // The product row is already written: log it now, even if the spec labels below fail.
-  await logActivity(staff, 'update', 'product', id, `Updated product #${id}`)
-  const rows: SpecLabelRow[] = Object.entries(labels).map(([key, label]) => ({ key, label }))
-  if (rows.length) {
-    const l = await saveSpecLabels(rows)
-    if (!l.ok) {
-      refreshStorefront()
-      return { ok: false, errors: { specs: l.error } }
-    }
-    await logActivity(staff, 'update', 'translations', null, `Saved ${rows.length} spec label(s) from product #${id}`)
-  }
-  refreshStorefront()
-  // The editor continues from what is now in the DB (new updatedAt and stock baseline).
-  const fresh = await loadEditorProduct(id)
-  if (!fresh) return { ok: false, errors: { _: 'Product not found.' } }
-  return { ok: true, fresh }
-}
-
-export async function publishAction(id: number, publish: boolean): Promise<{ ok: true; fresh: EditorProduct | null } | { ok: false; error: string }> {
-  const staff = await requirePermission('catalog')
-  const r = publish ? await publishProduct(id) : await unpublishProduct(id)
-  if (!r.ok) return r
-  await logActivity(staff, 'update', 'product', id, `${publish ? 'Published' : 'Unpublished'} product #${id}`)
-  refreshStorefront()
-  return { ok: true, fresh: await loadEditorProduct(id) }
-}
-
-export type TranslateActionResult =
-  | { ok: true; status: 'done' | 'not_configured'; translated: number; fresh: EditorProduct | null }
-  | { ok: false; message: string }
-
-export async function translateProductAction(id: number, force: boolean): Promise<TranslateActionResult> {
-  const staff = await requirePermission('catalog')
-  try {
-    const r = await translateProduct(id, { force })
-    if (r.status === 'done') {
-      if (r.translated > 0) await logActivity(staff, 'update', 'product', id, `Machine-translated ${r.translated} field(s) of product #${id}`)
-      refreshStorefront()
-    }
-    return { ok: true, status: r.status, translated: r.translated, fresh: await loadEditorProduct(id) }
-  } catch (e) {
-    return { ok: false, message: e instanceof TranslationError || e instanceof Error ? e.message : 'Translation failed.' }
-  }
 }
 
 // ---------- import ----------

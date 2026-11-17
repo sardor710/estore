@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/db'
-import { publishProduct, unpublishProduct, updateProduct as rawUpdate, checkPublishable, baselineOf, type ProductInput } from '@/lib/admin/products'
+import { publishProduct, unpublishProduct, updateProduct as rawUpdate, checkPublishable, baselineOf, bulkAction, duplicateProduct, updateVariantInline, completeness, type ProductInput } from '@/lib/admin/products'
+import type { Staff } from '@/lib/admin/session'
+
+const actor: Staff = { id: 0, email: 'pm@test', name: 'PM', role: 'PRODUCT_MANAGER' }
 
 // Most tests edit with a fresh baseline (what the editor would have just loaded).
 const updateProduct = async (id: number, input: ProductInput) => rawUpdate(id, input, await baselineOf(id))
@@ -21,7 +24,7 @@ function inputOf(p: Awaited<ReturnType<typeof mk>>, patch: Partial<ProductInput>
   return {
     slug: p.slug, categoryId: p.categoryId, templateOverride: null, brandId: null, badge: null,
     title: { en: 'T' }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [], inTheBox: [], faq: [], specs: [],
-    images: ['https://img/a.jpg'], reviewed: { uz: false, ru: false },
+    images: ['https://img/a.jpg'], reviewed: { uz: false, ru: false }, seoTitle: {}, seoDescription: {},
     variants: p.variants.map((v) => ({ id: v.id, sku: v.sku, name: { en: v.sku }, priceUzs: v.priceUzs, compareAtUzs: null, stock: v.stock, colorHex: null, imageIndex: null })),
     ...patch,
   }
@@ -206,5 +209,145 @@ describe('optimistic concurrency (stale editor)', () => {
     const fresh = await baselineOf(p.id)
     expect(fresh.stock[v.id!]).toBe(9)
     expect(await rawUpdate(p.id, inputOf(p, { variants: [{ ...v, stock: 1 }] }), fresh)).toEqual({ ok: true })
+  })
+})
+
+describe('SEO fields', () => {
+  it('saves per-locale SEO title/description and enforces 70/160 characters', async () => {
+    const p = await mk('seo', [{ sku: 'SEO1', price: 100 }])
+    expect(await updateProduct(p.id, inputOf(p, { seoTitle: { en: 'Charger' }, seoDescription: { ru: 'Описание' } }))).toEqual({ ok: true })
+    const db = await prisma.product.findUniqueOrThrow({ where: { id: p.id } })
+    expect(db.seoTitle).toEqual({ en: 'Charger' })
+    expect(db.seoDescription).toEqual({ ru: 'Описание' })
+    expect(await updateProduct(p.id, inputOf(p, { seoTitle: { uz: 'x'.repeat(71) } }))).toMatchObject({ ok: false, errors: { seo: expect.stringMatching(/70/) } })
+    expect(await updateProduct(p.id, inputOf(p, { seoDescription: { en: 'x'.repeat(161) } }))).toMatchObject({ ok: false, errors: { seo: expect.stringMatching(/160/) } })
+  })
+  it('accepts uploaded image paths next to http(s) URLs', async () => {
+    const p = await mk('up', [{ sku: 'UP1', price: 100 }])
+    expect(await updateProduct(p.id, inputOf(p, { images: ['/uploads/2026/11/0a1b2c3d.webp', 'https://img/a.jpg'] }))).toEqual({ ok: true })
+    expect(await updateProduct(p.id, inputOf(p, { images: ['/uploads/../secret.png'] }))).toMatchObject({ ok: false, errors: { images: expect.any(String) } })
+  })
+})
+
+describe('completeness', () => {
+  const filled = {
+    variants: [{ priceUzs: 100 }],
+    images: ['https://img/a.jpg'],
+    title: { uz: 'a', ru: 'b', en: 'c' },
+    descriptionHtml: { uz: '<p>a</p>', ru: '<p>b</p>', en: '<p>c</p>' },
+    reviewed: { uz: true, ru: true },
+    specs: [{ group: 'g', items: [{ label: 'l', value: 'v' }] }],
+    seoDescription: { uz: 'a', ru: 'b', en: 'c' },
+  }
+  it('a fully filled product scores 100 with nothing missing', () => {
+    expect(completeness(filled)).toEqual({ score: 100, missing: [] })
+  })
+  it('each check has equal weight', () => {
+    const r = completeness({ ...filled, images: [], reviewed: { uz: true, ru: false } })
+    expect(r.score).toBe(67)
+    expect(r.missing).toHaveLength(2)
+    expect(completeness({ variants: [], images: [], title: {}, descriptionHtml: {}, reviewed: {}, specs: [], seoDescription: null }).score).toBe(0)
+  })
+})
+
+describe('bulkAction', () => {
+  it('publish skips a product with a 0 price and reports the reason', async () => {
+    const ok = await mk('bulk-ok', [{ sku: 'BO1', price: 100 }])
+    const zero = await mk('bulk-zero', [{ sku: 'BZ1', price: 0 }])
+    const r = await bulkAction([ok.id, zero.id], { type: 'publish' }, actor)
+    expect(r.done).toBe(1)
+    expect(r.skipped).toEqual([{ id: zero.id, reason: expect.stringMatching(/price/i) }])
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: ok.id } })).status).toBe('PUBLISHED')
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: zero.id } })).status).toBe('DRAFT')
+    expect(await prisma.activityLog.count({ where: { entity: 'product', entityId: String(ok.id) } })).toBe(1)
+  })
+  it('sets category and brand, adds to a PRODUCT promotion only, deletes', async () => {
+    const a = await mk('bulk-a', [{ sku: 'BA1', price: 100 }])
+    const b = await mk('bulk-b', [{ sku: 'BB1', price: 100 }])
+    const cat = await prisma.category.create({ data: { slug: 'other', name: { en: 'Other' } } })
+    const brand = await prisma.brand.create({ data: { name: 'Anker', slug: 'anker' } })
+    expect(await bulkAction([a.id, b.id], { type: 'setCategory', value: cat.id }, actor)).toEqual({ done: 2, skipped: [] })
+    expect(await bulkAction([a.id], { type: 'setBrand', value: brand.id }, actor)).toEqual({ done: 1, skipped: [] })
+    const db = await prisma.product.findUniqueOrThrow({ where: { id: a.id } })
+    expect(db).toMatchObject({ categoryId: cat.id, brandId: brand.id })
+    expect((await bulkAction([a.id], { type: 'setCategory', value: 999999 }, actor)).done).toBe(0)
+
+    const promo = await prisma.promotion.create({ data: { name: 'P', kind: 'PERCENT', value: 5, targetType: 'PRODUCT', targetIds: [a.id] } })
+    const catPromo = await prisma.promotion.create({ data: { name: 'C', kind: 'PERCENT', value: 5, targetType: 'CATEGORY', targetIds: [cat.id] } })
+    const add = await bulkAction([a.id, b.id], { type: 'addToPromotion', value: promo.id }, actor)
+    expect(add.done).toBe(1)
+    expect(add.skipped).toEqual([{ id: a.id, reason: expect.any(String) }])
+    expect((await prisma.promotion.findUniqueOrThrow({ where: { id: promo.id } })).targetIds).toEqual([a.id, b.id])
+    expect(await bulkAction([a.id], { type: 'addToPromotion', value: catPromo.id }, actor)).toMatchObject({ done: 0, skipped: [{ id: a.id }] })
+
+    expect(await bulkAction([b.id], { type: 'delete' }, actor)).toEqual({ done: 1, skipped: [] })
+    expect(await prisma.product.findUnique({ where: { id: b.id } })).toBeNull()
+  })
+  it('delete skips a product whose variant is in an open order', async () => {
+    const a = await mk('bulk-open', [{ sku: 'OP1', price: 100, stock: 5 }])
+    await prisma.order.create({
+      data: {
+        number: 2001, name: 'n', phone: 'p', region: 'r', address: 'a', locale: 'uz', totalUzs: 100,
+        lines: { create: [{ variantId: a.variants[0].id, sku: 'OP1', productTitle: 't', variantName: 'v', priceUzs: 100, qty: 1 }] },
+      },
+    })
+    expect(await bulkAction([a.id], { type: 'delete' }, actor)).toEqual({ done: 0, skipped: [{ id: a.id, reason: expect.stringMatching(/open order/i) }] })
+    expect(await prisma.product.findUnique({ where: { id: a.id } })).not.toBeNull()
+  })
+})
+
+describe('duplicateProduct', () => {
+  it('twice -> x-copy, x-copy-2, DRAFT, unique SKUs, no sourceUrl', async () => {
+    const src = await mk('x', [{ sku: 'X1', price: 100 }, { sku: 'X2', price: 200 }])
+    await prisma.product.update({ where: { id: src.id }, data: { status: 'PUBLISHED', sourceUrl: 'https://anker.com/x', seoTitle: { en: 'S' } } })
+    const id1 = await duplicateProduct(src.id, actor)
+    const id2 = await duplicateProduct(src.id, actor)
+    const [c1, c2] = await Promise.all(
+      [id1, id2].map((id) => prisma.product.findUniqueOrThrow({ where: { id }, include: { variants: { orderBy: { sortOrder: 'asc' } } } })),
+    )
+    expect(c1).toMatchObject({ slug: 'x-copy', status: 'DRAFT', sourceUrl: null, seoTitle: { en: 'S' } })
+    expect(c2).toMatchObject({ slug: 'x-copy-2', status: 'DRAFT', sourceUrl: null })
+    expect(c1.variants.map((v) => v.sku)).toEqual(['X1-COPY', 'X2-COPY'])
+    expect(c2.variants.map((v) => v.sku)).toEqual(['X1-COPY-2', 'X2-COPY-2'])
+    expect(c1.variants.map((v) => v.priceUzs)).toEqual([100, 200])
+    expect(await prisma.activityLog.count({ where: { entity: 'product', action: 'create' } })).toBe(2)
+  })
+})
+
+describe('updateVariantInline', () => {
+  it('rejects -1 and non-integers; saves valid price/stock and logs', async () => {
+    const p = await mk('inline', [{ sku: 'IN1', price: 100, stock: 2 }])
+    const v = p.variants[0]
+    expect(await updateVariantInline(v.id, { stock: -1 }, actor)).toMatchObject({ ok: false })
+    expect(await updateVariantInline(v.id, { priceUzs: 1.5 }, actor)).toMatchObject({ ok: false })
+    expect((await prisma.variant.findUniqueOrThrow({ where: { id: v.id } })).stock).toBe(2)
+    expect(await updateVariantInline(v.id, { priceUzs: 250, stock: 7 }, actor)).toMatchObject({ ok: true })
+    expect(await prisma.variant.findUniqueOrThrow({ where: { id: v.id } })).toMatchObject({ priceUzs: 250, stock: 7 })
+    expect(await prisma.activityLog.count({ where: { entity: 'product', entityId: String(p.id) } })).toBe(1)
+  })
+  it('keeps a published product sellable (price 0 refused)', async () => {
+    const p = await mk('inline-pub', [{ sku: 'IP1', price: 100 }])
+    await publishProduct(p.id)
+    expect(await updateVariantInline(p.variants[0].id, { priceUzs: 0 }, actor)).toMatchObject({ ok: false, error: expect.stringMatching(/price/i) })
+  })
+})
+
+describe('productPromotions (editor tab)', () => {
+  it('lists active and scheduled promos targeting the product, its category tree or its brand; not expired/off ones', async () => {
+    const { productPromotions } = await import('@/lib/admin/product-view')
+    const parent = await prisma.category.create({ data: { slug: 'audio', name: { en: 'Audio' } } })
+    const p = await mk('pp', [{ sku: 'PP1', price: 100 }])
+    await prisma.category.update({ where: { id: p.categoryId }, data: { parentId: parent.id } })
+    const brand = await prisma.brand.create({ data: { name: 'Anker', slug: 'anker' } })
+    await prisma.product.update({ where: { id: p.id }, data: { brandId: brand.id } })
+    const day = 86_400_000
+    await prisma.promotion.create({ data: { name: 'Tree', kind: 'PERCENT', value: 5, targetType: 'CATEGORY', targetIds: [parent.id] } })
+    await prisma.promotion.create({ data: { name: 'Soon', kind: 'AMOUNT', value: 5000, targetType: 'PRODUCT', targetIds: [p.id], startsAt: new Date(Date.now() + day) } })
+    await prisma.promotion.create({ data: { name: 'Brand', kind: 'PERCENT', value: 7, targetType: 'BRAND', targetIds: [brand.id] } })
+    await prisma.promotion.create({ data: { name: 'Old', kind: 'PERCENT', value: 5, targetType: 'PRODUCT', targetIds: [p.id], endsAt: new Date(Date.now() - day) } })
+    await prisma.promotion.create({ data: { name: 'Off', kind: 'PERCENT', value: 5, targetType: 'PRODUCT', targetIds: [p.id], enabled: false } })
+    await prisma.promotion.create({ data: { name: 'Other', kind: 'PERCENT', value: 5, targetType: 'PRODUCT', targetIds: [p.id + 1000] } })
+    const r = await productPromotions(p.id)
+    expect(r.map((x) => [x.name, x.via, x.state]).sort()).toEqual([['Brand', 'brand', 'active'], ['Soon', 'product', 'scheduled'], ['Tree', 'category', 'active']])
   })
 })

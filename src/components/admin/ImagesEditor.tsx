@@ -1,19 +1,40 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { isHttpUrlClient } from './url'
+import { useRef, useState } from 'react'
+import { Plus, Upload } from 'lucide-react'
+import { isProductImageUrl } from '@/lib/admin/products-shared'
 import { btnGhost, btnSm, input } from './ui'
 import ListControls, { move } from './ListControls'
 
 export default function ImagesEditor({ images, onChange }: { images: string[]; onChange: (v: string[]) => void }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  /** Uploads one file through the admin upload endpoint and appends its URL. */
+  async function upload(file: File) {
+    setErr(null)
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('upload', file)
+      const res = await fetch('/api/admin/uploads', { method: 'POST', body: fd })
+      const body = (await res.json().catch(() => ({}))) as { url?: string; error?: { message?: string } }
+      if (!res.ok || !body.url) return setErr(body.error?.message ?? 'Upload failed.')
+      onChange([...images, body.url])
+    } catch {
+      setErr('Upload failed. Check your connection and try again.')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
 
   function add() {
     const v = draft.trim()
     if (!v) return
-    if (!isHttpUrlClient(v)) return setErr('Only http:// or https:// image URLs are allowed.')
+    if (!isProductImageUrl(v)) return setErr('Only http:// or https:// image URLs (or uploaded images) are allowed.')
     setErr(null)
     onChange([...images, v])
     setDraft('')
@@ -25,7 +46,7 @@ export default function ImagesEditor({ images, onChange }: { images: string[]; o
       <ul className="space-y-2">
         {images.map((src, i) => (
           <li key={`${src}-${i}`} className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-2">
-            {isHttpUrlClient(src) ? (
+            {isProductImageUrl(src) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={src} alt="" className="h-12 w-12 shrink-0 rounded-lg bg-white object-cover" />
             ) : (
@@ -61,9 +82,23 @@ export default function ImagesEditor({ images, onChange }: { images: string[]; o
         <button type="button" className={`${btnGhost} ${btnSm} shrink-0`} onClick={add}>
           <Plus size={14} /> Add
         </button>
+        <button type="button" className={`${btnGhost} ${btnSm} shrink-0`} onClick={() => fileRef.current?.click()} disabled={uploading}>
+          <Upload size={14} /> {uploading ? 'Uploading...' : 'Upload'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          aria-label="Upload image file"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) void upload(f)
+          }}
+        />
       </div>
       {err ? <p role="alert" className="text-sm text-red-700">{err}</p> : null}
-      <p className="text-xs text-neutral-500">Reordering changes which image a variant's "Image #" points at.</p>
+      <p className="text-xs text-neutral-500">Paste an image URL or upload a JPG, PNG, WEBP or GIF (up to 5 MB). Reordering changes which image a variant's "Image #" points at.</p>
     </div>
   )
 }

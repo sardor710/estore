@@ -1,8 +1,12 @@
 import { prisma } from '@/lib/db'
 import { sanitizeHtml } from '@/lib/sanitize'
+import type { Prisma } from '@/generated/prisma/client'
+import { logActivity } from './activity'
+import { loadPromotionInput, savePromotion, type PromotionInput } from './promotions'
+import type { Staff } from './session'
 import type { L10n } from '@/lib/localized'
 import type { FaqItem, Highlight, Section, SpecGroup } from '@/lib/catalog'
-import { SLUG_RE, STALE_PRODUCT, STALE_STOCK, checkPublishable, cleanL10n, isHttpUrl, type ActionResult, type EditBaseline, type ProductInput, type UpdateResult } from './products-shared'
+import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX, SLUG_RE, STALE_PRODUCT, STALE_STOCK, checkPublishable, cleanL10n, isProductImageUrl, type ActionResult, type BulkActionInput, type BulkResult, type EditBaseline, type ProductInput, type UpdateResult } from './products-shared'
 
 export * from './products-shared'
 
@@ -88,8 +92,15 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
   }
 
   const images = Array.isArray(input.images) ? input.images.map((s) => str(s).trim()).filter(Boolean) : []
-  const badImage = images.find((u) => !isHttpUrl(u))
-  if (badImage !== undefined) errors.images = `Only http(s) image URLs are allowed: ${badImage.slice(0, 80)}`
+  const badImage = images.find((u) => !isProductImageUrl(u))
+  if (badImage !== undefined) errors.images = `Only http(s) image URLs or uploaded images are allowed: ${badImage.slice(0, 80)}`
+
+  const seoTitle = cleanL10n(input.seoTitle)
+  const seoDescription = cleanL10n(input.seoDescription)
+  const seoErrors: string[] = []
+  for (const [l, v] of Object.entries(seoTitle)) if (v.length > SEO_TITLE_MAX) seoErrors.push(`SEO title (${l}) is longer than ${SEO_TITLE_MAX} characters.`)
+  for (const [l, v] of Object.entries(seoDescription)) if (v.length > SEO_DESCRIPTION_MAX) seoErrors.push(`SEO description (${l}) is longer than ${SEO_DESCRIPTION_MAX} characters.`)
+  if (seoErrors.length) errors.seo = seoErrors.join(' ')
 
   // Variants
   const variants = Array.isArray(input.variants) ? input.variants : []
@@ -172,6 +183,8 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
           specs: cleanSpecs(input.specs),
           images,
           reviewed: { uz: input.reviewed?.uz === true, ru: input.reviewed?.ru === true },
+          seoTitle,
+          seoDescription,
           updatedAt: new Date(),
         },
       })
@@ -209,4 +222,192 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
     throw e
   }
   return { ok: true }
+}
+
+// ---------- workspace tools (bulk actions, inline variant edit, duplicate) ----------
+
+const BULK_TYPES: readonly string[] = ['publish', 'unpublish', 'delete', 'setCategory', 'setBrand', 'addToPromotion']
+const MAX_BULK = 500
+
+/** True when any variant of the product is in a NEW/CONFIRMED order (deleting it would break stock handling). */
+async function inOpenOrder(productId: number): Promise<boolean> {
+  const variants = await prisma.variant.findMany({ where: { productId }, select: { id: true } })
+  if (!variants.length) return false
+  const n = await prisma.orderLine.count({ where: { variantId: { in: variants.map((v) => v.id) }, order: { status: { in: ['NEW', 'CONFIRMED'] } } } })
+  return n > 0
+}
+
+/**
+ * Applies one action to many products, one at a time, logging each product that changed. Products the
+ * action cannot apply to are reported in `skipped` with the reason (e.g. the publish gate) instead of failing the batch.
+ */
+export async function bulkAction(ids: number[], a: BulkActionInput, actor: Staff): Promise<BulkResult> {
+  const list = [...new Set(Array.isArray(ids) ? ids : [])].filter(isInt).slice(0, MAX_BULK)
+  const out: BulkResult = { done: 0, skipped: [] }
+  const skipAll = (reason: string): BulkResult => ({ done: 0, skipped: list.map((id) => ({ id, reason })) })
+  if (!a || !BULK_TYPES.includes(a.type)) return skipAll('Unknown bulk action.')
+
+  // Resolve the action's target once.
+  let label = ''
+  let categoryId = 0
+  if (a.type === 'setCategory') {
+    const c = isInt(a.value) ? await prisma.category.findUnique({ where: { id: a.value }, select: { id: true, slug: true } }) : null
+    if (!c) return skipAll('Choose an existing category.')
+    categoryId = c.id
+    label = c.slug
+  }
+  let brandId: number | null = null
+  if (a.type === 'setBrand') {
+    if (a.value !== undefined && a.value !== null) {
+      const b = isInt(a.value) ? await prisma.brand.findUnique({ where: { id: a.value }, select: { id: true, name: true } }) : null
+      if (!b) return skipAll('Choose an existing brand (or none).')
+      brandId = b.id
+      label = b.name
+    } else label = 'no brand'
+  }
+  let promo: PromotionInput | null = null
+  if (a.type === 'addToPromotion') {
+    promo = isInt(a.value) ? await loadPromotionInput(a.value) : null
+    if (!promo || promo.targetType !== 'PRODUCT') return skipAll('Choose a promotion that targets individual products.')
+  }
+
+  const rows = await prisma.product.findMany({ where: { id: { in: list } }, select: { id: true, slug: true } })
+  const slugOf = new Map(rows.map((r) => [r.id, r.slug]))
+  const toPromo: number[] = []
+  for (const id of list) {
+    const slug = slugOf.get(id)
+    if (slug === undefined) {
+      out.skipped.push({ id, reason: 'Product not found.' })
+      continue
+    }
+    let summary = ''
+    let action = 'update'
+    if (a.type === 'publish' || a.type === 'unpublish') {
+      const r = a.type === 'publish' ? await publishProduct(id) : await unpublishProduct(id)
+      if (!r.ok) {
+        out.skipped.push({ id, reason: r.error })
+        continue
+      }
+      summary = `${a.type === 'publish' ? 'Published' : 'Unpublished'} product #${id} (bulk)`
+    } else if (a.type === 'delete') {
+      if (await inOpenOrder(id)) {
+        out.skipped.push({ id, reason: 'A variant is in an open order (NEW/CONFIRMED); finish or cancel the order first.' })
+        continue
+      }
+      await prisma.product.delete({ where: { id } })
+      action = 'delete'
+      summary = `Deleted product #${id} "${slug}" (bulk)`
+    } else if (a.type === 'setCategory') {
+      await prisma.product.update({ where: { id }, data: { categoryId } })
+      summary = `Moved product #${id} to category "${label}" (bulk)`
+    } else if (a.type === 'setBrand') {
+      await prisma.product.update({ where: { id }, data: { brandId } })
+      summary = `Set brand of product #${id} to ${label} (bulk)`
+    } else {
+      // addToPromotion: collected and written once below.
+      if (promo!.targetIds.includes(id)) out.skipped.push({ id, reason: 'Already in this promotion.' })
+      else toPromo.push(id)
+      continue
+    }
+    await logActivity(actor, action, 'product', id, summary)
+    out.done++
+  }
+  if (promo && toPromo.length) {
+    // savePromotion validates the targets and logs the promotion change itself.
+    const r = await savePromotion({ ...promo, targetIds: [...promo.targetIds, ...toPromo] }, actor)
+    if (!r.ok) out.skipped.push(...toPromo.map((id) => ({ id, reason: r.error })))
+    else out.done += toPromo.length
+  }
+  return out
+}
+
+export type InlineVariantResult = { ok: true; variant: { id: number; priceUzs: number; stock: number } } | { ok: false; error: string }
+
+/** Price and/or stock of one variant from the product list (whole numbers >= 0). */
+export async function updateVariantInline(variantId: number, patch: { priceUzs?: number; stock?: number }, actor: Staff): Promise<InlineVariantResult> {
+  if (!isInt(variantId)) return { ok: false, error: 'Variant not found.' }
+  const data: { priceUzs?: number; stock?: number } = {}
+  for (const k of ['priceUzs', 'stock'] as const) {
+    const v = patch?.[k]
+    if (v === undefined) continue
+    if (!isInt(v) || v < 0) return { ok: false, error: `${k === 'priceUzs' ? 'Price' : 'Stock'} must be a whole number >= 0.` }
+    data[k] = v
+  }
+  if (!Object.keys(data).length) return { ok: false, error: 'Nothing to change.' }
+  const cur = await prisma.variant.findUnique({ where: { id: variantId }, include: { product: { select: { id: true, status: true } } } })
+  if (!cur) return { ok: false, error: 'Variant not found.' }
+  if (cur.product.status === 'PUBLISHED' && data.priceUzs === 0) return { ok: false, error: 'This product is live: every variant needs a price above 0.' }
+  const v = await prisma.$transaction(async (tx) => {
+    const updated = await tx.variant.update({ where: { id: variantId }, data })
+    // Bump the product so an editor opened before this change refuses to overwrite it.
+    await tx.product.update({ where: { id: cur.product.id }, data: { updatedAt: new Date() } })
+    return updated
+  })
+  const parts = [
+    data.priceUzs !== undefined && data.priceUzs !== cur.priceUzs ? `price ${cur.priceUzs} -> ${data.priceUzs}` : null,
+    data.stock !== undefined && data.stock !== cur.stock ? `stock ${cur.stock} -> ${data.stock}` : null,
+  ].filter(Boolean)
+  await logActivity(actor, 'update', 'product', cur.product.id, `Inline edit of ${cur.sku}: ${parts.join(', ') || 'no change'}`)
+  return { ok: true, variant: { id: v.id, priceUzs: v.priceUzs, stock: v.stock } }
+}
+
+/** First free value of base, base-2, base-3, ... */
+async function firstFree(base: string, taken: (candidate: string) => Promise<boolean>): Promise<string> {
+  for (let n = 1; ; n++) {
+    const candidate = n === 1 ? base : `${base}-${n}`
+    if (!(await taken(candidate))) return candidate
+  }
+}
+
+/** Copies a product as a DRAFT (`<slug>-copy[-n]`, SKUs `<sku>-COPY[-n]`, stock 0, not linked to an import source); returns the new id. */
+export async function duplicateProduct(id: number, actor: Staff): Promise<number> {
+  const src = await prisma.product.findUnique({ where: { id }, include: { variants: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] } } })
+  if (!src) throw new Error('Product not found.')
+  const slug = await firstFree(`${src.slug}-copy`, async (s) => Boolean(await prisma.product.findUnique({ where: { slug: s }, select: { id: true } })))
+  const skus: string[] = []
+  for (const v of src.variants) {
+    skus.push(await firstFree(`${v.sku}-COPY`, async (s) => skus.includes(s) || Boolean(await prisma.variant.findUnique({ where: { sku: s }, select: { id: true } }))))
+  }
+  // Json columns: copy the stored value; a NULL optional column stays unset.
+  const j = (v: unknown) => v as Prisma.InputJsonValue
+  const copy = await prisma.product.create({
+    data: {
+      slug,
+      categoryId: src.categoryId,
+      templateOverride: src.templateOverride,
+      status: 'DRAFT',
+      brandId: src.brandId,
+      ...(src.seoTitle !== null ? { seoTitle: j(src.seoTitle) } : {}),
+      ...(src.seoDescription !== null ? { seoDescription: j(src.seoDescription) } : {}),
+      sourceUrl: null,
+      sourcePriceUsd: null,
+      title: j(src.title),
+      subtitle: j(src.subtitle),
+      shortSpec: j(src.shortSpec),
+      descriptionHtml: j(src.descriptionHtml),
+      sections: j(src.sections),
+      highlights: j(src.highlights),
+      inTheBox: j(src.inTheBox),
+      faq: j(src.faq),
+      specs: j(src.specs),
+      images: j(src.images),
+      badge: src.badge,
+      reviewed: j(src.reviewed),
+      isDemo: src.isDemo,
+      variants: {
+        create: src.variants.map((v, i) => ({
+          sku: skus[i],
+          name: j(v.name),
+          colorHex: v.colorHex,
+          imageIndex: v.imageIndex,
+          priceUzs: v.priceUzs,
+          compareAtUzs: v.compareAtUzs,
+          stock: 0, // a copy is a new listing: it starts with no stock of its own
+          sortOrder: v.sortOrder,
+        })),
+      },
+    },
+  })
+  await logActivity(actor, 'create', 'product', copy.id, `Duplicated product #${id} as #${copy.id} "${slug}"`)
+  return copy.id
 }

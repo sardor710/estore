@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/db'
-import { loadEditorProduct } from '@/lib/admin/product-view'
+import { loadEditorProduct, productPromotions } from '@/lib/admin/product-view'
 import { PageTitle } from '@/components/admin/ui'
 import ProductEditor from '@/components/admin/ProductEditor'
 import type { L10n } from '@/lib/localized'
@@ -20,10 +20,11 @@ export default async function EditProductPage({
   await requirePermission('catalog')
   const id = Number((await params).id)
   if (!Number.isInteger(id)) notFound()
-  const [product, cats, brands, sp] = await Promise.all([
+  const [product, cats, brands, promotions, sp] = await Promise.all([
     loadEditorProduct(id),
     prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
     brandOptions(),
+    productPromotions(id),
     searchParams,
   ])
   if (!product) notFound()
@@ -41,7 +42,7 @@ export default async function EditProductPage({
         </Link>
       </p>
       <PageTitle>{title}</PageTitle>
-      <ProductEditor product={product} categories={categories} brands={brands} initialNotice={sp.notice} />
+      <ProductEditor key={product.id} product={product} categories={categories} brands={brands} promotions={promotions} initialNotice={sp.notice} />
     </>
   )
 }

@@ -14,7 +14,8 @@ vi.mock('next/headers', () => ({
 }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
-const { publishAction, saveProductAction, saveSettingsAction, setOrderStatusAction, testTelegramAction, saveUiAction } = await import('@/app/admin/actions')
+const { saveSettingsAction, setOrderStatusAction, testTelegramAction, saveUiAction } = await import('@/app/admin/actions')
+const { publishAction, saveProductAction, bulkProductsAction, updateVariantInlineAction, duplicateProductAction } = await import('@/app/admin/actions/products')
 const { baselineOf } = await import('@/lib/admin/products')
 const { createUserAction, resetPasswordAction, updateUserAction } = await import('@/app/admin/actions/users')
 const { changeOwnPasswordAction } = await import('@/app/admin/actions/account')
@@ -59,6 +60,9 @@ describe('server actions enforce permissions server-side', () => {
   it('blog editor -> 403 on product, order, translation and settings actions', async () => {
     await signIn('BLOG_EDITOR')
     await expect(publishAction(1, true)).rejects.toMatchObject(FORBIDDEN)
+    await expect(bulkProductsAction([1], { type: 'delete' })).rejects.toMatchObject(FORBIDDEN)
+    await expect(updateVariantInlineAction(1, { stock: 1 })).rejects.toMatchObject(FORBIDDEN)
+    await expect(duplicateProductAction(1)).rejects.toMatchObject(FORBIDDEN)
     await expect(setOrderStatusAction(1, 'CONFIRMED')).rejects.toMatchObject(FORBIDDEN)
     await expect(saveUiAction([])).rejects.toMatchObject(FORBIDDEN)
     await expect(saveSettingsAction({ minOrderUzs: 1 })).rejects.toMatchObject(FORBIDDEN)
@@ -150,7 +154,7 @@ describe('server actions enforce permissions server-side', () => {
     const input = {
       slug: p.slug, categoryId: cat.id, templateOverride: null, brandId: null, badge: null,
       title: { en: 'Renamed' }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [], inTheBox: [], faq: [], specs: [],
-      images: ['https://img/a.jpg'], reviewed: { uz: false, ru: false },
+      images: ['https://img/a.jpg'], reviewed: { uz: false, ru: false }, seoTitle: {}, seoDescription: {},
       variants: p.variants.map((v) => ({ id: v.id, sku: v.sku, name: { en: v.sku }, priceUzs: v.priceUzs, compareAtUzs: null, stock: v.stock, colorHex: null, imageIndex: null })),
     }
     // An empty spec key makes saveSpecLabels fail after updateProduct has already written the product.

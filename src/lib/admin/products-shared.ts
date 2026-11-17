@@ -31,8 +31,14 @@ export type ProductInput = {
   specs: SpecGroup[]
   images: string[]
   reviewed: { uz: boolean; ru: boolean }
+  /** Per-locale search-engine title / description (empty = storefront defaults). */
+  seoTitle: L10n
+  seoDescription: L10n
   variants: VariantInput[]
 }
+
+export const SEO_TITLE_MAX = 70
+export const SEO_DESCRIPTION_MAX = 160
 
 /** What the editor loaded: the save is rejected if the product or any variant's stock changed since. */
 export type EditBaseline = { updatedAt: string; stock: Record<number, number> }
@@ -41,6 +47,10 @@ export const STALE_PRODUCT = 'This product was changed since you opened it (anot
 export const STALE_STOCK = 'Stock changed since you opened this product (for example an order was confirmed). Reload the page to see the current stock, then redo your edits.'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
+export type BulkActionType = 'publish' | 'unpublish' | 'delete' | 'setCategory' | 'setBrand' | 'addToPromotion'
+/** `value`: category id, brand id (omit = no brand) or promotion id, depending on the action. */
+export type BulkActionInput = { type: BulkActionType; value?: number }
+export type BulkResult = { done: number; skipped: { id: number; reason: string }[] }
 export type UpdateResult = { ok: true } | { ok: false; errors: Record<string, string> }
 
 export const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -57,6 +67,14 @@ export function cleanL10n(v: unknown): L10n {
     }
   }
   return out
+}
+
+/** Files saved by the admin upload endpoint (served at /uploads/YYYY/MM/<random>.<ext>). */
+export const UPLOAD_PATH_RE = /^\/uploads\/\d{4}\/\d{2}\/[0-9a-f]+\.(jpg|png|webp|gif)$/i
+
+/** Product images: absolute http(s) URLs or our own uploads. */
+export function isProductImageUrl(s: unknown): boolean {
+  return isHttpUrl(s) || (typeof s === 'string' && UPLOAD_PATH_RE.test(s))
 }
 
 export function isHttpUrl(s: unknown): boolean {
@@ -76,6 +94,52 @@ export function checkPublishable(variants: { priceUzs: number }[]): string | nul
   return null
 }
 
+
+// ---------- completeness ----------
+
+const filled = (v: unknown, l: string): boolean => {
+  const x = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>)[l] : undefined
+  return typeof x === 'string' && x.trim() !== ''
+}
+const allLocales = (v: unknown) => locales.every((l) => filled(v, l))
+
+/** The checklist, in display order (labels are what `completeness().missing` returns). */
+export const COMPLETENESS_CHECKS = [
+  'Every variant has a price above 0',
+  'At least one image',
+  'Title and description in uz, ru and en',
+  'uz and ru translations marked reviewed',
+  'At least one spec group',
+  'SEO description in uz, ru and en',
+] as const
+
+export type CompletenessSource = {
+  variants: { priceUzs: number }[]
+  images: unknown
+  title: unknown
+  descriptionHtml: unknown
+  reviewed: unknown
+  specs: unknown
+  seoDescription: unknown
+}
+
+/**
+ * How ready a product is for the storefront: six equally weighted checks. `missing` lists the failed
+ * checks in admin wording (the editor's checklist and the list's score both come from here).
+ */
+export function completeness(p: CompletenessSource): { score: number; missing: string[] } {
+  const reviewed = (p.reviewed && typeof p.reviewed === 'object' ? p.reviewed : {}) as { uz?: unknown; ru?: unknown }
+  const passed = [
+    p.variants.length > 0 && p.variants.every((v) => v.priceUzs > 0),
+    Array.isArray(p.images) && p.images.length > 0,
+    allLocales(p.title) && allLocales(p.descriptionHtml),
+    reviewed.uz === true && reviewed.ru === true,
+    Array.isArray(p.specs) && p.specs.length > 0,
+    allLocales(p.seoDescription),
+  ]
+  const missing: string[] = COMPLETENESS_CHECKS.filter((_, i) => !passed[i])
+  return { score: Math.round(((passed.length - missing.length) / passed.length) * 100), missing }
+}
 
 /** Baseline for an editor that just loaded this product. */
 export function baselineFromEditor(p: { updatedAt: string; input: { variants: { id?: number; stock: number }[] } }): EditBaseline {
