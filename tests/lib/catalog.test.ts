@@ -107,6 +107,13 @@ describe('getProductBySlug', () => {
     expect(p?.specLabels.power).toEqual({ en: 'Power' })
     expect(p?.specLabels.wattage).toEqual({ en: 'Wattage' })
   })
+  it('carries the SEO title/description (empty when unset)', async () => {
+    const c = await mkCat('chargers')
+    const prod = await mkProduct({ slug: 'seo', categoryId: c.id })
+    expect(await getProductBySlug('seo')).toMatchObject({ seoTitle: {}, seoDescription: {} })
+    await prisma.product.update({ where: { id: prod.id }, data: { seoTitle: { ru: 'Заголовок' }, seoDescription: { en: 'Meta' } } })
+    expect(await getProductBySlug('seo')).toMatchObject({ seoTitle: { ru: 'Заголовок' }, seoDescription: { en: 'Meta' } })
+  })
 })
 
 describe('searchProducts', () => {

@@ -230,11 +230,40 @@ const BULK_TYPES: readonly string[] = ['publish', 'unpublish', 'delete', 'setCat
 const MAX_BULK = 500
 
 /** True when any variant of the product is in a NEW/CONFIRMED order (deleting it would break stock handling). */
-async function inOpenOrder(productId: number): Promise<boolean> {
-  const variants = await prisma.variant.findMany({ where: { productId }, select: { id: true } })
+async function inOpenOrder(tx: Prisma.TransactionClient, productId: number): Promise<boolean> {
+  const variants = await tx.variant.findMany({ where: { productId }, select: { id: true } })
   if (!variants.length) return false
-  const n = await prisma.orderLine.count({ where: { variantId: { in: variants.map((v) => v.id) }, order: { status: { in: ['NEW', 'CONFIRMED'] } } } })
+  const n = await tx.orderLine.count({ where: { variantId: { in: variants.map((v) => v.id) }, order: { status: { in: ['NEW', 'CONFIRMED'] } } } })
   return n > 0
+}
+
+class InOpenOrder extends Error {}
+
+/**
+ * Deletes a product and, in the same transaction, drops its id from every PRODUCT promotion (a stale id would
+ * make the promotion unsaveable). A promotion left without targets is switched off. Returns the promotions
+ * changed, or null when a variant is in an open order (nothing deleted).
+ */
+async function deleteProductEverywhere(id: number): Promise<{ id: number; name: string; disabled: boolean }[] | null> {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      if (await inOpenOrder(tx, id)) throw new InOpenOrder()
+      await tx.product.delete({ where: { id } })
+      const changed: { id: number; name: string; disabled: boolean }[] = []
+      for (const promo of await tx.promotion.findMany({ where: { targetType: 'PRODUCT' } })) {
+        const ids = Array.isArray(promo.targetIds) ? promo.targetIds : []
+        if (!ids.includes(id)) continue
+        const rest = ids.filter((x) => x !== id)
+        const disabled = rest.length === 0 && promo.enabled
+        await tx.promotion.update({ where: { id: promo.id }, data: { targetIds: rest, ...(rest.length === 0 ? { enabled: false } : {}) } })
+        changed.push({ id: promo.id, name: promo.name, disabled })
+      }
+      return changed
+    })
+  } catch (e) {
+    if (e instanceof InOpenOrder) return null
+    throw e
+  }
 }
 
 /**
@@ -290,11 +319,14 @@ export async function bulkAction(ids: number[], a: BulkActionInput, actor: Staff
       }
       summary = `${a.type === 'publish' ? 'Published' : 'Unpublished'} product #${id} (bulk)`
     } else if (a.type === 'delete') {
-      if (await inOpenOrder(id)) {
+      const promos = await deleteProductEverywhere(id)
+      if (!promos) {
         out.skipped.push({ id, reason: 'A variant is in an open order (NEW/CONFIRMED); finish or cancel the order first.' })
         continue
       }
-      await prisma.product.delete({ where: { id } })
+      for (const pr of promos) {
+        await logActivity(actor, 'update', 'promotion', pr.id, `Removed deleted product #${id} from promotion "${pr.name}"${pr.disabled ? ' (no targets left: switched off)' : ''}`)
+      }
       action = 'delete'
       summary = `Deleted product #${id} "${slug}" (bulk)`
     } else if (a.type === 'setCategory') {

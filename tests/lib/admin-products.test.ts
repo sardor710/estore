@@ -351,3 +351,19 @@ describe('productPromotions (editor tab)', () => {
     expect(r.map((x) => [x.name, x.via, x.state]).sort()).toEqual([['Brand', 'brand', 'active'], ['Soon', 'product', 'scheduled'], ['Tree', 'category', 'active']])
   })
 })
+
+describe('bulk delete keeps PRODUCT promotions saveable', () => {
+  it('removes the deleted id from promotions, disables a promotion left without targets, and logs it', async () => {
+    const a = await mk('del-a', [{ sku: 'DA1', price: 100 }])
+    const b = await mk('del-b', [{ sku: 'DB1', price: 100 }])
+    const c = await mk('del-c', [{ sku: 'DC1', price: 100 }])
+    const shared = await prisma.promotion.create({ data: { name: 'Shared', kind: 'PERCENT', value: 5, targetType: 'PRODUCT', targetIds: [a.id, b.id] } })
+    const only = await prisma.promotion.create({ data: { name: 'Only', kind: 'PERCENT', value: 5, targetType: 'PRODUCT', targetIds: [a.id] } })
+    expect(await bulkAction([a.id], { type: 'delete' }, actor)).toEqual({ done: 1, skipped: [] })
+    expect((await prisma.promotion.findUniqueOrThrow({ where: { id: shared.id } })).targetIds).toEqual([b.id])
+    expect(await prisma.promotion.findUniqueOrThrow({ where: { id: only.id } })).toMatchObject({ targetIds: [], enabled: false })
+    expect(await prisma.activityLog.count({ where: { entity: 'promotion' } })).toBe(2)
+    expect(await bulkAction([c.id], { type: 'addToPromotion', value: shared.id }, actor)).toEqual({ done: 1, skipped: [] })
+    expect((await prisma.promotion.findUniqueOrThrow({ where: { id: shared.id } })).targetIds).toEqual([b.id, c.id])
+  })
+})

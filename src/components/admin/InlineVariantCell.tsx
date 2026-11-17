@@ -31,6 +31,15 @@ export default function InlineVariantCell({
   const errId = useId()
   const router = useRouter()
   const inFlight = useRef(false) // Enter followed by blur must not save twice
+  // A newer value from the server (refresh, bulk action, another tab) replaces ours unless the user is mid-edit.
+  const [seen, setSeen] = useState(value)
+  if (value !== seen) {
+    setSeen(value)
+    if (draft.trim() === String(saved) && !pending) {
+      setSaved(value)
+      setDraft(String(value))
+    }
+  }
 
   function commit() {
     const text = draft.trim()
@@ -40,9 +49,14 @@ export default function InlineVariantCell({
     if (inFlight.current) return
     inFlight.current = true
     start(async () => {
-      const r = await updateVariantInlineAction(variantId, { [field]: n }).finally(() => {
+      let r: Awaited<ReturnType<typeof updateVariantInlineAction>>
+      try {
+        r = await updateVariantInlineAction(variantId, { [field]: n })
+      } catch {
+        return setError('Could not save.')
+      } finally {
         inFlight.current = false
-      })
+      }
       if (!r.ok) return setError(r.error)
       const next = field === 'priceUzs' ? r.variant.priceUzs : r.variant.stock
       setSaved(next)

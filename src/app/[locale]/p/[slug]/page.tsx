@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { hasLocale } from 'next-intl'
 import { routing } from '@/i18n/routing'
-import { jsonLdScript, pageMetadata, productDescription, productJsonLd } from '@/lib/seo'
+import { jsonLdScript, pageMetadata, productJsonLd, productMeta } from '@/lib/seo'
 import { notFound } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { getProductBySlug, getRelated } from '@/lib/catalog'
@@ -20,11 +20,12 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const product = await getProductBySlug(slug)
   if (!product) return {}
   const tStore = await getTranslations({ locale, namespace: 'store' })
+  const meta = productMeta(product, locale, tStore('name'))
   return pageMetadata({
     locale,
     path: `/p/${slug}`,
-    title: `${l10n(product.title, locale)} — ${tStore('name')}`,
-    description: productDescription(product, locale),
+    title: meta.title,
+    description: meta.description,
     siteName: tStore('name'),
     image: product.images[0],
   })

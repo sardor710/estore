@@ -152,3 +152,19 @@ describe('robots', () => {
     expect(r.sitemap).toBe(`${SITE_URL}/sitemap.xml`)
   })
 })
+
+describe('productMeta (storefront product page metadata)', () => {
+  it("uses the locale's SEO title/description when set, else the title and short spec/description", async () => {
+    const { productMeta } = await import('@/lib/seo')
+    const p = {
+      title: { en: 'Charger', ru: 'Зарядка' },
+      shortSpec: { en: '100W GaN' },
+      descriptionHtml: { ru: '<p>Описание</p>' },
+      seoTitle: { en: 'Best 100W charger', ru: '   ' },
+      seoDescription: { ru: 'SEO описание' },
+    }
+    expect(productMeta(p, 'en', 'Shop')).toEqual({ title: 'Best 100W charger', description: '100W GaN' })
+    expect(productMeta(p, 'ru', 'Shop')).toEqual({ title: 'Зарядка — Shop', description: 'SEO описание' })
+    expect(productMeta({ ...p, seoTitle: undefined, seoDescription: undefined }, 'en', 'Shop')).toEqual({ title: 'Charger — Shop', description: '100W GaN' })
+  })
+})

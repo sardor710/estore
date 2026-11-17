@@ -74,6 +74,9 @@ export type ProductDetail = {
   category: { id: number; slug: string; name: L10n; parent: { slug: string; name: L10n } | null }
   variants: VariantView[]
   specLabels: Record<string, L10n>
+  /** Admin-set per-locale SEO title / description (empty = page defaults). */
+  seoTitle: L10n
+  seoDescription: L10n
 }
 
 export function resolveTemplate(p: { templateOverride: string | null }, c: { template: string }): TemplateKind {
@@ -258,6 +261,8 @@ export async function getProductBySlug(
       }
     }),
     specLabels,
+    seoTitle: asL10n(row.seoTitle),
+    seoDescription: asL10n(row.seoDescription),
   }
 }
 

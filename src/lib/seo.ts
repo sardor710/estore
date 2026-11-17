@@ -84,6 +84,22 @@ export function productDescription(p: { shortSpec: L10n; descriptionHtml?: L10n 
   return truncate(text, 160)
 }
 
+/**
+ * <title> and meta description of a storefront product page: the locale's SEO title/description (set in the admin)
+ * when non-empty, otherwise "<title> — <shop>" and productDescription().
+ */
+export function productMeta(
+  p: { title: L10n; shortSpec: L10n; descriptionHtml?: L10n; seoTitle?: L10n; seoDescription?: L10n },
+  locale: Locale,
+  siteName: string,
+): { title: string; description: string } {
+  const own = (v: L10n | undefined) => (v?.[locale] ?? '').trim()
+  return {
+    title: own(p.seoTitle) || `${l10n(p.title, locale)} — ${siteName}`,
+    description: own(p.seoDescription) ? truncate(own(p.seoDescription), 160) : productDescription(p, locale),
+  }
+}
+
 /** schema.org Product with one Offer per variant. No ratings/reviews. */
 export function productJsonLd(product: LdProduct, variants: LdVariant | LdVariant[], locale: Locale) {
   const list = Array.isArray(variants) ? variants : [variants]
