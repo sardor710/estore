@@ -36,6 +36,7 @@ export default async function SimpleProduct({
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
         <ProductHero
           locale={locale}
+          productId={product.id}
           template="SIMPLE"
           title={product.title}
           subtitle={product.subtitle}

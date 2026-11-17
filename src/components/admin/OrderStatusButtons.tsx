@@ -11,7 +11,7 @@ const ERRORS: Record<string, string> = {
   BAD_REQUEST: 'Invalid request.',
 }
 
-const LABEL: Record<string, string> = { CONFIRMED: 'Confirm order', DELIVERED: 'Mark delivered', CANCELLED: 'Cancel order' }
+const LABEL: Record<string, string> = { CONFIRMED: 'Confirm order', SHIPPING: 'Out for delivery', DELIVERED: 'Mark delivered', CANCELLED: 'Cancel order' }
 
 export default function OrderStatusButtons({ orderId, status, allowed }: { orderId: number; status: string; allowed: string[] }) {
   const router = useRouter()
@@ -19,7 +19,7 @@ export default function OrderStatusButtons({ orderId, status, allowed }: { order
   const [error, setError] = useState<string | null>(null)
 
   function go(to: string) {
-    if (to === 'CANCELLED' && !window.confirm(status === 'CONFIRMED' ? 'Cancel this order and return the stock?' : 'Cancel this order?')) return
+    if (to === 'CANCELLED' && !window.confirm(status === 'CONFIRMED' || status === 'SHIPPING' ? 'Cancel this order and return the stock?' : 'Cancel this order?')) return
     setError(null)
     start(async () => {
       const r = await setOrderStatusAction(orderId, to)

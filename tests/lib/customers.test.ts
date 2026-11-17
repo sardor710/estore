@@ -102,6 +102,14 @@ describe('listCustomers / getCustomer', () => {
     expect(byName.Carl).toMatchObject({ orders: 0, spentUzs: 0, lastOrderAt: null, segment: 'NEW' })
   })
 
+  it('an order out for delivery (SHIPPING) counts towards spend and orders', async () => {
+    const a = await mkCustomer('+998900000009', 'Sam')
+    await mkOrder('+998900000009', 'SHIPPING', 400_000, daysAgo(1))
+    const { rows } = await listCustomers({ page: 1 }, NOW)
+    expect(rows.find((r) => r.id === a.id)).toMatchObject({ orders: 1, spentUzs: 400_000 })
+    expect(await getCustomer(a.id, NOW)).toMatchObject({ orders: 1, spentUzs: 400_000 })
+  })
+
   it('search, segment filter, sort and paging', async () => {
     for (let i = 0; i < 55; i++) await mkCustomer(`+99890100${String(i).padStart(4, '0')}`, `User ${String(i).padStart(2, '0')}`)
     await mkCustomer('+998977777777', 'Zed')
@@ -170,5 +178,17 @@ describe('customersCsv', () => {
     await mkCustomer('+998900000001', 'Night Owl')
     await mkOrder('+998900000001', 'CONFIRMED', 1000, new Date('2026-11-10T22:00:00Z'))
     expect((await customersCsv({}, NOW)).split('\r\n')[1]).toContain(';2026-11-11;')
+  })
+})
+
+describe('customer accounts in the admin list', () => {
+  it('rows and detail carry accountCreatedAt (null without a storefront account)', async () => {
+    const since = new Date('2026-11-17T08:00:00Z')
+    const a = await prisma.customer.create({ data: { phone: '+998901112233', name: 'Aziz', region: 'tashkent-city', tags: [], accountCreatedAt: since, telegramUserId: '42' } })
+    const b = await prisma.customer.create({ data: { phone: '+998901112244', name: 'Bobur', region: '', tags: [] } })
+    const { rows } = await listCustomers({ page: 1 })
+    expect(rows.find((r) => r.id === a.id)?.accountCreatedAt).toEqual(since)
+    expect(rows.find((r) => r.id === b.id)?.accountCreatedAt).toBeNull()
+    expect((await getCustomer(a.id))?.accountCreatedAt).toEqual(since)
   })
 })

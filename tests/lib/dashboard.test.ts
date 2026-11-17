@@ -35,6 +35,13 @@ describe('resolveRange', () => {
 })
 
 describe('getDashboard', () => {
+  it('an order out for delivery (SHIPPING) still counts as revenue and has its own status count', async () => {
+    await seedOrder('SHIPPING', 700_000, '2026-12-02T10:00:00Z')
+    const d = await getDashboard(resolveRange('custom', '2026-12-02', '2026-12-02', NOW), NOW)
+    expect(d.kpis.revenueUzs.value).toBe(700_000)
+    expect(d.ordersByStatus).toMatchObject({ SHIPPING: 1 })
+  })
+
   it('computes KPIs for a single Tashkent day', async () => {
     await seedOrder('CONFIRMED', 1_000_000, '2026-12-01T20:30:00Z') // 2026-12-02 01:30 Tashkent
     await seedOrder('DELIVERED', 500_000, '2026-12-02T10:00:00Z')

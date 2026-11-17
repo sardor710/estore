@@ -1,8 +1,8 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { loadEditorProduct, productPromotions } from '@/lib/admin/product-view'
-import { PageTitle } from '@/components/admin/ui'
+import { PageHeader } from '@/components/admin/ui'
+import BackLink from '@/components/admin/BackLink'
 import ProductEditor from '@/components/admin/ProductEditor'
 import type { L10n } from '@/lib/localized'
 import { requirePermission } from '@/lib/admin/session'
@@ -36,12 +36,8 @@ export default async function EditProductPage({
 
   return (
     <>
-      <p className="mb-2 text-sm">
-        <Link href="/admin/products" className="text-neutral-500 underline">
-          Products
-        </Link>
-      </p>
-      <PageTitle>{title}</PageTitle>
+      <BackLink href="/admin/products">Products</BackLink>
+      <PageHeader title={title} />
       <ProductEditor key={product.id} product={product} categories={categories} brands={brands} promotions={promotions} initialNotice={sp.notice} />
     </>
   )

@@ -9,9 +9,12 @@ import { saveSettings, sendTestMessage, type SettingsInput } from '@/lib/admin/s
 import { runImport, runRefresh, type ImportOutcome } from '@/lib/admin/import'
 import { isOrderStatus } from '@/lib/admin/orders'
 import { setOrderStatus } from '@/lib/orders'
+import { notifyOrderStatus } from '@/lib/account/notify'
+import { runAfterResponse } from '@/lib/after-response'
 import { can } from '@/lib/permissions'
 import { translateUiMissing } from '@/lib/translate'
 import type { NotifyResult } from '@/lib/telegram'
+import { connectBotWebhook } from '@/lib/telegram-bot/webhook'
 import type { L10n } from '@/lib/localized'
 
 // Every action re-checks the caller's permission against the DB (requirePermission) and records what it
@@ -51,7 +54,11 @@ export async function setOrderStatusAction(orderId: number, to: string): Promise
   const staff = await requirePermission('orders')
   if (!isOrderStatus(to)) return { ok: false, error: 'BAD_REQUEST' }
   const r = await setOrderStatus(orderId, to)
-  if (r.ok) await logActivity(staff, 'status', 'order', orderId, `Order status -> ${to}`)
+  if (r.ok) {
+    await logActivity(staff, 'status', 'order', orderId, `Order status -> ${to}`)
+    // Telegram message to the customer (if they have an account) after the response; never blocks or fails the change.
+    runAfterResponse(() => notifyOrderStatus(orderId, to))
+  }
   revalidatePath('/admin/orders')
   return r.ok ? { ok: true } : { ok: false, error: r.error }
 }
@@ -128,4 +135,19 @@ export async function saveSettingsAction(input: SettingsInput) {
 export async function testTelegramAction(): Promise<NotifyResult> {
   await requirePermission('settings.integrations')
   return sendTestMessage()
+}
+
+/** Registers `${SITE_URL}/api/telegram/webhook` with Telegram so the bot handles customer sign-ins in production. */
+export async function connectBotWebhookAction(): Promise<{ ok: true; username: string | null } | { ok: false; error: string }> {
+  const staff = await requirePermission('settings.integrations')
+  const r = await connectBotWebhook()
+  if (!r.ok) return r
+  await logActivity(
+    staff,
+    'update',
+    'settings',
+    null,
+    `Connected the Telegram bot${r.username ? ` @${r.username}` : ''} to ${r.url}${r.warnings.length ? ` (warnings: ${r.warnings.join('; ')})` : ''}`,
+  )
+  return { ok: true, username: r.username }
 }

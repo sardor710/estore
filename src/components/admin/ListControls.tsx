@@ -10,7 +10,7 @@ export function move<T>(list: T[], i: number, dir: -1 | 1): T[] {
   return next
 }
 
-const b = 'rounded-full p-1.5 text-neutral-600 hover:bg-neutral-200 disabled:opacity-30 disabled:hover:bg-transparent'
+const b = 'rounded-lg p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-30 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'
 
 /** Up / down / remove for one row of an editable list. */
 export default function ListControls({

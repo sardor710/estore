@@ -1,0 +1,34 @@
+import type { ReactNode } from 'react'
+import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
+import type { Locale } from '@/i18n/routing'
+import { getAccountCustomer } from '@/lib/account/session'
+import AccountNav from '@/components/account/AccountNav'
+
+// Account pages are never indexed (each page also sets its own localized title + robots).
+export const metadata: Metadata = { robots: { index: false, follow: false } }
+
+/**
+ * Account shell. A layout does not know the requested path, so the sign-in redirect (with `next` = that path)
+ * is done by every page via requireAccountCustomer; signed out, this layout renders the page bare and the page
+ * redirects before anything is sent.
+ */
+export default async function AccountLayout({ children, params }: { children: ReactNode; params: Promise<{ locale: string }> }) {
+  const { locale: raw } = await params
+  const locale = raw as Locale
+  const customer = await getAccountCustomer()
+  if (!customer) return <>{children}</>
+  const t = await getTranslations({ locale, namespace: 'nav' })
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+        <aside className="min-w-0">
+          <p className="mb-3 hidden px-4 text-xs font-bold uppercase tracking-widest text-neutral-500 lg:block">{t('myAccount')}</p>
+          <AccountNav locale={locale} />
+        </aside>
+        <div className="min-w-0">{children}</div>
+      </div>
+    </div>
+  )
+}

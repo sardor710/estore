@@ -20,17 +20,17 @@ model Category {
 }
 
 model Product {
-  id               Int       @id @default(autoincrement())
-  slug             String    @unique
+  id               Int        @id @default(autoincrement())
+  slug             String     @unique
   categoryId       Int
-  category         Category  @relation(fields: [categoryId], references: [id])
+  category         Category   @relation(fields: [categoryId], references: [id])
   templateOverride String?
-  status           String    @default("DRAFT") // DRAFT | PUBLISHED
+  status           String     @default("DRAFT") // DRAFT | PUBLISHED
   brandId          Int?
-  brand            Brand?    @relation(fields: [brandId], references: [id])
+  brand            Brand?     @relation(fields: [brandId], references: [id])
   seoTitle         Json?
   seoDescription   Json?
-  sourceUrl        String?   @unique
+  sourceUrl        String?    @unique
   sourcePriceUsd   Float?
   title            Json
   subtitle         Json
@@ -44,10 +44,11 @@ model Product {
   images           Json
   badge            String?
   reviewed         Json
-  isDemo           Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  isDemo           Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
   variants         Variant[]
+  favorites        Favorite[]
 }
 
 model Variant {
@@ -70,9 +71,9 @@ model SpecLabel {
 }
 
 model Order {
-  id              Int         @id @default(autoincrement())
-  number          Int         @unique
-  status          String      @default("NEW") // NEW | CONFIRMED | DELIVERED | CANCELLED
+  id              Int                @id @default(autoincrement())
+  number          Int                @unique
+  status          String             @default("NEW") // NEW | CONFIRMED | DELIVERED | CANCELLED
   name            String
   phone           String
   region          String
@@ -80,10 +81,14 @@ model Order {
   comment         String?
   locale          String
   totalUzs        Int
-  paymentStatus   String      @default("UNPAID")
+  paymentStatus   String             @default("UNPAID")
   paymentProvider String?
-  createdAt       DateTime    @default(now())
+  /// Optional delivery pin (Telegram location / geolocation), both or neither.
+  lat             Float?
+  lng             Float?
+  createdAt       DateTime           @default(now())
   lines           OrderLine[]
+  events          OrderStatusEvent[]
 
   @@index([phone])
   @@index([createdAt])
@@ -192,6 +197,85 @@ model Customer {
   blocked   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Customer account (Telegram sign-in). accountCreatedAt = null -> no account (order-only client).
+  telegramUserId   String?           @unique
+  telegramChatId   String?
+  accountLocale    String?
+  notifyTelegram   Boolean           @default(true)
+  sessionVersion   Int               @default(0)
+  accountCreatedAt DateTime?
+  addresses        CustomerAddress[]
+  favorites        Favorite[]
+  logins           CustomerLogin[]
+}
+
+/// Website sign-in through the Telegram bot. The raw token and browser secret are never stored, only SHA-256 hashes.
+model CustomerLogin {
+  id                    Int       @id @default(autoincrement())
+  tokenHash             String    @unique
+  browserHash           String
+  checkCode             String
+  status                String    @default("PENDING") // PENDING | CONFIRMED | USED | WRONG_CODE (wrong pick in the bot: cancelled, starts the 60 s cooldown)
+  pendingTelegramUserId String? // Telegram user who opened the deep link; binds start -> contact -> confirm
+  choices               Json? // 3 shuffled 4-digit codes for the bot buttons (stable per login)
+  customerId            Int?
+  customer              Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expiresAt             DateTime
+  createdAt             DateTime  @default(now())
+
+  @@index([pendingTelegramUserId, status])
+  @@index([createdAt])
+}
+
+/// 6-digit sign-in codes sent through the bot to an already linked chat. Only the SHA-256 hash is stored.
+model CustomerLoginCode {
+  id        Int       @id @default(autoincrement())
+  phone     String
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([phone, createdAt])
+}
+
+model CustomerAddress {
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String
+  recipient  String
+  region     String
+  address    String
+  lat        Float?
+  lng        Float?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+}
+
+model Favorite {
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([customerId, productId])
+  @@index([productId])
+}
+
+model OrderStatusEvent {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model BlogPost {
@@ -212,4 +296,22 @@ model BlogPost {
   updatedAt      DateTime  @updatedAt
 
   @@index([status, publishedAt])
+}
+
+model Banner {
+  id             Int       @id @default(autoincrement())
+  title          Json // L10n
+  text           Json // L10n
+  buttonText     Json // L10n
+  imageUrl       String
+  mobileImageUrl String?
+  linkUrl        String?
+  active         Boolean   @default(true)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  sortOrder      Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([active, sortOrder])
 }

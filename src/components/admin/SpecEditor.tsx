@@ -38,7 +38,7 @@ export default function SpecEditor({
       </p>
       {groups.map((g, gi) => (
         <fieldset key={gi} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-          <legend className="px-1 text-xs font-bold text-neutral-500">Group {gi + 1}</legend>
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">Group {gi + 1}</legend>
           <div className="mb-3 flex items-start gap-2">
             <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-[12rem_1fr]">
               <label>

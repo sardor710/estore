@@ -208,10 +208,16 @@ export function parseAnkerHtml(html: string, url: string): ImportedProduct {
     const sku = asStr(rv.sku).trim()
     const priceUsd = priceOf(rv.price) ?? priceOf(product.price)
     if (!sku || priceUsd === null) continue
+    // Every option's chosen value, in order (e.g. Color + Bundle Choice -> "Space Black / Power Bank + Charger",
+    // as anker.com names it); blanks and repeats are skipped. Using only the first option made bundles indistinguishable.
     const opts = Array.isArray(rv.options) ? rv.options : []
-    const o0 = isObj(opts[0]) ? opts[0] : null
-    const vals = o0 && Array.isArray(o0.values) ? o0.values : []
-    const label = isObj(vals[0]) ? asStr(vals[0].label).trim() : ''
+    const labels: string[] = []
+    for (const o of opts) {
+      const vals = isObj(o) && Array.isArray(o.values) ? o.values : []
+      const l = isObj(vals[0]) ? asStr(vals[0].label).trim() : ''
+      if (l && !labels.includes(l)) labels.push(l)
+    }
+    const label = labels.join(' / ')
     const rawImage = absHttps(rv.image)
     const imageUrl = rawImage ? byKey.get(keyOf(rawImage)) : undefined
     variants.push({

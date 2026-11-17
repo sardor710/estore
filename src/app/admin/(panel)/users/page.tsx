@@ -1,6 +1,6 @@
 import { requirePermission } from '@/lib/admin/session'
 import { listUsers } from '@/lib/admin/users'
-import { PageTitle } from '@/components/admin/ui'
+import { PageHeader } from '@/components/admin/ui'
 import UsersEditor from '@/components/admin/UsersEditor'
 
 export const metadata = { title: 'Users' }
@@ -10,7 +10,7 @@ export default async function UsersPage() {
   const users = await listUsers()
   return (
     <>
-      <PageTitle>Users</PageTitle>
+      <PageHeader title="Users" />
       <UsersEditor
         currentUserId={staff.id}
         users={users.map((u) => ({

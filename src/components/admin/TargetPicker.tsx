@@ -36,9 +36,9 @@ export default function TargetPicker({
       {value.length ? (
         <ul className="flex flex-wrap gap-1.5" aria-label={`Selected ${noun}`}>
           {value.map((id) => (
-            <li key={id} className="inline-flex items-center gap-1 rounded-full bg-neutral-900 py-0.5 pl-2.5 pr-1 text-xs font-semibold text-white">
+            <li key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-2.5 pr-1 text-xs font-semibold text-indigo-800 ring-1 ring-inset ring-indigo-200">
               {byId.get(id)?.label ?? `#${id} (deleted)`}
-              <button type="button" onClick={() => toggle(id)} className="rounded-full p-0.5 hover:bg-neutral-700" aria-label={`Remove ${byId.get(id)?.label ?? id}`}>
+              <button type="button" onClick={() => toggle(id)} className="rounded-full p-0.5 text-indigo-700 hover:bg-indigo-100" aria-label={`Remove ${byId.get(id)?.label ?? id}`}>
                 <X className="h-3 w-3" aria-hidden />
               </button>
             </li>

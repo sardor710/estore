@@ -22,3 +22,12 @@ describe('middleware matcher: admin guard entries', () => {
     for (const p of ['/admin', '/admin/products', '/api/admin/orders']) expect(re.test(p)).toBe(false)
   })
 })
+
+describe('middleware matcher: Telegram Mini App launch', () => {
+  it.each(['/tg', '/tg/'])('skips %s (outside the locale routing)', (p) => {
+    expect(re.test(p)).toBe(false)
+  })
+  it.each(['/tgx', '/uz/tg', '/tg-sale'])('still matches %s', (p) => {
+    expect(re.test(p)).toBe(true)
+  })
+})

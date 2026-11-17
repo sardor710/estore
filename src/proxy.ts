@@ -24,6 +24,7 @@ export default function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // [0]: public pages (next-intl). The rest: admin guard.
-  matcher: ['/((?!api|admin|_next|_vercel|.*\\..*).*)', '/admin/:path*', '/api/admin/:path*'],
+  // [0]: public pages (next-intl). `/tg` (Telegram Mini App launch) lives outside the locale routing.
+  // The rest: admin guard.
+  matcher: ['/((?!api|admin|tg(?:/|$)|_next|_vercel|.*\\..*).*)', '/admin/:path*', '/api/admin/:path*'],
 }

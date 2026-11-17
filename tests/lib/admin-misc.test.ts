@@ -139,6 +139,6 @@ describe('admin orders queries', () => {
     expect((await listOrders()).map((o) => o.number)).toEqual([1003, 1002, 1001])
     expect((await listOrders('NEW')).map((o) => o.number)).toEqual([1003, 1001])
     expect((await listOrders('BOGUS')).length).toBe(3)
-    expect(await orderCounts()).toEqual({ ALL: 3, NEW: 2, CONFIRMED: 1, DELIVERED: 0, CANCELLED: 0 })
+    expect(await orderCounts()).toEqual({ ALL: 3, NEW: 2, CONFIRMED: 1, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 })
   })
 })

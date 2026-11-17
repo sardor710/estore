@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
@@ -9,9 +10,12 @@ import { formatUzs } from '@/lib/money'
 import { path } from '@/lib/paths'
 import { useCart, useCartDrawer } from '@/lib/cart/useCart'
 import { useQuote } from '@/lib/cart/useQuote'
+import { useTgMainButton } from '@/components/tg/useTg'
 
-export default function CartDrawer({ locale }: { locale: Locale }) {
+export default function CartDrawer({ locale, telegram = false }: { locale: Locale; telegram?: boolean }) {
   const t = useTranslations('cart')
+  const tTg = useTranslations('tg')
+  const router = useRouter()
   const { open, setOpen } = useCartDrawer()
   const { lines, setQty, remove } = useCart()
   const { quote, loading, error, reload } = useQuote(lines, locale, open)
@@ -40,14 +44,20 @@ export default function CartDrawer({ locale }: { locale: Locale }) {
     }
   }, [quote, setQty])
 
-  if (!open) return null
-
   const byId = new Map((quote?.items ?? []).map((i) => [i.variantId, i]))
   const total = quote?.totalUzs ?? 0
   const min = quote?.minOrderUzs ?? 0
   const hasBad = (quote?.items ?? []).some((i) => !i.available || i.stock === 0)
   const belowMin = quote != null && total < min
   const canCheckout = quote != null && !loading && !error && lines.length > 0 && !belowMin && !hasBad && total > 0
+
+  // Telegram Mini App: the big native button replaces the in-drawer Checkout link.
+  const tgButton = useTgMainButton(telegram && open && canCheckout ? tTg('checkoutButton', { total: formatUzs(total, locale) }) : null, () => {
+    setOpen(false)
+    router.push(path(locale, '/checkout'))
+  })
+
+  if (!open) return null
 
   return (
     <div className="fixed inset-0 z-50" role="presentation">
@@ -184,7 +194,7 @@ export default function CartDrawer({ locale }: { locale: Locale }) {
                 <span className="text-xl font-extrabold text-neutral-900">{quote ? formatUzs(total, locale) : loading ? t('loading') : ''}</span>
               </div>
               {min > 0 && <p className="text-xs text-neutral-500">{t('minOrder', { amount: formatUzs(min, locale) })}</p>}
-              {canCheckout ? (
+              {tgButton ? null : canCheckout ? (
                 <Link
                   href={path(locale, '/checkout')}
                   onClick={() => setOpen(false)}

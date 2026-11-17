@@ -166,6 +166,42 @@ describe('setOrderStatus', () => {
     expect(await setOrderStatus(o.id, 'DELIVERED')).toEqual({ ok: false, error: 'BAD_TRANSITION' })
     expect(await setOrderStatus(987654, 'CONFIRMED')).toEqual({ ok: false, error: 'BAD_TRANSITION' })
   })
+
+  describe('optional SHIPPING (out for delivery)', () => {
+    it('CONFIRMED -> SHIPPING -> DELIVERED', async () => {
+      const v = await mkVariant({ sku: 'SH1', price: 1000, stock: 5 })
+      const o = await mkOrder(v.id, 1)
+      expect(await setOrderStatus(o.id, 'CONFIRMED')).toEqual({ ok: true })
+      expect(await setOrderStatus(o.id, 'SHIPPING')).toEqual({ ok: true })
+      expect(await setOrderStatus(o.id, 'DELIVERED')).toEqual({ ok: true })
+      expect(await stock(v.id)).toBe(4)
+      const events = await prisma.orderStatusEvent.findMany({ where: { orderId: o.id }, orderBy: { id: 'asc' } })
+      expect(events.map((e) => e.status)).toEqual(['NEW', 'CONFIRMED', 'SHIPPING', 'DELIVERED'])
+    })
+    it('CONFIRMED -> DELIVERED directly is still allowed', async () => {
+      const v = await mkVariant({ sku: 'SH2', price: 1000, stock: 5 })
+      const o = await mkOrder(v.id, 1)
+      await setOrderStatus(o.id, 'CONFIRMED')
+      expect(await setOrderStatus(o.id, 'DELIVERED')).toEqual({ ok: true })
+    })
+    it('NEW -> SHIPPING and DELIVERED -> SHIPPING are refused', async () => {
+      const v = await mkVariant({ sku: 'SH3', price: 1000, stock: 5 })
+      const o = await mkOrder(v.id, 1)
+      expect(await setOrderStatus(o.id, 'SHIPPING')).toEqual({ ok: false, error: 'BAD_TRANSITION' })
+      await setOrderStatus(o.id, 'CONFIRMED')
+      await setOrderStatus(o.id, 'DELIVERED')
+      expect(await setOrderStatus(o.id, 'SHIPPING')).toEqual({ ok: false, error: 'BAD_TRANSITION' })
+    })
+    it('SHIPPING -> CANCELLED restores stock', async () => {
+      const v = await mkVariant({ sku: 'SH4', price: 1000, stock: 5 })
+      const o = await mkOrder(v.id, 2)
+      await setOrderStatus(o.id, 'CONFIRMED')
+      expect(await setOrderStatus(o.id, 'SHIPPING')).toEqual({ ok: true })
+      expect(await stock(v.id)).toBe(3)
+      expect(await setOrderStatus(o.id, 'CANCELLED')).toEqual({ ok: true })
+      expect(await stock(v.id)).toBe(5)
+    })
+  })
 })
 
 describe('promotions', () => {
@@ -206,5 +242,61 @@ describe('promotions', () => {
     expect(q.items[1]).toMatchObject({ priceUzs: 50_000, originalUzs: 50_000 })
     expect(q.items[2]).toMatchObject({ available: false, priceUzs: 0, originalUzs: 0 })
     expect(q.totalUzs).toBe(2 * 1_161_000 + 50_000)
+  })
+})
+
+describe('status events and account options', () => {
+  const evs = async (orderId: number) =>
+    (await prisma.orderStatusEvent.findMany({ where: { orderId }, orderBy: { id: 'asc' } })).map((e) => e.status)
+
+  it('createOrder writes a NEW event; successful status changes add events, failed ones do not', async () => {
+    const v = await mkVariant({ sku: 'EV1', price: 100, stock: 1 })
+    expect(await createOrder({ ...base, lines: [{ variantId: v.id, qty: 1 }] })).toMatchObject({ ok: true })
+    expect(await createOrder({ ...base, lines: [{ variantId: v.id, qty: 1 }] })).toMatchObject({ ok: true })
+    const [o1, o2] = await prisma.order.findMany({ orderBy: { number: 'asc' } })
+    expect(await evs(o1.id)).toEqual(['NEW'])
+    expect(await setOrderStatus(o1.id, 'CONFIRMED')).toEqual({ ok: true })
+    expect(await setOrderStatus(o1.id, 'NEW')).toEqual({ ok: false, error: 'BAD_TRANSITION' })
+    expect(await setOrderStatus(o2.id, 'CONFIRMED')).toEqual({ ok: false, error: 'INSUFFICIENT_STOCK' })
+    expect(await evs(o1.id)).toEqual(['NEW', 'CONFIRMED'])
+    expect(await evs(o2.id)).toEqual(['NEW'])
+  })
+
+  it('saveAddress: stored for the signed-in account (first is default), skipped for guests, duplicates and at the limit', async () => {
+    const v = await mkVariant({ sku: 'EV2', price: 100, stock: 50 })
+    const acc = await prisma.customer.create({
+      data: { phone: '+998901234567', name: 'Ali', region: '', tags: [], telegramUserId: 't1', telegramChatId: 'c1', accountCreatedAt: new Date() },
+    })
+    const lines = [{ variantId: v.id, qty: 1 }]
+    // guest (no accountCustomerId): nothing saved
+    expect(await createOrder({ ...base, lines, saveAddress: { label: 'Home' } })).toMatchObject({ ok: true })
+    expect(await prisma.customerAddress.count()).toBe(0)
+    // signed in, asked
+    expect(await createOrder({ ...base, lines, accountCustomerId: acc.id, saveAddress: { label: ' Home ' } })).toMatchObject({ ok: true })
+    expect(await prisma.customerAddress.findMany()).toEqual([
+      expect.objectContaining({ customerId: acc.id, label: 'Home', recipient: 'Ali Valiyev', region: 'tashkent-city', address: 'Amir Temur 1', isDefault: true }),
+    ])
+    // identical address again: not duplicated
+    expect(await createOrder({ ...base, lines, accountCustomerId: acc.id, saveAddress: { label: 'Home' } })).toMatchObject({ ok: true })
+    expect(await prisma.customerAddress.count()).toBe(1)
+    // signed in, not asked
+    expect(await createOrder({ ...base, address: 'Navoiy 5', lines, accountCustomerId: acc.id, saveAddress: null })).toMatchObject({ ok: true })
+    expect(await prisma.customerAddress.count()).toBe(1)
+    // at the limit: order still placed, no address
+    for (let i = 0; i < 9; i++) {
+      await prisma.customerAddress.create({ data: { customerId: acc.id, label: `L${i}`, recipient: 'Ali', region: 'tashkent-city', address: `Street ${i}` } })
+    }
+    expect(await createOrder({ ...base, address: 'Navoiy 6', lines, accountCustomerId: acc.id, saveAddress: { label: 'x' } })).toMatchObject({ ok: true })
+    expect(await prisma.customerAddress.count()).toBe(10)
+    expect(await prisma.customerAddress.count({ where: { isDefault: true } })).toBe(1)
+  })
+
+  it('saveAddress is ignored when the account does not own the order phone', async () => {
+    const v = await mkVariant({ sku: 'EV3', price: 100, stock: 5 })
+    const other = await prisma.customer.create({
+      data: { phone: '+998907777777', name: 'Other', region: '', tags: [], telegramUserId: 't2', accountCreatedAt: new Date() },
+    })
+    expect(await createOrder({ ...base, lines: [{ variantId: v.id, qty: 1 }], accountCustomerId: other.id, saveAddress: { label: 'x' } })).toMatchObject({ ok: true })
+    expect(await prisma.customerAddress.count()).toBe(0)
   })
 })

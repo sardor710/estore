@@ -40,7 +40,7 @@ export default function AccountForm() {
 
   return (
     <section className={card} aria-labelledby="pw">
-      <h2 id="pw" className="mb-3 font-bold">Change password</h2>
+      <h2 id="pw" className="mb-4 border-b border-neutral-100 pb-3 text-base font-semibold text-neutral-900">Change password</h2>
       <form onSubmit={submit} className="max-w-md space-y-4">
         {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
         {field('current', 'Current password', 'current-password')}

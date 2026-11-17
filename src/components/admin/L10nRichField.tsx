@@ -17,7 +17,7 @@ export default function L10nRichField({ label, value, onChange }: { label: strin
   return (
     <div>
       <div className="mb-1 flex justify-end">
-        <div role="tablist" aria-label={`${label} language`} className="flex shrink-0 gap-1">
+        <div role="tablist" aria-label={`${label} language`} className="inline-flex shrink-0 gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5">
           {locales.map((l) => {
             const filled = Boolean(value[l]?.trim())
             return (
@@ -27,12 +27,12 @@ export default function L10nRichField({ label, value, onChange }: { label: strin
                 role="tab"
                 aria-selected={active === l}
                 onClick={() => setActive(l)}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase transition ${
-                  active === l ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold uppercase transition-colors ${
+                  active === l ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-neutral-200' : 'text-neutral-600 hover:bg-white/70 hover:text-neutral-900'
                 }`}
               >
                 {l}
-                <span className={`ml-1 inline-block h-1.5 w-1.5 rounded-full ${filled ? 'bg-green-500' : 'bg-neutral-300'}`} aria-hidden />
+                <span className={`ml-1 inline-block h-1.5 w-1.5 rounded-full ${filled ? 'bg-green-500' : 'bg-neutral-300 ring-1 ring-inset ring-neutral-400/40'}`} aria-hidden />
                 <span className="sr-only">{filled ? ' (filled)' : ' (empty)'}</span>
               </button>
             )

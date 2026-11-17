@@ -89,7 +89,7 @@ export default function InlineVariantCell({
             setError(null)
           }
         }}
-        className={`w-full rounded-md border px-2 py-1 text-right font-mono text-xs tabular-nums focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 disabled:opacity-60 ${
+        className={`w-full rounded-md border px-2 py-1 text-right font-mono text-xs tabular-nums transition-colors hover:border-neutral-400 focus:border-indigo-600 focus:outline-none focus:ring-3 focus:ring-indigo-600/20 disabled:opacity-60 ${
           error ? 'border-red-400 bg-red-50' : ok ? 'border-green-400 bg-green-50' : low ? 'border-amber-300 bg-amber-50' : 'border-neutral-200 bg-white'
         } ${field === 'priceUzs' ? 'min-w-[7rem]' : 'min-w-[4rem]'}`}
       />

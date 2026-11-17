@@ -69,11 +69,11 @@ export default function ClientEditor({ id, notes: initialNotes, tags: initialTag
           {tags.length > 0 ? (
             <ul className="mb-2 flex flex-wrap gap-2">
               {tags.map((t) => (
-                <li key={t} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 py-0.5 pl-3 pr-1 text-sm text-neutral-800">
+                <li key={t} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-3 pr-1 text-sm font-medium text-indigo-800 ring-1 ring-inset ring-indigo-200">
                   {t}
                   <button
                     type="button"
-                    className="rounded-full p-1 text-neutral-500 hover:bg-neutral-200"
+                    className="rounded-full p-1 text-indigo-700 hover:bg-indigo-100"
                     aria-label={`Remove tag ${t}`}
                     onClick={() => setTags(tags.filter((x) => x !== t))}
                   >
@@ -104,7 +104,7 @@ export default function ClientEditor({ id, notes: initialNotes, tags: initialTag
       </form>
 
       <div className={`${card} space-y-3`}>
-        <h2 className="font-bold text-neutral-900">Online orders</h2>
+        <h2 className="text-base font-semibold text-neutral-900">Online orders</h2>
         <p className="text-sm text-neutral-600">
           {blocked
             ? 'This client is blocked: online orders from this phone number are refused and they are told to call the shop.'

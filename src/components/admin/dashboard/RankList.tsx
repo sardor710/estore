@@ -10,9 +10,9 @@ export default function RankList({ title, items, empty = 'No data yet' }: { titl
     <section className={card}>
       <h2 className="mb-3 text-sm font-semibold text-neutral-900">{title}</h2>
       {items.length === 0 ? (
-        <p className="text-sm text-neutral-500">{empty}</p>
+        <p className="rounded-lg bg-neutral-50 px-3 py-6 text-center text-sm text-neutral-500">{empty}</p>
       ) : (
-        <ol className="space-y-2">
+        <ol className="space-y-2.5">
           {items.map((i) => (
             <li key={i.label} className="text-sm">
               <div className="flex items-baseline justify-between gap-3">

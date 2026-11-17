@@ -15,6 +15,7 @@ export const PERMISSIONS = [
   'settings.integrations',
   'users',
   'activity',
+  'banners',
 ] as const
 export type Permission = (typeof PERMISSIONS)[number]
 
@@ -54,6 +55,7 @@ const SECTION: Record<string, Permission> = {
   users: 'users',
   activity: 'activity',
   settings: 'settings.business',
+  banners: 'banners',
 }
 
 /** Permission required for an admin page path; null outside the guarded sections (e.g. /admin/login). */

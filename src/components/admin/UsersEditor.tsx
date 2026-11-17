@@ -41,8 +41,8 @@ export default function UsersEditor({ users, currentUserId }: { users: UserRow[]
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
 
       <section className={card} aria-labelledby="staff-list">
-        <h2 id="staff-list" className="mb-3 font-bold">Staff accounts</h2>
-        <ul className="divide-y divide-neutral-200">
+        <h2 id="staff-list" className="mb-3 text-base font-semibold text-neutral-900">Staff accounts</h2>
+        <ul className="divide-y divide-neutral-100">
           {users.map((u) => {
             const self = u.id === currentUserId
             return (
@@ -122,7 +122,7 @@ export default function UsersEditor({ users, currentUserId }: { users: UserRow[]
       </section>
 
       <section className={card} aria-labelledby="new-user">
-        <h2 id="new-user" className="mb-3 font-bold">Add a staff member</h2>
+        <h2 id="new-user" className="mb-3 text-base font-semibold text-neutral-900">Add a staff member</h2>
         <form onSubmit={create} className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <Label>Email</Label>

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { PageTitle } from '@/components/admin/ui'
+import { PageHeader } from '@/components/admin/ui'
 import CategoriesEditor, { type CategoryRow } from '@/components/admin/CategoriesEditor'
 import type { L10n } from '@/lib/localized'
 import { requirePermission } from '@/lib/admin/session'
@@ -19,7 +19,7 @@ export default async function CategoriesPage() {
   }))
   return (
     <>
-      <PageTitle>Categories</PageTitle>
+      <PageHeader title="Categories" />
       <CategoriesEditor rows={rows} />
     </>
   )

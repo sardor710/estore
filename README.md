@@ -56,8 +56,8 @@ Log in at `/admin`. On a fresh database, signing in with `ADMIN_USER` / `ADMIN_P
 
 | Role | Can do |
 |---|---|
-| ADMIN | Everything: dashboard and analytics, orders, clients, promotions, products and catalog, blog, translations, business and integration settings (Telegram, etc.), users and the activity log. |
-| PRODUCT_MANAGER | Dashboard, orders, clients, promotions, catalog (products, brands, categories), blog, translations and business settings. No access to users, the activity log or integration settings. |
+| ADMIN | Everything: dashboard and analytics, orders, clients, promotions, products and catalog, homepage banners, blog, translations, business and integration settings (Telegram, etc.), users and the activity log. |
+| PRODUCT_MANAGER | Dashboard, orders, clients, promotions, catalog (products, brands, categories), homepage banners, blog, translations and business settings. No access to users, the activity log or integration settings. |
 | BLOG_EDITOR | The blog only (posts and their images). Signs in straight to `/admin/blog`. |
 
 Lost access to the last admin account? Run `npm run admin:reset -- <email>` on the server (optionally `--name "Full Name"`). It creates the account as a full admin, or resets an existing one (role ADMIN, active, new password asked at the prompt) and signs out all of its sessions. There is deliberately no web-based recovery.
@@ -76,6 +76,59 @@ Notes:
 - Publishing is blocked while the price is zero.
 - Refresh from Anker updates source data but keeps your prices, stock and translations.
 - Soundcore-branded Anker pages may lack specifications; fill them in by hand. Links on soundcore.com are not supported.
+- Variant names come from all of Anker's options, e.g. "Space Black / Power Bank + Charger" for a color + bundle choice. Translate them to Uzbek and Russian with the Translate button like other texts.
+
+Product images and variants:
+
+- In the Images tab, drag several images onto the drop area (or press Choose files) to upload them at once. Up to 3 upload in parallel; a file that is too big or not an image shows its own error without stopping the others. The first image is the cover.
+- Each variant has a name per language, an optional color and a picture chosen from the product's images (Change picture). The product list shows every variant by picture, color dot and name, with the SKU underneath. Reordering or removing images keeps each variant on the same picture.
+
+### Homepage banners
+
+Content → Banners (full admins and product managers) manages the slides at the top of the homepage:
+
+- Image (about 1920×720) and an optional mobile image (about 800×1000, used on phones).
+- Title, text and button text in uz/ru/en, all optional; a missing language falls back to Uzbek. With no text the slide is image-only.
+- Link: a site path like `/c/chargers` (the visitor's language is added) or a full `https://` URL. Without button text the whole banner is clickable.
+- On/off switch and optional start/end times (Tashkent time). Slides show in list order (arrows to reorder).
+
+When no banner is live, the homepage shows the built-in slides.
+
+## Customer accounts
+
+Shoppers sign in with the shop's Telegram bot (the same bot whose token is set in Settings for order alerts). No SMS, email or passwords.
+
+- **First sign-in:** "Sign in with Telegram" on `/{lang}/login` opens the bot (QR code on desktop). The shopper shares their phone number with Telegram's own button (only their own contact, Uzbek numbers only), then taps the 4-digit code that the website shows (6 choices; a wrong tap cancels and blocks new attempts for a minute). The website signs in by itself. After every sign-in the bot sends a "New sign-in — not you?" message with a "Sign out everywhere" button.
+- **Next time:** the same button, or enter the phone on the website and type the 6-digit code the bot sends.
+- **Account:** orders (every order placed with that phone, also older ones), order details with a status timeline and "Buy again", saved addresses (used at checkout), favorites, name/language/notification settings, sign out everywhere, delete account (removes the login, addresses and favorites; orders stay with the shop). When staff change an order's status, the customer gets a Telegram message.
+- **Admin:** clients with an account show an "Account" badge.
+
+Setup:
+
+1. Set the bot token in Settings (full admin) and `SITE_URL` to the public `https://` address.
+2. Press **Connect bot to website** in Settings. This registers the webhook `/api/telegram/webhook` (protected by a random secret).
+3. Local development (no public HTTPS): run `npm run bot:poll` next to `npm run dev`. It removes the webhook and reads bot messages by polling; press Connect again on the live site afterwards.
+
+Stored per account: phone, name, Telegram user and chat id, language and notification choice, addresses and favorites. Sign-in requests and codes are stored hashed and cleaned up automatically.
+
+## Telegram Mini App
+
+The whole shop also runs **inside Telegram** as a Mini App: the same pages, database, cart, checkout, orders and account as the website, with Telegram's look (bottom tab bar Home · Catalog · Cart · Orders · Profile, Telegram's Back button and big bottom button).
+
+- **Opening it:** the bot's menu button **🛍 Shop**, the **Open shop** button after `/start`, or any button in the bot's order messages. Every entry goes through `/tg?next=…`, which checks Telegram's signed launch data (`initData`, accepted for 1 hour) with the bot token and signs the shopper in automatically when their Telegram account is linked.
+- **First order:** checkout asks for one tap on **Share phone number** (Telegram's own contact sharing). The bot links the phone to the account; the Mini App then continues signed in. Only the shopper's own Uzbek number is accepted.
+- **Location:** "📍 Share my location" at checkout and in saved addresses (Telegram's location API, or the browser's). Sending a location to the bot in chat offers to attach it to a saved address or start a new address with it. The typed address stays required.
+- **Bot messages to the customer:** order received (items, total, pay on delivery), confirmed, out for delivery, delivered, cancelled — each with a button that opens the order inside the Mini App. Customers can turn them off in Profile. Bot commands: `/start`, `/orders` (last 5 orders), `/help`.
+
+Setup (production):
+
+1. `SITE_URL` must be the public **https** address (Telegram opens Mini Apps only over HTTPS).
+2. Admin → Settings → **Connect bot to website**. Besides the webhook, this sets the bot's menu button (opens `${SITE_URL}/tg`) and its command list in uz/ru/en. Press it again whenever `SITE_URL` changes.
+3. Optional: in @BotFather, `/newapp` creates a direct link like `t.me/<bot>/shop` with URL `${SITE_URL}/tg`.
+
+Testing inside Telegram from a local machine: start an HTTPS tunnel, for example `cloudflared tunnel --url http://localhost:3000`, put the tunnel URL into `SITE_URL`, restart `npm run dev`, and press Connect bot (this replaces the production webhook — press Connect on the live site afterwards). Opening `/tg` in a normal browser only shows "open this from the Telegram bot": there is no fake sign-in for local browsers.
+
+Known limits: in Telegram **Web** (browser version) the Mini App runs in an iframe; browsers that block third-party cookies may not keep the session there (mobile and desktop apps are not affected). Cookies set by the Mini App are `SameSite=None; Secure; Partitioned` on https, so `/api/orders` and `/api/tg/session` accept only same-origin JSON requests.
 
 ## Uploads
 
@@ -95,7 +148,7 @@ Visitor analytics are first-party: the shop records its own page views, with no 
 
 ## Orders
 
-Customers check out without an account. Each order has a status: NEW, CONFIRMED, DELIVERED or CANCELLED. Stock is decremented when you Confirm an order, and restored if a confirmed order is Cancelled. Cancelling an order that was never confirmed does not change stock.
+Customers check out without an account. Each order has a status: NEW, CONFIRMED, SHIPPING ("Out for delivery", optional), DELIVERED or CANCELLED. A confirmed order can go to Out for delivery and then Delivered, or straight to Delivered (pickup, same-day). Stock is decremented when you Confirm an order, and restored if a confirmed or out-for-delivery order is Cancelled. Cancelling an order that was never confirmed does not change stock. Orders can carry an optional map pin (shared location); the order page in admin then shows Yandex/Google map links and the staff Telegram alert includes a map link. Payment is on delivery (no online payment yet).
 
 ### Telegram notifications
 

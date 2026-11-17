@@ -74,7 +74,7 @@ export type DashboardData = {
     conversionPct: Kpi
   }
   series: { day: string; revenueUzs: number; orders: number; visitors: number }[]
-  ordersByStatus: Record<'NEW' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED', number>
+  ordersByStatus: Record<'NEW' | 'CONFIRMED' | 'SHIPPING' | 'DELIVERED' | 'CANCELLED', number>
   recentOrders: { id: number; number: number; status: string; name: string; totalUzs: number; createdAt: Date }[]
   /** Both lists are cut from the full set of sold titles, so the leader of one ranking is never lost to the other. */
   topProductsByUnits: { title: string; units: number; revenueUzs: number }[]
@@ -92,7 +92,7 @@ export type DashboardData = {
 export type StockList = { total: number; items: { productId: number; title: string; variant: string; sku: string; stock: number }[] }
 
 const STOCK_LIST_CAP = 20
-const REVENUE = ['CONFIRMED', 'DELIVERED']
+const REVENUE = ['CONFIRMED', 'SHIPPING', 'DELIVERED'] // SHIPPING = out for delivery (still a sale)
 const rank = <K extends string>(m: Map<K, number>, n: number): RankRow[] =>
   [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n).map(([label, value]) => ({ label, value }))
 
@@ -165,7 +165,7 @@ export async function getDashboard(range: DashboardRange, now: Date = new Date()
     }
   }
 
-  const ordersByStatus = { NEW: 0, CONFIRMED: 0, DELIVERED: 0, CANCELLED: 0 }
+  const ordersByStatus = { NEW: 0, CONFIRMED: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 }
   for (const o of orders) if (o.status in ordersByStatus) ordersByStatus[o.status as keyof typeof ordersByStatus] += 1
 
   const regions = new Map<string, { orders: number; revenueUzs: number }>()

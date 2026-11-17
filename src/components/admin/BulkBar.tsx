@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { bulkProductsAction } from '@/app/admin/actions/products'
 import type { BulkActionType, BulkResult } from '@/lib/admin/products-shared'
-import { btn, btnGhost, btnSm, input, Notice } from './ui'
+import { btn, btnDanger, btnGhost, btnSm, input, Notice } from './ui'
 
 export type Option = { id: number; label: string }
 
@@ -63,16 +63,16 @@ export default function BulkBar({
   if (!selected.length && !result) return null
 
   return (
-    <div className="sticky top-0 z-20 mb-3 space-y-2">
+    <div className="sticky top-16 z-20 mb-3 space-y-2 md:top-3">
       {selected.length > 0 ? (
-        <div role="region" aria-label="Bulk actions" className="flex flex-wrap items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3 py-2 shadow-sm">
-          <span className="text-sm font-semibold">{selected.length} selected</span>
+        <div role="region" aria-label="Bulk actions" className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 shadow-md ring-1 ring-indigo-600/10">
+          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-sm font-semibold text-indigo-700">{selected.length} selected</span>
           <label className="sr-only" htmlFor="bulk-action">
             Bulk action
           </label>
           <select
             id="bulk-action"
-            className={`${input} !w-auto !py-1`}
+            className={`${input} !w-auto !py-1 !text-sm`}
             value={type}
             onChange={(e) => {
               setType(e.target.value as BulkActionType)
@@ -90,7 +90,7 @@ export default function BulkBar({
               <label className="sr-only" htmlFor="bulk-value">
                 {type === 'setCategory' ? 'Category' : type === 'setBrand' ? 'Brand' : 'Promotion'}
               </label>
-              <select id="bulk-value" className={`${input} !w-auto !py-1`} value={value} onChange={(e) => setValue(e.target.value)}>
+              <select id="bulk-value" className={`${input} !w-auto !max-w-full !py-1 !text-sm`} value={value} onChange={(e) => setValue(e.target.value)}>
                 <option value="">{type === 'setBrand' ? 'No brand' : type === 'setCategory' ? 'Choose category...' : 'Choose promotion...'}</option>
                 {options.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -101,10 +101,10 @@ export default function BulkBar({
               {type === 'addToPromotion' && promotions.length === 0 ? <span className="text-xs text-neutral-500">No promotions target individual products.</span> : null}
             </>
           ) : null}
-          <button type="button" className={`${type === 'delete' ? btnGhost + ' !border-red-300 !text-red-700' : btn} ${btnSm}`} onClick={apply} disabled={pending}>
+          <button type="button" className={`${type === 'delete' ? btnDanger : btn} ${btnSm} !py-1.5`} onClick={apply} disabled={pending}>
             {pending ? 'Working...' : 'Apply'}
           </button>
-          <button type="button" className={`${btnGhost} ${btnSm}`} onClick={onDone} disabled={pending}>
+          <button type="button" className={`${btnGhost} ${btnSm} !py-1.5`} onClick={onDone} disabled={pending}>
             Clear selection
           </button>
           {error ? (
@@ -129,7 +129,7 @@ export default function BulkBar({
                 </ul>
               ) : null}
             </div>
-            <button type="button" className="text-xs underline" onClick={() => setResult(null)}>
+            <button type="button" className="shrink-0 rounded text-xs font-semibold underline underline-offset-2 hover:no-underline" onClick={() => setResult(null)}>
               Dismiss
             </button>
           </div>

@@ -18,6 +18,11 @@ describe('can()', () => {
       expect(can('PRODUCT_MANAGER', p), p).toBe(!['users', 'activity', 'settings.integrations'].includes(p))
     }
   })
+  it('banners: full admin and product manager, not blog editor', () => {
+    expect(can('ADMIN', 'banners')).toBe(true)
+    expect(can('PRODUCT_MANAGER', 'banners')).toBe(true)
+    expect(can('BLOG_EDITOR', 'banners')).toBe(false)
+  })
   it('unknown role (e.g. a stale or tampered value) has no permissions', () => {
     expect(can('ROOT' as never, 'blog')).toBe(false)
     expect(isRole('ROOT')).toBe(false)
@@ -42,6 +47,9 @@ describe('permissionForPath()', () => {
     ['/admin/users', 'users'],
     ['/admin/activity', 'activity'],
     ['/admin/settings', 'settings.business'],
+    ['/admin/banners', 'banners'],
+    ['/admin/banners/3', 'banners'],
+    ['/admin/banners/new', 'banners'],
   ])('%s -> %s', (path, perm) => {
     expect(permissionForPath(path)).toBe(perm)
   })

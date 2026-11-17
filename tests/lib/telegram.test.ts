@@ -49,3 +49,14 @@ describe('notifyNewOrder', () => {
     expect(await notifyNewOrder(order, f as unknown as typeof fetch)).toBe('failed')
   })
 })
+
+describe('notifyNewOrder map link', () => {
+  it('adds a Map line only when the order has a pin', async () => {
+    await updateSettings({ telegramBotToken: 'TOKEN', telegramChatId: '42' })
+    const f = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    await notifyNewOrder({ ...order, mapUrl: 'https://www.google.com/maps?q=41.311081,69.240562' }, f as unknown as typeof fetch)
+    await notifyNewOrder(order, f as unknown as typeof fetch)
+    expect(JSON.parse(f.mock.calls[0][1].body).text).toContain('Map: https://www.google.com/maps?q=41.311081,69.240562')
+    expect(JSON.parse(f.mock.calls[1][1].body).text).not.toContain('Map:')
+  })
+})

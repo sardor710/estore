@@ -14,7 +14,7 @@ const MAX_NOTES = 2000
 const MAX_TAGS = 20
 const MAX_TAG_LEN = 30
 /** Orders that count towards a client's `orders` / `spentUzs` (revenue statuses). */
-const REVENUE = ['CONFIRMED', 'DELIVERED']
+const REVENUE = ['CONFIRMED', 'SHIPPING', 'DELIVERED'] // SHIPPING = out for delivery (still a sale)
 
 // ---------- segments ----------
 
@@ -32,8 +32,20 @@ export function segmentOf(s: { orders: number; spentUzs: number; lastOrderAt: Da
 
 // ---------- order-side hook ----------
 
-/** Creates the customer for `phone` or refreshes name/region to the latest order's. Returns the customer id. Never touches `blocked`. */
+/**
+ * Creates the customer for `phone` or refreshes name/region to the latest order's. Returns the customer id. Never
+ * touches `blocked`. An account holder (accountCreatedAt set) keeps their own profile name: the order's name is the
+ * recipient's, who may be someone else; only the region follows.
+ */
 export async function upsertCustomerFromOrder(tx: Db, i: { phone: string; name: string; region: string }): Promise<number> {
+  const existing = await tx.customer.findUnique({ where: { phone: i.phone }, select: { id: true, accountCreatedAt: true } })
+  if (existing) {
+    await tx.customer.update({
+      where: { id: existing.id },
+      data: existing.accountCreatedAt ? { region: i.region } : { name: i.name, region: i.region },
+    })
+    return existing.id
+  }
   const c = await tx.customer.upsert({
     where: { phone: i.phone },
     update: { name: i.name, region: i.region },
@@ -67,6 +79,8 @@ export type CustomerRow = {
   /** Latest non-cancelled order */
   lastOrderAt: Date | null
   segment: Segment
+  /** Signed in on the storefront with Telegram (null when never, or after the customer deleted the account). */
+  accountCreatedAt: Date | null
 }
 
 const toTags = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
@@ -126,7 +140,7 @@ async function loadRows(query: CustomerQuery, now: Date): Promise<CustomerRow[]>
     const seg = segmentOf(s, settings.vipThresholdUzs, now)
     if (segment && seg !== segment) continue
     rows.push({
-      id: c.id, phone: c.phone, name: c.name, region: c.region, notes: c.notes, tags: toTags(c.tags), blocked: c.blocked,
+      id: c.id, phone: c.phone, name: c.name, region: c.region, notes: c.notes, tags: toTags(c.tags), blocked: c.blocked, accountCreatedAt: c.accountCreatedAt,
       createdAt: c.createdAt, ...s, segment: seg,
     })
   }
@@ -169,7 +183,7 @@ export async function getCustomer(id: number, now: Date = new Date()): Promise<C
   }
   const s = { orders, spentUzs, lastOrderAt }
   return {
-    id: c.id, phone: c.phone, name: c.name, region: c.region, notes: c.notes, tags: toTags(c.tags), blocked: c.blocked, createdAt: c.createdAt,
+    id: c.id, phone: c.phone, name: c.name, region: c.region, notes: c.notes, tags: toTags(c.tags), blocked: c.blocked, accountCreatedAt: c.accountCreatedAt, createdAt: c.createdAt,
     ...s, segment: segmentOf(s, settings.vipThresholdUzs, now), history,
   }
 }

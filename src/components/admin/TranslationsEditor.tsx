@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import { saveSpecLabelsAction, saveUiAction, translateUiMissingAction } from '@/app/admin/actions'
 import type { UiRow, SpecLabelRow } from '@/lib/admin/translations'
 import type { L10n } from '@/lib/localized'
-import { Badge, btn, btnGhost, card, input, Notice } from './ui'
+import { Badge, btn, btnGhost, card, input, Notice, table, td, th } from './ui'
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null
+
+const sth = `${th} sticky top-0 z-10`
 
 export default function TranslationsEditor({ rows, specRows, configured }: { rows: UiRow[]; specRows: SpecLabelRow[]; configured: boolean }) {
   const router = useRouter()
@@ -83,7 +85,7 @@ export default function TranslationsEditor({ rows, specRows, configured }: { row
 
       <section aria-labelledby="ui-h" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="ui-h" className="text-lg font-bold">
+          <h2 id="ui-h" className="text-base font-semibold text-neutral-900">
             Interface texts <span className="text-sm font-normal text-neutral-500">({rows.length} keys, {missingCount} with a missing uz/ru)</span>
           </h2>
           <div className="flex flex-wrap items-center gap-2">
@@ -96,39 +98,39 @@ export default function TranslationsEditor({ rows, specRows, configured }: { row
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <input className={`${input} max-w-xs`} placeholder="Search key or text" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search UI strings" />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> only missing
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-neutral-200 bg-white p-3 shadow-xs">
+          <input className={`${input} max-w-xs !py-1.5`} placeholder="Search key or text" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search UI strings" />
+          <label className="flex items-center gap-2 text-sm text-neutral-700">
+            <input className="size-4" type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> only missing
           </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={editEn} onChange={(e) => setEditEn(e.target.checked)} /> edit English too
+          <label className="flex items-center gap-2 text-sm text-neutral-700">
+            <input className="size-4" type="checkbox" checked={editEn} onChange={(e) => setEditEn(e.target.checked)} /> edit English too
           </label>
         </div>
-        <div className={`${card} overflow-x-auto !p-0`}>
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-neutral-50 text-xs uppercase text-neutral-500">
+        <div className={`${card} overflow-auto !p-0 md:max-h-[calc(100dvh-14rem)]`}>
+          <table className={`${table} min-w-[760px]`}>
+            <thead>
               <tr>
-                <th className="px-3 py-2">Key</th>
-                <th className="px-3 py-2">EN</th>
-                <th className="px-3 py-2">UZ</th>
-                <th className="px-3 py-2">RU</th>
+                <th className={`${sth} sm:pl-4`}>Key</th>
+                <th className={sth}>EN</th>
+                <th className={sth}>UZ</th>
+                <th className={`${sth} sm:pr-4`}>RU</th>
               </tr>
             </thead>
             <tbody>
               {shown.map((r) => (
-                <tr key={r.key} className="border-t border-neutral-100 align-top">
-                  <th scope="row" className="px-3 py-2 font-mono text-xs font-normal text-neutral-500">
+                <tr key={r.key} className="transition-colors hover:bg-neutral-50">
+                  <th scope="row" className={`${td} !align-top font-mono text-xs font-normal text-neutral-500 sm:pl-4`}>
                     {r.key}
                   </th>
-                  <td className="px-3 py-2">{cell(r, 'en')}</td>
-                  <td className="px-3 py-2">{cell(r, 'uz')}</td>
-                  <td className="px-3 py-2">{cell(r, 'ru')}</td>
+                  <td className={`${td} !align-top`}>{cell(r, 'en')}</td>
+                  <td className={`${td} !align-top`}>{cell(r, 'uz')}</td>
+                  <td className={`${td} !align-top sm:pr-4`}>{cell(r, 'ru')}</td>
                 </tr>
               ))}
               {shown.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-neutral-500">
+                  <td colSpan={4} className="px-3 py-10 text-center text-sm text-neutral-500">
                     Nothing matches.
                   </td>
                 </tr>
@@ -141,31 +143,31 @@ export default function TranslationsEditor({ rows, specRows, configured }: { row
 
       <section aria-labelledby="spec-h" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="spec-h" className="text-lg font-bold">
+          <h2 id="spec-h" className="text-base font-semibold text-neutral-900">
             Specification dictionary <span className="text-sm font-normal text-neutral-500">({specRows.length} labels)</span>
           </h2>
           <button type="button" className={btn} disabled={pending || changedSpec.length === 0} onClick={saveSpec}>
             Save{changedSpec.length ? ` (${changedSpec.length})` : ''}
           </button>
         </div>
-        <div className={`${card} overflow-x-auto !p-0`}>
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-neutral-50 text-xs uppercase text-neutral-500">
+        <div className={`${card} overflow-auto !p-0 md:max-h-[calc(100dvh-14rem)]`}>
+          <table className={`${table} min-w-[760px]`}>
+            <thead>
               <tr>
-                <th className="px-3 py-2">Key</th>
-                <th className="px-3 py-2">EN</th>
-                <th className="px-3 py-2">UZ</th>
-                <th className="px-3 py-2">RU</th>
+                <th className={`${sth} sm:pl-4`}>Key</th>
+                <th className={sth}>EN</th>
+                <th className={sth}>UZ</th>
+                <th className={`${sth} sm:pr-4`}>RU</th>
               </tr>
             </thead>
             <tbody>
               {specRows.map((r) => (
-                <tr key={r.key} className="border-t border-neutral-100">
-                  <th scope="row" className="px-3 py-2 font-mono text-xs font-normal text-neutral-500">
+                <tr key={r.key} className="transition-colors hover:bg-neutral-50">
+                  <th scope="row" className={`${td} font-mono text-xs font-normal text-neutral-500 sm:pl-4`}>
                     {r.key}
                   </th>
                   {(['en', 'uz', 'ru'] as const).map((l) => (
-                    <td key={l} className="px-3 py-2">
+                    <td key={l} className={`${td} ${l === 'ru' ? 'sm:pr-4' : ''}`}>
                       <input
                         aria-label={`${r.key} ${l}`}
                         className={`${input} !py-1 ${l !== 'en' && !spec[r.key]?.[l]?.trim() ? '!border-amber-400 !bg-amber-50' : ''}`}
@@ -178,7 +180,7 @@ export default function TranslationsEditor({ rows, specRows, configured }: { row
               ))}
               {specRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-neutral-500">
+                  <td colSpan={4} className="px-3 py-10 text-center text-sm text-neutral-500">
                     No spec labels yet. They appear when you import a product.
                   </td>
                 </tr>

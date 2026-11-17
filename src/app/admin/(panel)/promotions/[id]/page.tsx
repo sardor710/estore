@@ -1,8 +1,8 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/admin/session'
 import { loadPromotionInput, targetOptions } from '@/lib/admin/promotions'
-import { PageTitle } from '@/components/admin/ui'
+import { PageHeader } from '@/components/admin/ui'
+import BackLink from '@/components/admin/BackLink'
 import PromotionEditor from '@/components/admin/PromotionEditor'
 
 export const metadata = { title: 'Edit promotion' }
@@ -15,12 +15,8 @@ export default async function EditPromotionPage({ params }: { params: Promise<{ 
   if (!promotion) notFound()
   return (
     <>
-      <p className="mb-2 text-sm">
-        <Link href="/admin/promotions" className="text-neutral-500 underline">
-          Promotions
-        </Link>
-      </p>
-      <PageTitle>{promotion.name}</PageTitle>
+      <BackLink href="/admin/promotions">Promotions</BackLink>
+      <PageHeader title={promotion.name} />
       <PromotionEditor key={promotion.id} initial={promotion} options={options} />
     </>
   )

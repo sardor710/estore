@@ -10,9 +10,12 @@ import { t as l10n } from '@/lib/localized'
 import { formatUzs } from '@/lib/money'
 import { useCart } from '@/lib/cart/useCart'
 import { stepIndex, visibleIndex } from '@/lib/gallery'
+import FavoriteButton from '@/components/account/FavoriteButton'
 
 type Props = {
   locale: Locale
+  /** Enables the favorites heart in the buy box (storefront only; hidden without the shell's provider). */
+  productId?: number
   template: 'SIMPLE' | 'DETAILED'
   title: L10n
   subtitle: L10n
@@ -33,7 +36,7 @@ function isLight(hex: string | null): boolean {
 }
 
 /** Gallery + variant selector + price/stock + add-to-cart. Shared by both templates. */
-export default function ProductHero({ locale, template, title, subtitle, shortSpec, badge, categoryName, images, variants, children }: Props) {
+export default function ProductHero({ locale, productId, template, title, subtitle, shortSpec, badge, categoryName, images, variants, children }: Props) {
   const t = useTranslations('product')
   const { add } = useCart()
   const [variantIdx, setVariantIdx] = useState(() => Math.max(0, variants.findIndex((v) => v.stock > 0)))
@@ -260,6 +263,7 @@ export default function ProductHero({ locale, template, title, subtitle, shortSp
                   </>
                 )}
               </button>
+              {productId != null && <FavoriteButton productId={productId} name={name} locale={locale} variant="hero" />}
             </div>
 
             <ul className="grid grid-cols-2 gap-2 border-y border-neutral-100 py-3 text-center text-[11px] text-neutral-600">

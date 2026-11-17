@@ -22,6 +22,7 @@ const { changeOwnPasswordAction } = await import('@/app/admin/actions/account')
 const { savePromotionAction, togglePromotionAction, deletePromotionAction } = await import('@/app/admin/actions/promotions')
 const { saveBrandAction, deleteBrandAction } = await import('@/app/admin/actions/brands')
 const { updateCustomerAction } = await import('@/app/admin/actions/clients')
+const { saveBannerAction, deleteBannerAction, reorderBannersAction, toggleBannerAction } = await import('@/app/admin/actions/banners')
 const { hashPassword } = await import('@/lib/password')
 
 const saved = { ...process.env }
@@ -128,6 +129,25 @@ describe('server actions enforce permissions server-side', () => {
     expect(p).toMatchObject({ ok: true })
     expect(await togglePromotionAction((p as { id: number }).id, false)).toEqual({ ok: true })
     expect(await prisma.activityLog.count({ where: { userId: pm.id, entity: { in: ['brand', 'promotion'] } } })).toBe(3)
+  })
+
+  it('banner actions: blog editor 403, product manager allowed and logged', async () => {
+    const banner = { title: { uz: 'B' }, text: {}, buttonText: {}, imageUrl: '/uploads/2026/11/ab12.jpg', mobileImageUrl: '', linkUrl: '', active: true, startsAt: null, endsAt: null }
+    await signIn('BLOG_EDITOR')
+    await expect(saveBannerAction(banner)).rejects.toMatchObject(FORBIDDEN)
+    await expect(deleteBannerAction(1)).rejects.toMatchObject(FORBIDDEN)
+    await expect(reorderBannersAction([1])).rejects.toMatchObject(FORBIDDEN)
+    await expect(toggleBannerAction(1, false)).rejects.toMatchObject(FORBIDDEN)
+    expect(await prisma.banner.count()).toBe(0)
+
+    const pm = await signIn('PRODUCT_MANAGER')
+    const r = await saveBannerAction(banner)
+    expect(r).toMatchObject({ ok: true })
+    const id = (r as { id: number }).id
+    expect(await toggleBannerAction(id, false)).toEqual({ ok: true })
+    expect(await reorderBannersAction([id])).toEqual({ ok: true })
+    expect(await deleteBannerAction(id)).toEqual({ ok: true })
+    expect(await prisma.activityLog.count({ where: { userId: pm.id, entity: 'banner' } })).toBe(4)
   })
 
   it('client action: blog editor 403, product manager allowed and logged', async () => {

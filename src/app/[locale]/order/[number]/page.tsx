@@ -29,7 +29,7 @@ export default async function OrderPage({ params }: { params: Promise<{ locale: 
   const order = await prisma.order.findUnique({ where: { number: Number(rawNumber) }, select: { number: true, status: true } })
   if (!order) notFound()
   const t = await getTranslations({ locale, namespace: 'order' })
-  const known = ['NEW', 'CONFIRMED', 'DELIVERED', 'CANCELLED'].includes(order.status)
+  const known = ['NEW', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'CANCELLED'].includes(order.status)
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">

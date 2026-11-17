@@ -7,6 +7,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { getNavCategories, getNewArrivals, getSaleProducts } from '@/lib/catalog'
 import type { Locale } from '@/i18n/routing'
 import { path } from '@/lib/paths'
+import { getActiveBanners } from '@/lib/banners'
 import HeroBanner from '@/components/store/HeroBanner'
 import CategoryTiles from '@/components/store/CategoryTiles'
 import ProductGrid from '@/components/store/ProductGrid'
@@ -32,11 +33,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   setRequestLocale(raw)
   const locale = raw as Locale
   const t = await getTranslations({ locale, namespace: 'home' })
-  const [categories, arrivals, sale] = await Promise.all([getNavCategories(), getNewArrivals(8), getSaleProducts()])
+  const [categories, arrivals, sale, banners] = await Promise.all([getNavCategories(), getNewArrivals(8), getSaleProducts(), getActiveBanners(locale)])
 
   return (
     <>
-      <HeroBanner locale={locale} />
+      <HeroBanner locale={locale} banners={banners} />
 
       <div className="mx-auto max-w-7xl space-y-16 px-4 py-14 sm:px-6 lg:space-y-20 lg:px-8 lg:py-20">
         <section aria-labelledby="cats-h">

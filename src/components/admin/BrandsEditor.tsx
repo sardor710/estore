@@ -65,11 +65,11 @@ export default function BrandsEditor({ brands }: { brands: BrandRow[] }) {
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
 
       <section className={card} aria-labelledby="brand-list">
-        <h2 id="brand-list" className="mb-3 font-bold">
+        <h2 id="brand-list" className="mb-3 text-base font-semibold text-neutral-900">
           Brands
         </h2>
-        {brands.length === 0 ? <p className="text-sm text-neutral-500">No brands yet.</p> : null}
-        <ul className="divide-y divide-neutral-200">
+        {brands.length === 0 ? <p className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-600">No brands yet.</p> : null}
+        <ul className="divide-y divide-neutral-100">
           {brands.map((b) => {
             const draft = drafts[b.id]
             return (
@@ -133,7 +133,7 @@ export default function BrandsEditor({ brands }: { brands: BrandRow[] }) {
           run(() => saveBrandAction(toInput(fresh)), `Created ${fresh.name.trim()}.`, () => setFresh(toDraft()))
         }}
       >
-        <h2 id="brand-add" className="mb-3 font-bold">
+        <h2 id="brand-add" className="mb-3 text-base font-semibold text-neutral-900">
           Add brand
         </h2>
         <div className="flex flex-wrap items-end gap-3">

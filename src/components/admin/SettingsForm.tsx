@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveSettingsAction, testTelegramAction } from '@/app/admin/actions'
+import { connectBotWebhookAction, saveSettingsAction, testTelegramAction } from '@/app/admin/actions'
 import type { SettingsInput, SettingsView } from '@/lib/admin/settings'
 import { Badge, btn, btnGhost, card, input, Label, Notice } from './ui'
 
@@ -21,6 +21,7 @@ export default function SettingsForm({ view, translationConfigured }: { view: Se
   const [chat, setChat] = useState(view.integrations ? view.telegramChatId : '')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState<Msg>(null)
+  const [botStatus, setBotStatus] = useState<{ ok: boolean; text: string } | null>(null)
   const [pending, start] = useTransition()
 
   function save() {
@@ -60,6 +61,18 @@ export default function SettingsForm({ view, translationConfigured }: { view: Se
     })
   }
 
+  function connectBot() {
+    setBotStatus(null)
+    start(async () => {
+      const r = await connectBotWebhookAction()
+      setBotStatus(
+        r.ok
+          ? { ok: true, text: `Customers can now sign in through ${r.username ? `@${r.username}` : 'the bot'}.` }
+          : { ok: false, text: r.error },
+      )
+    })
+  }
+
   const err = (k: string) => (errors[k] ? <p role="alert" className="mt-1 text-sm text-red-700">{errors[k]}</p> : null)
 
   return (
@@ -67,7 +80,7 @@ export default function SettingsForm({ view, translationConfigured }: { view: Se
       {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
 
       <section className={`${card} space-y-4`} aria-labelledby="biz">
-        <h2 id="biz" className="font-bold">Business</h2>
+        <h2 id="biz" className="text-base font-semibold text-neutral-900">Business</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block">
             <Label hint="UZS, 0 = no minimum">Minimum order</Label>
@@ -90,7 +103,7 @@ export default function SettingsForm({ view, translationConfigured }: { view: Se
       {view.integrations ? (
         <>
           <section className={`${card} space-y-4`} aria-labelledby="tg">
-            <h2 id="tg" className="font-bold">Telegram notifications</h2>
+            <h2 id="tg" className="text-base font-semibold text-neutral-900">Telegram notifications</h2>
             <label className="block max-w-md">
               <Label hint={view.telegramTokenSet ? `stored: ${view.telegramTokenMasked}` : 'not set'}>Bot token</Label>
               <input
@@ -119,10 +132,30 @@ export default function SettingsForm({ view, translationConfigured }: { view: Se
               </button>
               <span className="self-center text-xs text-neutral-500">Uses the saved values; save first if you changed them.</span>
             </div>
+            <div className="space-y-2 border-t border-neutral-100 pt-4">
+              <h3 className="text-sm font-semibold text-neutral-900">Customer sign-in bot</h3>
+              <p className="text-sm text-neutral-600">
+                Lets shoppers sign in with Telegram. Registers this site&apos;s address (SITE_URL, https only) with Telegram so the bot
+                answers customers. Uses the saved bot token. For local development run <code className="text-xs">npm run bot:poll</code> instead.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className={btnGhost} disabled={pending} onClick={connectBot}>
+                  Connect bot to website
+                </button>
+                {botStatus ? (
+                  <Badge tone={botStatus.ok ? 'green' : 'amber'}>{botStatus.ok ? 'Connected' : 'Not connected'}</Badge>
+                ) : null}
+              </div>
+              {botStatus ? (
+                <p role="status" className={`text-sm ${botStatus.ok ? 'text-neutral-600' : 'text-red-700'}`}>
+                  {botStatus.text}
+                </p>
+              ) : null}
+            </div>
           </section>
 
           <section className={`${card} space-y-2`} aria-labelledby="trn">
-            <h2 id="trn" className="font-bold">Machine translation</h2>
+            <h2 id="trn" className="text-base font-semibold text-neutral-900">Machine translation</h2>
             <div className="flex items-center gap-2">
               <Badge tone={translationConfigured ? 'green' : 'amber'}>{translationConfigured ? 'Configured' : 'Not configured'}</Badge>
               <span className="text-sm text-neutral-600">

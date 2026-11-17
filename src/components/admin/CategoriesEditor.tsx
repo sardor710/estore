@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveCategoryAction } from '@/app/admin/actions'
 import type { L10n } from '@/lib/localized'
-import { btn, card, input, Label, Notice } from './ui'
+import { btn, btnGhost, card, input, Label, Notice } from './ui'
 import L10nField from './L10nField'
 
 export type CategoryRow = { id: number | null; slug: string; name: L10n; parentId: number | null; sortOrder: number; template: 'SIMPLE' | 'DETAILED' }
@@ -70,7 +70,7 @@ function CategoryForm({ row, all, onSaved }: { row: CategoryRow; all: { id: numb
         </label>
       </div>
       <div className="flex items-center gap-3">
-        <button type="button" className={btn} onClick={save} disabled={pending}>
+        <button type="button" className={btnGhost} onClick={save} disabled={pending}>
           {v.id === null ? 'Create category' : 'Save'}
         </button>
         {ok ? <span role="status" className="text-sm text-green-700">Saved</span> : null}
@@ -89,7 +89,7 @@ export default function CategoriesEditor({ rows }: { rows: CategoryRow[] }) {
       {rows.map((r) => (
         <CategoryForm key={`${r.id}`} row={r} all={all} onSaved={() => router.refresh()} />
       ))}
-      <h2 className="pt-4 text-lg font-bold">New category</h2>
+      <h2 className="pt-4 text-base font-semibold text-neutral-900">New category</h2>
       <CategoryForm key={`new-${adding}`} row={{ id: null, slug: '', name: {}, parentId: null, sortOrder: rows.length ? Math.max(...rows.map((r) => r.sortOrder)) + 1 : 0, template: 'SIMPLE' }} all={all} onSaved={() => { setAdding((n) => n + 1); router.refresh() }} />
       {rows.length === 0 ? <Notice kind="info">No categories yet.</Notice> : null}
     </div>

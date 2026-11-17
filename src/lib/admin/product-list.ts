@@ -4,6 +4,7 @@ import { bestPrice } from '@/lib/pricing'
 import { categoryAncestry, loadActiveRules, priceTargetFor } from '@/lib/promotions'
 import type { L10n } from '@/lib/localized'
 import { completeness } from './products-shared'
+import { variantThumb } from './variant-display'
 
 // Admin product list: URL params -> filters, sorting and paging over computed per-product facts
 // (price range, stock state, completeness, active promotion). The catalog is small (hundreds of
@@ -29,7 +30,7 @@ export type ProductListParams = {
   page?: number
 }
 
-export type ProductRowVariant = { id: number; sku: string; name: string; priceUzs: number; stock: number }
+export type ProductRowVariant = { id: number; sku: string; name: string; priceUzs: number; stock: number; colorHex: string | null; image: string | null }
 
 export type ProductRow = {
   id: number
@@ -152,6 +153,7 @@ async function matching(p: ProductListParams): Promise<ProductRow[]> {
       const hit = titles.some((t) => t.toLowerCase().includes(needle)) || r.variants.some((v) => v.sku.toLowerCase().includes(needle)) || r.slug.includes(needle)
       if (!hit) continue
     }
+    const images = Array.isArray(r.images) ? r.images.filter((x): x is string => typeof x === 'string') : []
     const prices = r.variants.map((v) => v.priceUzs)
     const stocks = r.variants.map((v) => v.stock)
     const totalStock = stocks.reduce((a, b) => a + Math.max(0, b), 0)
@@ -173,10 +175,10 @@ async function matching(p: ProductListParams): Promise<ProductRow[]> {
       title: display(r.title, r.slug),
       status: r.status,
       isDemo: r.isDemo,
-      image: Array.isArray(r.images) && typeof r.images[0] === 'string' ? r.images[0] : null,
+      image: images[0] ?? null,
       category: display(r.category.name, r.category.slug),
       brand: r.brand?.name ?? null,
-      variants: r.variants.map((v) => ({ id: v.id, sku: v.sku, name: display(v.name, v.sku), priceUzs: v.priceUzs, stock: v.stock })),
+      variants: r.variants.map((v) => ({ id: v.id, sku: v.sku, name: display(v.name, v.sku), priceUzs: v.priceUzs, stock: v.stock, colorHex: v.colorHex, image: variantThumb(images, v.imageIndex) })),
       minPrice: prices.length ? Math.min(...prices) : 0,
       maxPrice: prices.length ? Math.max(...prices) : 0,
       totalStock,

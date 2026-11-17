@@ -56,8 +56,35 @@ export function createLimiter(opts: { windowMs: number; max: number; globalMax?:
   }
 }
 
-/** Client key for throttling. X-Forwarded-For is client-controlled; only honour it behind a trusted proxy (TRUST_PROXY=1). */
+/**
+ * Client key for throttling. X-Forwarded-For is client-controlled; only honour it behind a trusted proxy
+ * (TRUST_PROXY=1), and then take the RIGHTMOST entry: the one our proxy appended (anything left of it is whatever
+ * the client sent). Without TRUST_PROXY every client shares the key 'shared' (see createSharedAwareLimiter).
+ */
 export function clientKey(headers: Headers): string {
   if (process.env.TRUST_PROXY !== '1') return 'shared'
-  return headers.get('x-forwarded-for')?.split(',')[0]?.trim() || headers.get('x-real-ip') || 'shared'
+  const xff = (headers.get('x-forwarded-for') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return xff.at(-1) || headers.get('x-real-ip')?.trim() || 'shared'
+}
+
+/**
+ * Per-client limiter that gives the key 'shared' (all clients, when TRUST_PROXY is off) its own, much larger cap,
+ * so a per-IP limit does not turn into one tiny global bucket for the whole shop (same idea as order-throttle.ts).
+ */
+export function createSharedAwareLimiter(opts: { windowMs: number; max: number; sharedMax: number }): Limiter {
+  const perKey = createLimiter({ windowMs: opts.windowMs, max: opts.max })
+  const shared = createLimiter({ windowMs: opts.windowMs, max: opts.sharedMax })
+  const pick = (key: string) => (key === 'shared' ? shared : perKey)
+  return {
+    reserve: (key, now) => pick(key).reserve(key, now),
+    release: (key, at) => pick(key).release(key, at),
+    reset() {
+      perKey.reset()
+      shared.reset()
+    },
+    tracked: () => perKey.tracked() + shared.tracked(),
+  }
 }

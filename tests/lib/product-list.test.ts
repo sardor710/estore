@@ -73,6 +73,18 @@ describe('queryProducts', () => {
     expect((await queryProducts({ promo: false })).rows.map((x) => x.slug)).toEqual(['nopromo'])
   })
 
+  it('variant rows carry color and thumbnail (variant image, else cover) so staff can tell them apart', async () => {
+    const p = await mk('colors', [{ sku: 'C-BLK' }, { sku: 'C-WHT' }], { images: ['https://img/cover.jpg', 'https://img/white.jpg'] })
+    const [blk, wht] = await prisma.variant.findMany({ where: { productId: p.id }, orderBy: { sortOrder: 'asc' } })
+    await prisma.variant.update({ where: { id: blk.id }, data: { colorHex: '#111111', name: { en: 'Black', uz: 'Qora' } } })
+    await prisma.variant.update({ where: { id: wht.id }, data: { colorHex: '#ffffff', imageIndex: 1 } })
+    const [row] = (await queryProducts({ q: 'C-' })).rows
+    expect(row.variants).toEqual([
+      expect.objectContaining({ sku: 'C-BLK', name: 'Black', colorHex: '#111111', image: 'https://img/cover.jpg' }),
+      expect.objectContaining({ sku: 'C-WHT', colorHex: '#ffffff', image: 'https://img/white.jpg' }),
+    ])
+  })
+
   it('sorts and paginates 25 per page', async () => {
     for (let i = 0; i < 27; i++) await mk(`p${String(i).padStart(2, '0')}`, [{ sku: `S${i}`, price: 1000 * (i + 1) }])
     const first = await queryProducts({ sort: 'price', dir: 'desc' })

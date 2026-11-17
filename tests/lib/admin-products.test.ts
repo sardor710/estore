@@ -128,6 +128,18 @@ describe('updateProduct', () => {
     expect(await updateProduct(a.id, inputOf(a, { categoryId: 99999 }))).toMatchObject({ ok: false, errors: { categoryId: expect.any(String) } })
     expect(await updateProduct(a.id, inputOf(a, { templateOverride: 'WEIRD' as never }))).toMatchObject({ ok: false })
   })
+  it('a variant in an order that is out for delivery (SHIPPING) cannot be removed', async () => {
+    const a = await mk('s', [{ sku: 'S1', price: 1, stock: 5 }, { sku: 'S2', price: 1 }])
+    await prisma.order.create({
+      data: {
+        number: 1002, status: 'SHIPPING', name: 'n', phone: 'p', region: 'r', address: 'a', locale: 'uz', totalUzs: 1,
+        lines: { create: [{ variantId: a.variants[0].id, sku: 'S1', productTitle: 't', variantName: 'v', priceUzs: 1, qty: 1 }] },
+      },
+    })
+    const r = await updateProduct(a.id, inputOf(a, { variants: [inputOf(a).variants[1]] }))
+    expect(r).toMatchObject({ ok: false, errors: { variants: expect.stringContaining('S1') } })
+  })
+
   it('refuses to delete a variant that is in an open order', async () => {
     const a = await mk('a', [{ sku: 'A1', price: 1, stock: 5 }, { sku: 'A2', price: 1 }])
     await prisma.order.create({

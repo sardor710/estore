@@ -9,8 +9,10 @@ import { notifyNewOrder, type NotifyOrder } from '@/lib/telegram'
 import { isVariantId, MAX_LINE_QTY, type CartLine } from '@/lib/cart/cart'
 import { loadPricer } from '@/lib/promotions'
 import { upsertCustomerFromOrder } from '@/lib/customers'
+import { insertAddress } from '@/lib/account/addresses'
+import { cleanLatLng, mapLinks } from '@/lib/geo'
 
-export type OrderStatus = 'NEW' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'
+export type OrderStatus = 'NEW' | 'CONFIRMED' | 'SHIPPING' | 'DELIVERED' | 'CANCELLED'
 export type CreateOrderInput = {
   lines: CartLine[]
   name: string
@@ -19,6 +21,12 @@ export type CreateOrderInput = {
   address: string
   comment?: string
   locale: Locale
+  /** Signed-in customer (the route has already forced `phone` to the account phone). Only used for saveAddress. */
+  accountCustomerId?: number
+  /** Also store the delivery address in the account (best effort; never fails the order). */
+  saveAddress?: { label: string } | null
+  /** Optional delivery pin from Telegram location sharing / geolocation; validated by cleanLatLng. */
+  location?: { lat?: unknown; lng?: unknown } | null
 }
 export type CreateOrderResult = { ok: true; number: number } | { ok: false; error: 'INVALID' | 'OUT_OF_STOCK' | 'BELOW_MIN' | 'BLOCKED' }
 export type StatusResult = { ok: true } | { ok: false; error: 'INSUFFICIENT_STOCK' | 'BAD_TRANSITION' }
@@ -111,9 +119,11 @@ export async function createOrder(
   const phone = typeof input?.phone === 'string' ? normalizeUzPhone(input.phone) : null
   const region = typeof input?.region === 'string' ? getRegion(input.region) : undefined
   const locale = input?.locale
+  const loc = input?.location && typeof input.location === 'object' ? input.location : null
+  const pin = cleanLatLng(loc?.lat, loc?.lng)
   if (
     !lines || name.length < 2 || name.length > 100 || address.length < 3 || address.length > 300 || comment.length > 500 ||
-    !phone || !region || !(locales as readonly string[]).includes(locale)
+    !phone || !region || !(locales as readonly string[]).includes(locale) || pin === 'INVALID'
   ) {
     return { ok: false, error: 'INVALID' }
   }
@@ -162,11 +172,18 @@ export async function createOrder(
             comment: comment || null,
             locale,
             totalUzs: total,
+            lat: pin?.lat ?? null,
+            lng: pin?.lng ?? null,
             lines: { create: snap },
+            events: { create: [{ status: 'NEW' }] },
           },
           include: { lines: true },
         })
       })
+
+      if (input.accountCustomerId != null && input.saveAddress) {
+        await saveOrderAddress(input.accountCustomerId, phone, { label: input.saveAddress.label, recipient: name, region: region.code, address, lat: pin?.lat ?? null, lng: pin?.lng ?? null })
+      }
 
       // Fire-and-forget: never affects the response.
       const payload: NotifyOrder = {
@@ -178,6 +195,7 @@ export async function createOrder(
         comment: order.comment,
         totalUzs: order.totalUzs,
         lines: order.lines,
+        mapUrl: pin ? mapLinks(pin.lat, pin.lng).google : null,
       }
       try {
         Promise.resolve((deps.notify ?? notifyNewOrder)(payload)).catch(() => {})
@@ -194,11 +212,31 @@ export async function createOrder(
   return { ok: false, error: 'INVALID' }
 }
 
+/**
+ * Best effort, after the order is committed: only for an existing account that owns the order phone; skipped at
+ * the address limit or when the same address is already saved. Errors are logged and swallowed.
+ */
+async function saveOrderAddress(cid: number, phone: string, a: { label: unknown; recipient: string; region: string; address: string; lat: number | null; lng: number | null }): Promise<void> {
+  try {
+    if (!Number.isSafeInteger(cid) || cid <= 0) return
+    const label = typeof a.label === 'string' ? a.label.trim().slice(0, 40) : ''
+    await prisma.$transaction(async (tx) => {
+      const c = await tx.customer.findUnique({ where: { id: cid }, select: { phone: true, accountCreatedAt: true } })
+      if (!c || !c.accountCreatedAt || c.phone !== phone) return
+      await insertAddress(tx, cid, { label, recipient: a.recipient, region: a.region, address: a.address, lat: a.lat, lng: a.lng }, { skipDuplicate: true })
+    })
+  } catch (e) {
+    console.error('[orders] saving the account address failed', e)
+  }
+}
+
 // ---------- status ----------
 
 const TRANSITIONS: Record<string, OrderStatus[]> = {
   NEW: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['DELIVERED', 'CANCELLED'],
+  // SHIPPING ('out for delivery') is optional: CONFIRMED may still go straight to DELIVERED.
+  CONFIRMED: ['SHIPPING', 'DELIVERED', 'CANCELLED'],
+  SHIPPING: ['DELIVERED', 'CANCELLED'],
   DELIVERED: [],
   CANCELLED: [],
 }
@@ -219,6 +257,7 @@ export async function setOrderStatus(orderId: number, to: OrderStatus): Promise<
       // Guard against concurrent transitions: only move if still in the status we read.
       const moved = await tx.order.updateMany({ where: { id: orderId, status: order.status }, data: { status: to } })
       if (moved.count !== 1) return { ok: false, error: 'BAD_TRANSITION' }
+      await tx.orderStatusEvent.create({ data: { orderId, status: to } })
 
       const perVariant = new Map<number, number>()
       for (const l of order.lines) perVariant.set(l.variantId, (perVariant.get(l.variantId) ?? 0) + l.qty)
@@ -228,7 +267,7 @@ export async function setOrderStatus(orderId: number, to: OrderStatus): Promise<
           const r = await tx.variant.updateMany({ where: { id: variantId, stock: { gte: qty } }, data: { stock: { decrement: qty } } })
           if (r.count !== 1) throw new Insufficient()
         }
-      } else if (order.status === 'CONFIRMED' && to === 'CANCELLED') {
+      } else if ((order.status === 'CONFIRMED' || order.status === 'SHIPPING') && to === 'CANCELLED') {
         for (const [variantId, qty] of perVariant) {
           await tx.variant.updateMany({ where: { id: variantId }, data: { stock: { increment: qty } } })
         }

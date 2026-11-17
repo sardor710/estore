@@ -132,3 +132,51 @@ describe('runAfterResponse', () => {
     expect(task).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('POST /api/orders delivery pin', () => {
+  it('stores a valid lat/lng pair rounded to 6 decimals', async () => {
+    const v = await mkVariant()
+    const r = await orderPOST(post('/api/orders', { ...form, lines: [{ variantId: v.id, qty: 1 }], location: { lat: 41.3110814, lng: 69.240562 } }) as never)
+    expect(r.status).toBe(201)
+    const { number } = await r.json()
+    const o = await prisma.order.findUnique({ where: { number } })
+    expect([o!.lat, o!.lng]).toEqual([41.311081, 69.240562])
+  })
+  it('half a pair or out of range -> 400 INVALID, no order', async () => {
+    const v = await mkVariant()
+    const before = await prisma.order.count()
+    for (const location of [{ lat: 41.3 }, { lat: 'x', lng: 69 }, { lat: 100, lng: 69 }]) {
+      const r = await orderPOST(post('/api/orders', { ...form, lines: [{ variantId: v.id, qty: 1 }], location }, { 'x-forwarded-for': '9.9.9.9' }) as never)
+      expect(r.status).toBe(400)
+      expect(await r.json()).toEqual({ error: 'INVALID' })
+    }
+    expect(await prisma.order.count()).toBe(before)
+  })
+  it('no location -> order without a pin', async () => {
+    const v = await mkVariant()
+    const r = await order([{ variantId: v.id, qty: 1 }])
+    const { number } = await r.json()
+    const o = await prisma.order.findUnique({ where: { number } })
+    expect([o!.lat, o!.lng]).toEqual([null, null])
+  })
+})
+
+describe('POST /api/orders CSRF (appsec review: Mini App session cookie is SameSite=None)', () => {
+  it('cross-site Origin -> 403, no order', async () => {
+    const v = await mkVariant()
+    const before = await prisma.order.count()
+    const r = await order([{ variantId: v.id, qty: 1 }], { origin: 'https://evil.example' })
+    expect(r.status).toBe(403)
+    expect(await prisma.order.count()).toBe(before)
+  })
+  it('text/plain body (simple cross-site form) -> 415, no order', async () => {
+    const v = await mkVariant()
+    const r = await orderPOST(post('/api/orders', { ...form, lines: [{ variantId: v.id, qty: 1 }] }, { 'content-type': 'text/plain' }) as never)
+    expect(r.status).toBe(415)
+  })
+  it('same-site Origin is fine', async () => {
+    const v = await mkVariant()
+    const r = await order([{ variantId: v.id, qty: 1 }], { origin: 'http://localhost:3000', host: 'localhost:3000' })
+    expect(r.status).toBe(201)
+  })
+})

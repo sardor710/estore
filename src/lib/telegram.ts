@@ -10,6 +10,8 @@ export type NotifyOrder = {
   comment?: string | null
   totalUzs: number
   lines: { productTitle: string; variantName: string; qty: number; priceUzs: number }[]
+  /** Map link when the customer attached a delivery pin. */
+  mapUrl?: string | null
 }
 
 export type NotifyResult = 'sent' | 'skipped' | 'failed'
@@ -24,6 +26,7 @@ function summary(o: NotifyOrder): string {
     `Phone: ${o.phone}`,
     `Region: ${o.region}`,
     `Address: ${o.address}`,
+    ...(o.mapUrl ? [`Map: ${o.mapUrl}`] : []),
     ...(o.comment ? [`Comment: ${o.comment}`] : []),
     '',
     ...lines,

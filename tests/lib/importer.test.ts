@@ -43,6 +43,28 @@ describe('parseAnkerHtml image selection (synthetic)', () => {
     expect(p.variants[0].imageUrl).toBeDefined()
     expect(p.images).toContain(p.variants[0].imageUrl)
   })
+  it('names a variant from every option (color + bundle), like anker.com: "Space Black / Power Bank + Charger"', () => {
+    const m = fixture.match(NEXT_RE)!
+    const next = JSON.parse(m[2])
+    const prod = next.props.pageProps.product
+    const opt = (name: string, label: string) => ({ __typename: 'MultipleChoiceOption', name, displayName: name.toLowerCase(), values: [{ label }] })
+    const base = prod.variants[0]
+    prod.variants = [
+      { ...base, sku: 'A1695H11', options: [opt('Color', 'Space Black'), opt('Bundle Choice', 'Power Bank')] },
+      { ...base, sku: 'BUNDLE-B26971Z1-1-A1695H11-1', options: [opt('Color', 'Space Black'), opt('Bundle Choice', 'Power Bank + Charger')] },
+      { ...base, sku: 'ONLY-COLOR', options: [opt('Color', 'Silver')] },
+      { ...base, sku: 'DUP', options: [opt('Color', 'Silver'), opt('Bundle Choice', ' '), opt('Style', 'Silver')] },
+      { ...base, sku: 'NO-OPTIONS', title: 'Default Title', options: [] },
+    ]
+    const html = fixture.replace(m[0], () => m[1] + JSON.stringify(next).split('<').join(String.fromCharCode(92) + 'u003c') + m[3])
+    expect(parseAnkerHtml(html, URL_A120F).variants.map((v) => v.name)).toEqual([
+      'Space Black / Power Bank',
+      'Space Black / Power Bank + Charger',
+      'Silver',
+      'Silver',
+      'Default Title',
+    ])
+  })
   it('a variant image equal to a product image (other query) maps to the stored URL', () => {
     const p = parseAnkerHtml(withImages(['https://cdn.example/a.jpg?v=1', 'https://cdn.example/b.jpg'], 'https://cdn.example/b.jpg?width=200'), URL_A120F)
     expect(p.images).toEqual(['https://cdn.example/a.jpg?v=1', 'https://cdn.example/b.jpg'])

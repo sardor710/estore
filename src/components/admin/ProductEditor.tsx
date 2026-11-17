@@ -24,6 +24,7 @@ import L10nRichField from './L10nRichField'
 import VariantEditor from './VariantEditor'
 import SpecEditor from './SpecEditor'
 import ImagesEditor from './ImagesEditor'
+import { remapImageIndex } from '@/lib/admin/variant-display'
 import { FaqEditor, HighlightsEditor, InTheBoxEditor, SectionsEditor } from './ContentEditor'
 
 type Option = { id: number; label: string }
@@ -46,7 +47,7 @@ const ERROR_TAB: Record<string, TabId> = { slug: 'general', categoryId: 'general
 function Section({ title, children, error, id }: { title: string; children: ReactNode; error?: string; id: string }) {
   return (
     <section className={card} aria-labelledby={id}>
-      <h2 id={id} className="mb-3 text-base font-bold text-neutral-900">
+      <h2 id={id} className="mb-4 border-b border-neutral-100 pb-3 text-base font-semibold text-neutral-900">
         {title}
       </h2>
       {error ? (
@@ -325,7 +326,14 @@ export default function ProductEditor({
     ),
     images: (
       <Section id="img" title="Images" error={errors.images}>
-        <ImagesEditor images={data.images} onChange={(images) => patch({ images })} />
+        <ImagesEditor
+          images={data.images}
+          onChange={(images) => {
+            // Variants point at pictures by index: keep each variant on the same picture when images move or go away.
+            setData((d) => ({ ...d, images, variants: d.variants.map((v) => ({ ...v, imageIndex: remapImageIndex(d.images, images, v.imageIndex) })) }))
+            setDirty(true)
+          }}
+        />
       </Section>
     ),
     specs: (
@@ -347,8 +355,8 @@ export default function ProductEditor({
           Optional. Shown by search engines and link previews. Keep titles within {SEO_TITLE_MAX} and descriptions within {SEO_DESCRIPTION_MAX} characters.
         </p>
         {locales.map((l) => (
-          <fieldset key={l} className="space-y-3 rounded-xl border border-neutral-200 p-3">
-            <legend className="px-1 text-xs font-bold uppercase text-neutral-700">{l}</legend>
+          <fieldset key={l} className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50/60 p-3 sm:p-4">
+            <legend className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-neutral-700">{l}</legend>
             <SeoInput label="SEO title" value={data.seoTitle[l] ?? ''} max={SEO_TITLE_MAX} placeholder={data.title[l] ?? ''} onChange={(v) => setSeo('seoTitle', l, v)} />
             <SeoInput label="SEO description" multiline value={data.seoDescription[l] ?? ''} max={SEO_DESCRIPTION_MAX} onChange={(v) => setSeo('seoDescription', l, v)} />
           </fieldset>
@@ -358,13 +366,13 @@ export default function ProductEditor({
     promotions: (
       <Section id="promo-h" title="Promotions affecting this product">
         {promotions.length === 0 ? (
-          <p className="text-sm text-neutral-500">No active or upcoming promotion applies to this product.</p>
+          <p className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-600">No active or upcoming promotion applies to this product.</p>
         ) : (
           <ul className="divide-y divide-neutral-100">
             {promotions.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
                 <Badge tone={p.state === 'active' ? 'green' : 'blue'}>{p.state}</Badge>
-                <Link href={`/admin/promotions/${p.id}`} className="font-semibold underline-offset-2 hover:underline">
+                <Link href={`/admin/promotions/${p.id}`} className="font-semibold text-neutral-900 underline-offset-2 hover:text-indigo-700 hover:underline">
                   {p.name}
                 </Link>
                 <span className="text-neutral-700">{p.kind === 'PERCENT' ? `-${p.value}%` : `-${p.value.toLocaleString('en')} so'm`}</span>
@@ -386,14 +394,14 @@ export default function ProductEditor({
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={status === 'PUBLISHED' ? 'green' : 'amber'}>{status}</Badge>
         {product.isDemo ? <Badge tone="blue">Demo</Badge> : null}
-        {dirty ? <Badge tone="neutral">Unsaved changes</Badge> : null}
+        {dirty ? <Badge tone="amber">Unsaved changes</Badge> : null}
         {storefront ? (
-          <Link href={storefront} target="_blank" className="inline-flex items-center gap-1 text-sm text-neutral-600 underline">
+          <Link href={storefront} target="_blank" className="inline-flex items-center gap-1 text-sm font-medium text-neutral-600 underline-offset-2 hover:text-indigo-700 hover:underline">
             View in store <ExternalLink size={14} aria-hidden />
           </Link>
         ) : null}
         {product.sourceUrl ? (
-          <a href={product.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-neutral-500 underline">
+          <a href={product.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-neutral-600 underline-offset-2 hover:text-indigo-700 hover:underline">
             Anker page
           </a>
         ) : null}
@@ -406,7 +414,7 @@ export default function ProductEditor({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
         <div className="min-w-0 space-y-4">
-          <div role="tablist" aria-label="Product sections" className="flex gap-1 overflow-x-auto border-b border-neutral-200">
+          <div role="tablist" aria-label="Product sections" className="flex gap-1 overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-50 p-1">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -421,15 +429,15 @@ export default function ProductEditor({
                 tabIndex={tab === t.id ? 0 : -1}
                 onClick={() => openTab(t.id)}
                 onKeyDown={onTabKey}
-                className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition ${
-                  tab === t.id ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'
+                className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  tab === t.id ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-neutral-200' : 'text-neutral-600 hover:bg-white/70 hover:text-neutral-900'
                 }`}
               >
                 {t.label}
                 {tabHasError(t.id) ? (
                   <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" aria-label="has errors" />
                 ) : t.id === 'promotions' && promotions.length ? (
-                  <span className="ml-1.5 rounded-full bg-neutral-100 px-1.5 text-xs text-neutral-600">{promotions.length}</span>
+                  <span className={`ml-1.5 rounded-full px-1.5 text-xs tabular-nums ${tab === t.id ? 'bg-indigo-50 text-indigo-700' : 'bg-neutral-200/70 text-neutral-700'}`}>{promotions.length}</span>
                 ) : null}
               </button>
             ))}
@@ -444,10 +452,10 @@ export default function ProductEditor({
         </div>
 
         <aside aria-labelledby="completeness-h" className={`${card} lg:sticky lg:top-4`}>
-          <h2 id="completeness-h" className="text-sm font-bold text-neutral-900">
+          <h2 id="completeness-h" className="flex items-baseline justify-between text-sm font-semibold text-neutral-900">
             Completeness <span className="tabular-nums">{score.score}%</span>
           </h2>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-200" aria-hidden>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-100" aria-hidden>
             <div className={`h-full ${score.score >= 100 ? 'bg-green-500' : score.score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${score.score}%` }} />
           </div>
           <ul className="mt-3 space-y-1.5 text-xs">
@@ -468,9 +476,10 @@ export default function ProductEditor({
         </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur md:left-56">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-end gap-2">
-          <span className="mr-auto hidden text-sm text-neutral-500 sm:block" aria-live="polite">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_-6px_rgb(0_0_0/0.08)] backdrop-blur sm:px-6 md:left-60 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-end gap-2">
+          <span className="mr-auto hidden items-center gap-2 text-sm text-neutral-600 sm:inline-flex" aria-live="polite">
+            <span aria-hidden className={`size-2 rounded-full ${pending ? 'animate-pulse bg-indigo-500' : dirty ? 'bg-amber-500' : 'bg-green-500'}`} />
             {pending ? 'Working...' : dirty ? 'Unsaved changes' : 'All changes saved'}
           </span>
           <button type="button" className={btnGhost} onClick={duplicate} disabled={pending}>

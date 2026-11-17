@@ -3,6 +3,8 @@ import { adminApi } from '@/lib/admin/api'
 import { logActivity } from '@/lib/admin/activity'
 import { isOrderStatus } from '@/lib/admin/orders'
 import { setOrderStatus } from '@/lib/orders'
+import { notifyOrderStatus } from '@/lib/account/notify'
+import { runAfterResponse } from '@/lib/after-response'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,5 +15,7 @@ export const POST = adminApi<{ params: Promise<{ id: string }> }>('orders', asyn
   const r = await setOrderStatus(id, body.to)
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 409 })
   await logActivity(staff, 'status', 'order', id, `Order status -> ${body.to}`)
+  const to = body.to
+  runAfterResponse(() => notifyOrderStatus(id, to)) // customer's Telegram message; never blocks or fails the change
   return NextResponse.json({ ok: true })
 })

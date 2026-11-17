@@ -26,3 +26,8 @@ export function isSameOrigin(headers: Headers, method: string): boolean {
   const site = headers.get('sec-fetch-site')
   return !site || site === 'same-origin' || site === 'none'
 }
+
+/** JSON API bodies only: a cross-site HTML form can send text/plain, form-urlencoded or multipart, never application/json. */
+export function isJsonContentType(headers: Headers): boolean {
+  return (headers.get('content-type') ?? '').toLowerCase().split(';')[0].trim() === 'application/json'
+}

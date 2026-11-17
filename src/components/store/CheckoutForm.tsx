@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -9,22 +9,90 @@ import type { Locale } from '@/i18n/routing'
 import { formatUzs } from '@/lib/money'
 import { path } from '@/lib/paths'
 import { normalizeUzPhone } from '@/lib/phone'
+import { formatPhone } from '@/components/account/format'
 import { useCart, useCartDrawer } from '@/lib/cart/useCart'
 import { useQuote } from '@/lib/cart/useQuote'
+import { useTgMainButton } from '@/components/tg/useTg'
+import LocationButton from './LocationButton'
+import type { LatLng } from '@/lib/geo'
 
 type FieldErrors = Partial<Record<'name' | 'phone' | 'region' | 'address' | 'comment', string>>
 
-export default function CheckoutForm({ locale, regions }: { locale: Locale; regions: { code: string; name: string }[] }) {
+export type CheckoutAddress = {
+  id: number
+  label: string
+  recipient: string
+  region: string
+  address: string
+  isDefault: boolean
+  lat?: number | null
+  lng?: number | null
+}
+/** Signed-in shopper (null = guest checkout, unchanged). */
+export type CheckoutAccount = { name: string; phone: string; addresses: CheckoutAddress[] }
+
+export default function CheckoutForm({
+  locale,
+  regions,
+  account = null,
+  telegram = false,
+}: {
+  locale: Locale
+  regions: { code: string; name: string }[]
+  account?: CheckoutAccount | null
+  /** Telegram Mini App: Telegram's MainButton places the order (the in-page submit button is hidden). */
+  telegram?: boolean
+}) {
   const t = useTranslations('checkout')
   const tc = useTranslations('cart')
   const router = useRouter()
   const { lines, clear, remove } = useCart()
   const { setOpen: setCartOpen } = useCartDrawer()
   const { quote, loading, error: quoteError, reload } = useQuote(lines, locale)
-  const [values, setValues] = useState({ name: '', phone: '', region: '', address: '', comment: '' })
+  const saved = account?.addresses ?? []
+  // Same limit as MAX_ADDRESSES in src/lib/account/addresses.ts (server-only module): at the limit the option is hidden
+  // instead of being silently ignored by the server.
+  const canSaveAddress = saved.length < 10
+  const preselected = saved.find((a) => a.isDefault) ?? saved[0] ?? null
+  // Saved address id, or 'new'. Choosing a saved address fills recipient (name), region and address.
+  const [choice, setChoice] = useState<number | 'new'>(preselected ? preselected.id : 'new')
+  const [saveNew, setSaveNew] = useState(false)
+  const [newLabel, setNewLabel] = useState('')
+  const [values, setValues] = useState(() => ({
+    name: preselected?.recipient ?? account?.name ?? '',
+    phone: account?.phone ?? '',
+    region: preselected?.region ?? '',
+    address: preselected?.address ?? '',
+    comment: '',
+  }))
   const [errors, setErrors] = useState<FieldErrors>({})
+  const pinOf = (a: CheckoutAddress | null | undefined): LatLng | null => (a && a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null)
+  // Optional delivery pin; a saved address brings its own pin along.
+  const [pin, setPin] = useState<LatLng | null>(() => pinOf(preselected))
+
+  const choose = (c: number | 'new') => {
+    setChoice(c)
+    const a = c === 'new' ? null : saved.find((x) => x.id === c)
+    setPin(pinOf(a))
+    setValues((v) => (a ? { ...v, name: a.recipient, region: a.region, address: a.address } : { ...v, name: account?.name || v.name, region: '', address: '' }))
+    setErrors((e) => ({ ...e, name: undefined, region: undefined, address: undefined }))
+  }
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const tTg = useTranslations('tg')
+  const mainTotal = quote?.totalUzs ?? 0
+  // same rule as `blocked` below (computed here because hooks run before the empty-cart return)
+  const mainBlocked =
+    !quote ||
+    mainTotal <= 0 ||
+    mainTotal < quote.minOrderUzs ||
+    quote.items.some((i) => !i.available || i.stock === 0 || (i.available && i.stock > 0 && i.qty > i.stock))
+  const tgButton = useTgMainButton(
+    telegram && lines.length > 0 && quote && mainTotal > 0 ? tTg('placeOrderButton', { total: formatUzs(mainTotal, locale) }) : null,
+    () => formRef.current?.requestSubmit(),
+    { disabled: submitting || mainBlocked, progress: submitting },
+  )
 
   const set = (k: keyof typeof values) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setValues((v) => ({ ...v, [k]: e.target.value }))
@@ -52,7 +120,7 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
   const validate = (): FieldErrors => {
     const e: FieldErrors = {}
     if (values.name.trim().length < 2) e.name = t('errors.name')
-    if (!normalizeUzPhone(values.phone)) e.phone = t('errors.phone')
+    if (!account && !normalizeUzPhone(values.phone)) e.phone = t('errors.phone')
     if (!regions.some((r) => r.code === values.region)) e.region = t('errors.region')
     if (values.address.trim().length < 3) e.address = t('errors.address')
     if (values.comment.trim().length > 500) e.comment = t('errors.comment')
@@ -71,7 +139,14 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ lines, ...values, locale }),
+        body: JSON.stringify({
+          lines,
+          ...values,
+          locale,
+          location: pin,
+          // Signed in: the server uses the account phone anyway; optionally keep the new address.
+          ...(account && choice === 'new' && canSaveAddress && saveNew ? { saveAddress: { label: newLabel.trim() } } : {}),
+        }),
       })
       const data = (await res.json().catch(() => ({}))) as { number?: number; error?: string }
       if (res.ok && typeof data.number === 'number') {
@@ -109,7 +184,7 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
   const border = (id: keyof FieldErrors) => (errors[id] ? 'border-red-400' : 'border-neutral-200')
 
   return (
-    <form onSubmit={onSubmit} noValidate className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px]">
+    <form ref={formRef} onSubmit={onSubmit} noValidate className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px]">
       <section aria-labelledby="co-details" className="space-y-5">
         <h2 id="co-details" className="text-lg font-bold text-neutral-900">
           {t('details')}
@@ -119,7 +194,25 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
           t('name'),
           <input id="co-name" name="name" autoComplete="name" value={values.name} onChange={set('name')} className={`${input} ${border('name')}`} {...aria('name')} />,
         )}
-        {field(
+        {account ? (
+          <div>
+            <label htmlFor="co-phone" className="mb-1.5 block text-sm font-semibold text-neutral-800">
+              {t('phone')}
+            </label>
+            <input
+              id="co-phone"
+              name="phone"
+              type="tel"
+              readOnly
+              value={formatPhone(account.phone)}
+              aria-describedby="co-phone-hint"
+              className={`${input} border-neutral-200 bg-neutral-50 text-neutral-600`}
+            />
+            <p id="co-phone-hint" className="mt-1 text-xs text-neutral-500">
+              <span className="font-semibold text-neutral-700">{t('fromAccount')}.</span> {t('phoneLocked')}
+            </p>
+          </div>
+        ) : field(
           'phone',
           t('phone'),
           <input
@@ -134,6 +227,43 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
             className={`${input} ${border('phone')}`}
             {...aria('phone')}
           />,
+        )}
+        {account && saved.length > 0 && (
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold text-neutral-800">{t('savedAddresses')}</legend>
+            <div className="space-y-2">
+              {saved.map((a) => (
+                <label
+                  key={a.id}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-neutral-900 ${
+                    choice === a.id ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200 hover:border-neutral-400'
+                  }`}
+                >
+                  <input type="radio" name="co-saved" checked={choice === a.id} onChange={() => choose(a.id)} className="mt-0.5 h-4 w-4 accent-neutral-900" />
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2 font-semibold text-neutral-900">
+                      {a.label || a.recipient}
+                      {a.isDefault && (
+                        <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">{t('defaultAddress')}</span>
+                      )}
+                    </span>
+                    <span className="block break-words text-neutral-600">
+                      {a.label ? `${a.recipient}, ` : ''}
+                      {regions.find((r) => r.code === a.region)?.name ?? a.region}, {a.address}
+                    </span>
+                  </span>
+                </label>
+              ))}
+              <label
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-neutral-900 ${
+                  choice === 'new' ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200 hover:border-neutral-400'
+                }`}
+              >
+                <input type="radio" name="co-saved" checked={choice === 'new'} onChange={() => choose('new')} className="h-4 w-4 accent-neutral-900" />
+                {t('newAddress')}
+              </label>
+            </div>
+          </fieldset>
         )}
         {field(
           'region',
@@ -162,6 +292,30 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
           />,
           t('addressHint'),
         )}
+        {account && choice === 'new' && canSaveAddress && (
+          <div className="rounded-xl bg-neutral-50 p-4">
+            <label className="flex items-center gap-2.5 text-sm font-semibold text-neutral-800">
+              <input type="checkbox" checked={saveNew} onChange={(e) => setSaveNew(e.target.checked)} className="h-4 w-4 accent-neutral-900" />
+              {t('saveAddress')}
+            </label>
+            {saveNew && (
+              <div className="mt-3">
+                <label htmlFor="co-label" className="mb-1.5 block text-sm font-semibold text-neutral-800">
+                  {t('addressLabel')}
+                </label>
+                <input
+                  id="co-label"
+                  value={newLabel}
+                  maxLength={40}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  placeholder={t('addressLabelPlaceholder')}
+                  className={`${input} border-neutral-200`}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        <LocationButton value={pin} onChange={setPin} />
         {field(
           'comment',
           t('comment'),
@@ -239,6 +393,7 @@ export default function CheckoutForm({ locale, regions }: { locale: Locale; regi
 
         <button
           type="submit"
+          hidden={tgButton}
           disabled={submitting || blocked}
           className="mt-4 w-full rounded-full bg-neutral-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
         >

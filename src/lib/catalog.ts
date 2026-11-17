@@ -87,7 +87,8 @@ export function resolveTemplate(p: { templateOverride: string | null }, c: { tem
 const asArray = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 const asL10n = (v: unknown): L10n => (v && typeof v === 'object' && !Array.isArray(v) ? (v as L10n) : {})
 
-type ProductWithVariants = {
+/** Product row (with its variants) that `toCard` maps to a storefront card. */
+export type ProductWithVariants = {
   id: number
   slug: string
   categoryId: number
@@ -106,7 +107,8 @@ function effective<V extends { priceUzs: number; compareAtUzs: number | null }>(
   return r.promotionId === null ? { ...v, discounted: false } : { ...v, priceUzs: r.priceUzs, compareAtUzs: r.originalUzs, discounted: true }
 }
 
-function toCard(p: ProductWithVariants, price: Pricer): CardProduct {
+/** Storefront card of a product (cheapest variant after active promotions, first in-stock variant for quick add). */
+export function toCard(p: ProductWithVariants, price: Pricer): CardProduct {
   const vs = p.variants.map((v) => effective(v, p, price)).sort((a, b) => a.priceUzs - b.priceUzs || a.sortOrder - b.sortOrder)
   const cheapest = vs[0]
   const firstInStock = vs.find((v) => v.stock > 0)

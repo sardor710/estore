@@ -4,7 +4,8 @@ import { CUSTOMERS_PAGE_SIZE, SEGMENTS, isCustomerSort, isSegment, listCustomers
 import { formatUzs } from '@/lib/money'
 import { getRegion } from '@/lib/regions'
 import { tashkentDay } from '@/lib/analytics/visitor'
-import { Badge, PageTitle, btn, btnGhost, card, input } from '@/components/admin/ui'
+import { Users } from 'lucide-react'
+import { Badge, EmptyState, Label, PageHeader, Toolbar, btn, btnGhost, card, input, table, td, th } from '@/components/admin/ui'
 
 export const metadata = { title: 'Clients' }
 
@@ -12,7 +13,7 @@ type Search = { q?: string; segment?: string; sort?: string; page?: string }
 
 const SEGMENT_TONE: Record<Segment, 'blue' | 'neutral' | 'amber' | 'red'> = { NEW: 'blue', RETURNING: 'neutral', VIP: 'amber', INACTIVE: 'red' }
 const SORT_LABEL: Record<CustomerSort, string> = { last: 'Last order', spent: 'Total spent', orders: 'Orders', name: 'Name' }
-const fieldLabel = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500'
+const sth = `${th} sticky top-0 z-10`
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requirePermission('clients')
@@ -36,23 +37,23 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageTitle
+      <PageHeader
+        title="Clients"
         actions={
           <a href={`/api/admin/clients/export${exportQs ? `?${exportQs}` : ''}`} className={btnGhost}>
             Export CSV
           </a>
         }
-      >
-        Clients
-      </PageTitle>
+      />
 
-      <form method="get" className={`${card} mb-4 flex flex-wrap items-end gap-3`}>
+      <Toolbar>
+      <form method="get" className="contents">
         <label className="min-w-[12rem] flex-1">
-          <span className={fieldLabel}>Search</span>
+          <Label>Search</Label>
           <input className={input} name="q" defaultValue={q} placeholder="Name or phone" />
         </label>
         <label>
-          <span className={fieldLabel}>Segment</span>
+          <Label>Segment</Label>
           <select className={input} name="segment" defaultValue={segment ?? ''}>
             <option value="">All</option>
             {SEGMENTS.map((s) => (
@@ -63,7 +64,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           </select>
         </label>
         <label>
-          <span className={fieldLabel}>Sort by</span>
+          <Label>Sort by</Label>
           <select className={input} name="sort" defaultValue={sort}>
             {(Object.keys(SORT_LABEL) as CustomerSort[]).map((s) => (
               <option key={s} value={s}>
@@ -72,33 +73,32 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
             ))}
           </select>
         </label>
-        <button type="submit" className={btn}>
+        <button type="submit" className={btnGhost}>
           Apply
         </button>
       </form>
+      </Toolbar>
 
       {rows.length === 0 ? (
-        <div className={`${card} text-sm text-neutral-500`}>
-          {q || segment ? 'No clients match these filters.' : 'No clients yet. They appear with the first order.'}
-        </div>
+        <EmptyState icon={Users} title={q || segment ? 'No clients match these filters.' : 'No clients yet. They appear with the first order.'} />
       ) : (
-        <div className={`${card} overflow-x-auto`}>
-          <table className="w-full min-w-[840px] text-left text-sm">
-            <thead className="text-xs uppercase text-neutral-500">
+        <div className={`${card} overflow-auto !p-0 md:max-h-[calc(100dvh-16rem)]`}>
+          <table className={`${table} min-w-[840px]`}>
+            <thead>
               <tr>
-                <th className="pb-2">Client</th>
-                <th className="pb-2">Region</th>
-                <th className="pb-2">Segment</th>
-                <th className="pb-2 text-right">Orders</th>
-                <th className="pb-2 text-right">Spent</th>
-                <th className="pb-2 pl-3">Last order</th>
+                <th className={`${sth} sm:pl-5`}>Client</th>
+                <th className={sth}>Region</th>
+                <th className={sth}>Segment</th>
+                <th className={`${sth} text-right`}>Orders</th>
+                <th className={`${sth} text-right`}>Spent</th>
+                <th className={`${sth} sm:pr-5`}>Last order</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((c) => (
-                <tr key={c.id} className="border-t border-neutral-100 align-top">
-                  <td className="py-2 pr-3">
-                    <Link href={`/admin/clients/${c.id}`} className="font-semibold text-neutral-900 underline-offset-2 hover:underline">
+                <tr key={c.id} className="transition-colors hover:bg-neutral-50">
+                  <td className={`${td} sm:pl-5`}>
+                    <Link href={`/admin/clients/${c.id}`} className="font-semibold text-neutral-900 underline-offset-2 hover:text-indigo-700 hover:underline">
                       {c.name}
                     </Link>
                     {c.blocked ? (
@@ -106,15 +106,20 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                         <Badge tone="red">Blocked</Badge>
                       </span>
                     ) : null}
+                    {c.accountCreatedAt ? (
+                      <span className="ml-2" title={`Telegram account since ${tashkentDay(c.accountCreatedAt)}`}>
+                        <Badge tone="accent">Account</Badge>
+                      </span>
+                    ) : null}
                     <div className="text-xs text-neutral-500">{c.phone}</div>
                   </td>
-                  <td className="py-2 pr-3 text-neutral-700">{getRegion(c.region)?.name.en ?? c.region}</td>
-                  <td className="py-2 pr-3">
+                  <td className={`${td} text-neutral-700`}>{c.region ? (getRegion(c.region)?.name.en ?? c.region) : '-'}</td>
+                  <td className={td}>
                     <Badge tone={SEGMENT_TONE[c.segment]}>{c.segment}</Badge>
                   </td>
-                  <td className="py-2 pr-3 text-right">{c.orders}</td>
-                  <td className="whitespace-nowrap py-2 pr-3 text-right">{formatUzs(c.spentUzs, 'en')}</td>
-                  <td className="whitespace-nowrap py-2 pl-3 text-xs text-neutral-600">{c.lastOrderAt ? tashkentDay(c.lastOrderAt) : '-'}</td>
+                  <td className={`${td} text-right tabular-nums`}>{c.orders}</td>
+                  <td className={`${td} whitespace-nowrap text-right tabular-nums`}>{formatUzs(c.spentUzs, 'en')}</td>
+                  <td className={`${td} whitespace-nowrap text-xs text-neutral-600 sm:pr-5`}>{c.lastOrderAt ? tashkentDay(c.lastOrderAt) : '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -123,7 +128,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
       )}
 
       {pages > 1 ? (
-        <nav className="mt-4 flex items-center justify-between text-sm" aria-label="Pagination">
+        <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Pagination">
           {page > 1 ? (
             <Link href={`/admin/clients?${qs({ page: page - 1 })}`} className={btnGhost}>
               Previous

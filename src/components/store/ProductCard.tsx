@@ -10,6 +10,7 @@ import { t as l10n } from '@/lib/localized'
 import { formatUzs } from '@/lib/money'
 import { path } from '@/lib/paths'
 import { useCart } from '@/lib/cart/useCart'
+import FavoriteButton from '@/components/account/FavoriteButton'
 
 export default function ProductCard({ product, locale }: { product: CardProduct; locale: Locale }) {
   const t = useTranslations('product')
@@ -63,6 +64,10 @@ export default function ProductCard({ product, locale }: { product: CardProduct;
           {shortSpec && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-500">{shortSpec}</p>}
         </div>
       </Link>
+      {/* Outside the link (no button inside <a>), positioned over the image's top-right corner. */}
+      <div className="absolute right-5 top-5 z-10 sm:right-6 sm:top-6">
+        <FavoriteButton productId={product.id} name={title} locale={locale} />
+      </div>
 
       <div className="mt-3 flex items-end justify-between gap-2 border-t border-neutral-100 pt-3">
         <div className="flex flex-wrap items-baseline gap-x-2">

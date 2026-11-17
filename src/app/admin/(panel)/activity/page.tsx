@@ -1,8 +1,9 @@
 import Link from 'next/link'
+import { History } from 'lucide-react'
 import { requirePermission } from '@/lib/admin/session'
 import { ACTIVITY_PAGE_SIZE, activityEntities, listActivity } from '@/lib/admin/activity'
 import { listUsers } from '@/lib/admin/users'
-import { Badge, PageTitle, btn, btnGhost, card, input, Label } from '@/components/admin/ui'
+import { Badge, EmptyState, PageHeader, Toolbar, btn, btnGhost, card, input, Label, table, td, th } from '@/components/admin/ui'
 
 export const metadata = { title: 'Activity log' }
 
@@ -16,6 +17,7 @@ const ACTION_TONE: Record<string, 'neutral' | 'green' | 'amber' | 'red' | 'blue'
   status: 'amber',
   login: 'neutral',
 }
+const sth = `${th} sticky top-0 z-10`
 const day = (v: string | undefined) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)
 
 export default async function ActivityPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -45,10 +47,11 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageTitle>Activity log</PageTitle>
+      <PageHeader title="Activity log" />
 
-      <form method="get" className={`${card} mb-4 grid gap-3 sm:grid-cols-5 sm:items-end`}>
-        <label className="block">
+      <Toolbar>
+      <form method="get" className="grid w-full grid-cols-2 gap-3 sm:grid-cols-5 sm:items-end">
+        <label className="col-span-2 block sm:col-span-1">
           <Label>User</Label>
           <select name="user" defaultValue={filter.userId ? String(filter.userId) : ''} className={input}>
             <option value="">All users</option>
@@ -59,7 +62,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
             ))}
           </select>
         </label>
-        <label className="block">
+        <label className="col-span-2 block sm:col-span-1">
           <Label>Entity</Label>
           <select name="entity" defaultValue={filter.entity ?? ''} className={input}>
             <option value="">Everything</option>
@@ -78,8 +81,8 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           <Label hint="inclusive">To</Label>
           <input type="date" name="to" defaultValue={filter.to ?? ''} className={input} />
         </label>
-        <div className="flex gap-2">
-          <button type="submit" className={btn}>
+        <div className="col-span-2 flex gap-2 sm:col-span-1">
+          <button type="submit" className={btnGhost}>
             Filter
           </button>
           <Link href="/admin/activity" className={btnGhost}>
@@ -87,29 +90,30 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           </Link>
         </div>
       </form>
+      </Toolbar>
 
       {rows.length === 0 ? (
-        <div className={`${card} text-sm text-neutral-500`}>No activity matches these filters.</div>
+        <EmptyState icon={History} title="No activity matches these filters." />
       ) : (
-        <div className={`${card} overflow-x-auto p-0 sm:p-0`}>
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
+        <div className={`${card} overflow-auto !p-0 md:max-h-[calc(100dvh-18rem)]`}>
+          <table className={`${table} min-w-[640px]`}>
+            <thead>
               <tr>
-                <th scope="col" className="px-4 py-3 font-semibold">When</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Who</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Action</th>
-                <th scope="col" className="px-4 py-3 font-semibold">What</th>
+                <th scope="col" className={`${sth} sm:pl-5`}>When</th>
+                <th scope="col" className={sth}>Who</th>
+                <th scope="col" className={sth}>Action</th>
+                <th scope="col" className={`${sth} sm:pr-5`}>What</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="align-top">
-                  <td className="whitespace-nowrap px-4 py-2 text-neutral-600">{fmt.format(r.createdAt)}</td>
-                  <td className="px-4 py-2 text-neutral-900">{r.userEmail}</td>
-                  <td className="px-4 py-2">
+                <tr key={r.id} className="transition-colors hover:bg-neutral-50">
+                  <td className={`${td} whitespace-nowrap !align-top text-neutral-600 sm:pl-5`}>{fmt.format(r.createdAt)}</td>
+                  <td className={`${td} !align-top text-neutral-900`}>{r.userEmail}</td>
+                  <td className={`${td} !align-top`}>
                     <Badge tone={ACTION_TONE[r.action] ?? 'neutral'}>{r.action}</Badge>
                   </td>
-                  <td className="px-4 py-2 text-neutral-800">
+                  <td className={`${td} !align-top sm:pr-5`}>
                     <span className="text-neutral-500">
                       {r.entity}
                       {r.entityId ? ` #${r.entityId}` : ''}:
@@ -123,7 +127,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      <nav aria-label="Pagination" className="mt-4 flex items-center justify-between text-sm text-neutral-600">
+      <nav aria-label="Pagination" className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-600">
         <span>
           {total} entr{total === 1 ? 'y' : 'ies'} · page {Math.min(page, pages)} of {pages}
         </span>

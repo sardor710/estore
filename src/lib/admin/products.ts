@@ -131,12 +131,12 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
   const removed = existing.variants.filter((e) => !keepIds.has(e.id))
   if (removed.length) {
     const open = await prisma.orderLine.findMany({
-      where: { variantId: { in: removed.map((r) => r.id) }, order: { status: { in: ['NEW', 'CONFIRMED'] } } },
+      where: { variantId: { in: removed.map((r) => r.id) }, order: { status: { in: ['NEW', 'CONFIRMED', 'SHIPPING'] } } },
       select: { variantId: true },
     })
     for (const vid of new Set(open.map((o) => o.variantId))) {
       const sku = removed.find((r) => r.id === vid)?.sku
-      vErrors.push(`Variant ${sku} is in an open order (NEW/CONFIRMED) and cannot be removed.`)
+      vErrors.push(`Variant ${sku} is in an open order (new, confirmed or out for delivery) and cannot be removed.`)
     }
   }
   // A live product must stay sellable: same gate as publishing (never silently unpublish).
@@ -229,11 +229,11 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
 const BULK_TYPES: readonly string[] = ['publish', 'unpublish', 'delete', 'setCategory', 'setBrand', 'addToPromotion']
 const MAX_BULK = 500
 
-/** True when any variant of the product is in a NEW/CONFIRMED order (deleting it would break stock handling). */
+/** True when any variant of the product is in a NEW/CONFIRMED/SHIPPING order (deleting it would break stock handling). */
 async function inOpenOrder(tx: Prisma.TransactionClient, productId: number): Promise<boolean> {
   const variants = await tx.variant.findMany({ where: { productId }, select: { id: true } })
   if (!variants.length) return false
-  const n = await tx.orderLine.count({ where: { variantId: { in: variants.map((v) => v.id) }, order: { status: { in: ['NEW', 'CONFIRMED'] } } } })
+  const n = await tx.orderLine.count({ where: { variantId: { in: variants.map((v) => v.id) }, order: { status: { in: ['NEW', 'CONFIRMED', 'SHIPPING'] } } } })
   return n > 0
 }
 
@@ -321,7 +321,7 @@ export async function bulkAction(ids: number[], a: BulkActionInput, actor: Staff
     } else if (a.type === 'delete') {
       const promos = await deleteProductEverywhere(id)
       if (!promos) {
-        out.skipped.push({ id, reason: 'A variant is in an open order (NEW/CONFIRMED); finish or cancel the order first.' })
+        out.skipped.push({ id, reason: 'A variant is in an open order (new, confirmed or out for delivery); finish or cancel the order first.' })
         continue
       }
       for (const pr of promos) {
