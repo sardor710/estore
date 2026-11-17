@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/db'
-import { SITE_URL, alternatesFor, productJsonLd, jsonLdScript, stripHtml, truncate } from '@/lib/seo'
+import { SITE_URL, alternatesFor, articleJsonLd, productJsonLd, jsonLdScript, stripHtml, truncate } from '@/lib/seo'
 import sitemap from '@/app/sitemap'
 import robots from '@/app/robots'
 
@@ -75,6 +75,45 @@ describe('productJsonLd edge cases', () => {
     const ld = productJsonLd(product, [], 'en') as any
     expect('offers' in ld).toBe(false)
     expect('sku' in ld).toBe(false)
+  })
+})
+
+describe('articleJsonLd', () => {
+  const post = {
+    slug: 'hello', title: { en: 'Hello', uz: 'Salom' }, excerpt: { en: 'Ex' }, contentHtml: { en: '<p>Body text</p>' },
+    seoTitle: {}, seoDescription: {}, coverImage: '/uploads/2026/06/ab12.png',
+    publishedAt: new Date('2026-06-01T00:00:00Z'), updatedAt: new Date('2026-06-02T00:00:00Z'),
+  }
+  it('is a BlogPosting with language, dates and absolute image', () => {
+    const ld = articleJsonLd(post, 'uz') as any
+    expect(ld['@type']).toBe('BlogPosting')
+    expect(ld.headline).toBe('Salom')
+    expect(ld.inLanguage).toBe('uz')
+    expect(ld.datePublished).toBe('2026-06-01T00:00:00.000Z')
+    expect(ld.dateModified).toBe('2026-06-02T00:00:00.000Z')
+    expect(ld.image).toEqual([`${SITE_URL}/uploads/2026/06/ab12.png`])
+    expect(ld.mainEntityOfPage).toBe(`${SITE_URL}/uz/blog/hello`)
+  })
+  it('omits image without a cover', () => {
+    expect('image' in (articleJsonLd({ ...post, coverImage: null }, 'en') as any)).toBe(false)
+  })
+})
+
+describe('sitemap blog', () => {
+  it('lists the blog index and visible posts in 3 locales', async () => {
+    const mk = (slug: string, status: string, publishedAt: Date | null) =>
+      prisma.blogPost.create({
+        data: { slug, status, publishedAt, title: { en: slug }, excerpt: {}, contentHtml: {}, seoTitle: {}, seoDescription: {}, tags: [], reviewed: {} },
+      })
+    await mk('live-post', 'PUBLISHED', new Date('2026-01-01'))
+    await mk('draft-post', 'DRAFT', null)
+    await mk('future-post', 'PUBLISHED', new Date('2999-01-01'))
+    const urls = (await sitemap()).map((e) => e.url)
+    for (const l of ['uz', 'ru', 'en']) {
+      expect(urls).toContain(`${SITE_URL}/${l}/blog/live-post`)
+      expect(urls).toContain(`${SITE_URL}/${l}/blog`)
+    }
+    expect(urls.some((u) => u.includes('draft-post') || u.includes('future-post'))).toBe(false)
   })
 })
 

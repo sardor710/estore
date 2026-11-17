@@ -97,6 +97,12 @@ export default function Navbar({ locale, categories }: { locale: Locale; categor
           >
             {t('sale')}
           </Link>
+          <Link
+            href={path(locale, '/blog')}
+            className="rounded-full px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900"
+          >
+            {t('blog')}
+          </Link>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
@@ -163,6 +169,13 @@ export default function Navbar({ locale, categories }: { locale: Locale; categor
               className="block rounded-lg px-3 py-2.5 text-base font-semibold text-red-600 hover:bg-red-50"
             >
               {t('sale')}
+            </Link>
+            <Link
+              href={path(locale, '/blog')}
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-2.5 text-base font-semibold text-neutral-900 hover:bg-neutral-50"
+            >
+              {t('blog')}
             </Link>
           </nav>
           <div className="mt-4 sm:hidden">

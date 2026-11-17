@@ -2,6 +2,7 @@
   "store": { "name": "Electronics Store", "tagline": "Chargers, audio and smart gadgets" },
   "nav": {
     "sale": "Sale",
+    "blog": "Blog",
     "search": "Search",
     "searchPlaceholder": "Search products or SKU",
     "cart": "Cart",
@@ -77,6 +78,19 @@
     "title": "Sale",
     "subtitle": "Discounted products",
     "empty": "There are no discounted products right now."
+  },
+  "blog": {
+    "title": "Blog",
+    "subtitle": "News, guides and tips",
+    "readMore": "Read more",
+    "empty": "No articles yet.",
+    "tag": "Tag",
+    "allTags": "All",
+    "related": "Related articles",
+    "back": "All articles",
+    "prev": "Previous",
+    "next": "Next",
+    "page": "Page {page} of {pages}"
   },
   "footer": {
     "about": "Original chargers, audio and smart gadgets with delivery across Uzbekistan.",
@@ -160,6 +174,7 @@
   "seo": {
     "homeDescription": "Chargers, power banks, audio and smart gadgets. Delivery across Uzbekistan.",
     "categoryDescription": "{name} — buy in Uzbekistan with prices in UZS, original products and delivery.",
-    "saleDescription": "Discounted electronics with prices in UZS and delivery across Uzbekistan."
+    "saleDescription": "Discounted electronics with prices in UZS and delivery across Uzbekistan.",
+    "blogDescription": "Guides, news and tips about chargers, audio and smart gadgets."
   }
 }

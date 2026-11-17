@@ -75,3 +75,39 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* Generic rich-content styles for sanitized CKEditor output (blog posts; product descriptions adopt it in M8) */
+.rich-content { color: #404040; line-height: 1.75; font-size: 1.0625rem; overflow-wrap: anywhere; }
+.rich-content > * + * { margin-top: 1em; }
+.rich-content h2, .rich-content h3, .rich-content h4 { color: #171717; font-weight: 700; line-height: 1.25; margin-top: 1.6em; }
+.rich-content h2 { font-size: 1.6em; }
+.rich-content h3 { font-size: 1.3em; }
+.rich-content h4 { font-size: 1.1em; }
+.rich-content ul { list-style: disc; padding-left: 1.4em; }
+.rich-content ol { list-style: decimal; padding-left: 1.4em; }
+.rich-content a { color: #0b57d0; text-decoration: underline; }
+.rich-content blockquote { border-left: 4px solid #d4d4d4; padding-left: 1em; color: #525252; font-style: italic; }
+.rich-content img { max-width: 100%; height: auto; border-radius: 0.75rem; }
+.rich-content figure { margin-left: 0; margin-right: 0; }
+.rich-content figure.image { display: table; clear: both; text-align: center; margin-left: auto; margin-right: auto; max-width: 100%; }
+.rich-content figure.image img { display: block; margin: 0 auto; }
+.rich-content figure.image-inline { display: inline-block; }
+.rich-content figcaption { display: table-caption; caption-side: bottom; font-size: 0.85em; color: #737373; padding: 0.4em 0; text-align: center; }
+.rich-content .image-style-side { float: right; max-width: 50%; margin-left: 1.5em; }
+.rich-content .image-style-align-left { float: left; max-width: 50%; margin-right: 1.5em; }
+.rich-content .image-style-align-right { float: right; max-width: 50%; margin-left: 1.5em; }
+.rich-content .image-style-align-center, .rich-content .image-style-block-align-center { margin-left: auto; margin-right: auto; }
+.rich-content .image-style-block-align-left { margin-right: auto; margin-left: 0; }
+.rich-content .image-style-block-align-right { margin-left: auto; margin-right: 0; }
+.rich-content .text-align-left { text-align: left; }
+.rich-content .text-align-center { text-align: center; }
+.rich-content .text-align-right { text-align: right; }
+.rich-content .text-align-justify { text-align: justify; }
+.rich-content figure.media { clear: both; width: 100%; }
+.rich-content figure.media > div { position: relative; width: 100%; }
+.rich-content .media iframe { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 0; border-radius: 0.75rem; }
+.rich-content figure.table, .rich-content .table { display: block; max-width: 100%; overflow-x: auto; }
+.rich-content table { border-collapse: collapse; width: 100%; }
+.rich-content th, .rich-content td { border: 1px solid #d4d4d4; padding: 0.5em 0.75em; text-align: left; vertical-align: top; }
+.rich-content th { background: #f5f5f5; font-weight: 600; }
+.rich-content::after { content: ''; display: block; clear: both; }

@@ -113,3 +113,39 @@ export function productJsonLd(product: LdProduct, variants: LdVariant | LdVarian
 export function jsonLdScript(data: unknown): string {
   return JSON.stringify(data).replace(/</g, '\\u003c')
 }
+
+type LdPost = {
+  slug: string
+  title: L10n
+  excerpt: L10n
+  contentHtml: L10n
+  seoTitle?: L10n
+  seoDescription?: L10n
+  coverImage: string | null
+  publishedAt: Date
+  updatedAt: Date
+}
+
+/** Meta description for a post: SEO description, else excerpt, else the start of the body. */
+export function postDescription(p: Pick<LdPost, 'excerpt' | 'contentHtml' | 'seoDescription'>, locale: Locale): string {
+  const text = l10n(p.seoDescription, locale) || l10n(p.excerpt, locale) || stripHtml(l10n(p.contentHtml, locale))
+  return truncate(text, 160)
+}
+
+/** schema.org BlogPosting for a blog post page. */
+export function articleJsonLd(post: LdPost, locale: Locale) {
+  const url = abs(locale, `/blog/${post.slug}`)
+  const description = postDescription(post, locale)
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: truncate(l10n(post.seoTitle, locale) || l10n(post.title, locale), 110),
+    ...(description ? { description } : {}),
+    ...(post.coverImage ? { image: [new URL(post.coverImage, SITE_URL).href] } : {}),
+    datePublished: post.publishedAt.toISOString(),
+    dateModified: post.updatedAt.toISOString(),
+    inLanguage: locale,
+    mainEntityOfPage: url,
+    url,
+  }
+}

@@ -31,6 +31,11 @@ export default async function Footer({ locale, categories }: { locale: Locale; c
                 {tNav('sale')}
               </Link>
             </li>
+            <li>
+              <Link href={path(locale, '/blog')} className="transition hover:text-white">
+                {tNav('blog')}
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

@@ -293,3 +293,51 @@ export async function translateUiMissing(
   }
   return { status: 'done', translated }
 }
+
+/**
+ * Machine-translates a blog post from its EN source into uz/ru, same rules as translateProduct: locales
+ * marked `reviewed` are kept (unless `force`), the rest are overwritten from EN, nothing is written on any error.
+ */
+export async function translateBlogPost(
+  postId: number,
+  opts: { force?: boolean; translator?: Translator } = {},
+): Promise<TranslateResult> {
+  const translator = opts.translator ?? getTranslator()
+  if (!translator) return { status: 'not_configured', translated: 0 }
+
+  const post = await prisma.blogPost.findUniqueOrThrow({ where: { id: postId } })
+  const reviewed = isObj(post.reviewed) ? post.reviewed : {}
+  const locales = TARGETS.filter((l) => opts.force || reviewed[l] !== true)
+  if (locales.length === 0) return { status: 'done', translated: 0 }
+
+  const w = {
+    title: clone(post.title),
+    excerpt: clone(post.excerpt),
+    contentHtml: clone(post.contentHtml),
+    seoTitle: clone(post.seoTitle),
+    seoDescription: clone(post.seoDescription),
+  }
+  let translated = 0
+  for (const locale of locales) {
+    const slots: Slot[] = []
+    l10nSlot(slots, w.title, locale)
+    l10nSlot(slots, w.excerpt, locale)
+    l10nSlot(slots, w.contentHtml, locale, true)
+    l10nSlot(slots, w.seoTitle, locale)
+    l10nSlot(slots, w.seoDescription, locale)
+    const map = await run(translator, slots.map((s) => s.en), locale)
+    for (const s of slots) s.assign(map.get(s.en) as string)
+    translated += slots.length
+  }
+  await prisma.blogPost.update({
+    where: { id: postId },
+    data: {
+      title: w.title as never,
+      excerpt: w.excerpt as never,
+      contentHtml: w.contentHtml as never,
+      seoTitle: w.seoTitle as never,
+      seoDescription: w.seoDescription as never,
+    },
+  })
+  return { status: 'done', translated }
+}

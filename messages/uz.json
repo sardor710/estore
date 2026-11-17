@@ -2,6 +2,7 @@
   "store": { "name": "Elektronika doʻkoni", "tagline": "Zaryadlovchi qurilmalar, audio va aqlli gadjetlar" },
   "nav": {
     "sale": "Chegirmalar",
+    "blog": "Blog",
     "search": "Qidirish",
     "searchPlaceholder": "Mahsulot yoki SKU qidirish",
     "cart": "Savat",
@@ -77,6 +78,19 @@
     "title": "Chegirmalar",
     "subtitle": "Chegirmadagi mahsulotlar",
     "empty": "Hozircha chegirmadagi mahsulotlar yoʻq."
+  },
+  "blog": {
+    "title": "Blog",
+    "subtitle": "Yangiliklar, qoʻllanmalar va maslahatlar",
+    "readMore": "Batafsil",
+    "empty": "Hozircha maqolalar yoʻq.",
+    "tag": "Teg",
+    "allTags": "Hammasi",
+    "related": "Oʻxshash maqolalar",
+    "back": "Barcha maqolalar",
+    "prev": "Oldingi",
+    "next": "Keyingi",
+    "page": "{pages} sahifadan {page}-sahifa"
   },
   "footer": {
     "about": "Original zaryadlovchilar, audio va aqlli qurilmalar, Oʻzbekiston boʻylab yetkazib berish.",
@@ -160,6 +174,7 @@
   "seo": {
     "homeDescription": "Zaryadlovchi qurilmalar, quvvat banklari, audio va aqlli gadjetlar. Oʻzbekiston boʻylab yetkazib berish.",
     "categoryDescription": "{name} — Oʻzbekistonda narxlar soʻmda, original mahsulotlar va yetkazib berish bilan xarid qiling.",
-    "saleDescription": "Chegirmadagi elektronika mahsulotlari — soʻmda narxlar, Oʻzbekiston boʻylab yetkazib berish."
+    "saleDescription": "Chegirmadagi elektronika mahsulotlari — soʻmda narxlar, Oʻzbekiston boʻylab yetkazib berish.",
+    "blogDescription": "Quvvatlagichlar, audio va aqlli gadjetlar haqida qoʻllanmalar, yangiliklar va maslahatlar."
   }
 }
