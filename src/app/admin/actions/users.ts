@@ -1,10 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { cookies } from 'next/headers'
-import { prisma } from '@/lib/db'
-import { createSession, SESSION_COOKIE, SESSION_MAX_AGE } from '@/lib/auth'
-import { requirePermission } from '@/lib/admin/session'
+import { reissueSessionCookie, requirePermission } from '@/lib/admin/session'
 import { createUser, resetPassword, updateUser, type UserResult } from '@/lib/admin/users'
 import { isRole, type Role } from '@/lib/permissions'
 
@@ -41,16 +38,7 @@ export async function resetPasswordAction(id: number, password: string): Promise
   const r = await resetPassword(id, String(password ?? ''), staff)
   if (!r.ok) return r
   // Resetting signs the user out everywhere (sessionVersion bump). For your own account, keep this browser signed in.
-  if (id === staff.id) {
-    const u = await prisma.adminUser.findUniqueOrThrow({ where: { id } })
-    ;(await cookies()).set(SESSION_COOKIE, await createSession({ uid: u.id, role: staff.role, sv: u.sessionVersion }), {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: SESSION_MAX_AGE,
-    })
-  }
+  if (id === staff.id) await reissueSessionCookie(staff.id)
   revalidatePath('/admin/users')
   return r
 }

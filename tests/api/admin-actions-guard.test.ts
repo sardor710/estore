@@ -14,7 +14,8 @@ vi.mock('next/headers', () => ({
 }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
-const { publishAction, saveSettingsAction, setOrderStatusAction, testTelegramAction, saveUiAction } = await import('@/app/admin/actions')
+const { publishAction, saveProductAction, saveSettingsAction, setOrderStatusAction, testTelegramAction, saveUiAction } = await import('@/app/admin/actions')
+const { baselineOf } = await import('@/lib/admin/products')
 const { createUserAction, resetPasswordAction, updateUserAction } = await import('@/app/admin/actions/users')
 const { changeOwnPasswordAction } = await import('@/app/admin/actions/account')
 const { hashPassword } = await import('@/lib/password')
@@ -101,5 +102,29 @@ describe('server actions enforce permissions server-side', () => {
   })
   it('no session -> account action redirects to login', async () => {
     await expect(changeOwnPasswordAction({ current: 'x', password: 'new password 12', confirm: 'new password 12' })).rejects.toMatchObject(REDIRECT)
+  })
+
+  it('product save is logged even when the spec labels that follow it fail', async () => {
+    const pm = await signIn('PRODUCT_MANAGER')
+    const cat = await prisma.category.create({ data: { slug: 'c', name: { en: 'c' } } })
+    const p = await prisma.product.create({
+      data: {
+        slug: 'p1', categoryId: cat.id, title: { en: 'T' }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [],
+        inTheBox: [], faq: [], specs: [], images: ['https://img/a.jpg'], reviewed: { uz: false, ru: false },
+        variants: { create: [{ sku: 'S1', name: { en: 'S1' }, priceUzs: 100, stock: 1 }] },
+      },
+      include: { variants: true },
+    })
+    const input = {
+      slug: p.slug, categoryId: cat.id, templateOverride: null, brand: '', badge: null,
+      title: { en: 'Renamed' }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [], inTheBox: [], faq: [], specs: [],
+      images: ['https://img/a.jpg'], reviewed: { uz: false, ru: false },
+      variants: p.variants.map((v) => ({ id: v.id, sku: v.sku, name: { en: v.sku }, priceUzs: v.priceUzs, compareAtUzs: null, stock: v.stock, colorHex: null, imageIndex: null })),
+    }
+    // An empty spec key makes saveSpecLabels fail after updateProduct has already written the product.
+    const r = await saveProductAction(p.id, input, { '  ': { en: 'x' } }, await baselineOf(p.id))
+    expect(r).toMatchObject({ ok: false, errors: { specs: expect.any(String) } })
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: p.id } })).title).toEqual({ en: 'Renamed' })
+    expect(await prisma.activityLog.findFirst({ where: { entity: 'product', entityId: String(p.id) } })).toMatchObject({ userId: pm.id, action: 'update' })
   })
 })

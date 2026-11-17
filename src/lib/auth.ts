@@ -6,6 +6,15 @@ import { isRole, type Role } from './permissions'
 export const SESSION_COOKIE = 'admin_session'
 export const SESSION_MAX_AGE = 7 * 24 * 60 * 60
 
+/** Options for every place that sets the session cookie (login route, cookie re-issue after a password change). */
+export const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  path: '/',
+  maxAge: SESSION_MAX_AGE,
+} as const
+
 export const MIN_PASSWORD_LENGTH = 10
 export const MIN_SECRET_LENGTH = 32
 

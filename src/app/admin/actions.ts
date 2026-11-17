@@ -39,12 +39,17 @@ export async function saveProductAction(
   const staff = await requirePermission('catalog')
   const r = await updateProduct(id, input, baseline)
   if (!r.ok) return r
+  // The product row is already written: log it now, even if the spec labels below fail.
+  await logActivity(staff, 'update', 'product', id, `Updated product #${id}`)
   const rows: SpecLabelRow[] = Object.entries(labels).map(([key, label]) => ({ key, label }))
   if (rows.length) {
     const l = await saveSpecLabels(rows)
-    if (!l.ok) return { ok: false, errors: { specs: l.error } }
+    if (!l.ok) {
+      refreshStorefront()
+      return { ok: false, errors: { specs: l.error } }
+    }
+    await logActivity(staff, 'update', 'translations', null, `Saved ${rows.length} spec label(s) from product #${id}`)
   }
-  await logActivity(staff, 'update', 'product', id, `Updated product #${id}${rows.length ? ` (+${rows.length} spec labels)` : ''}`)
   refreshStorefront()
   // The editor continues from what is now in the DB (new updatedAt and stock baseline).
   const fresh = await loadEditorProduct(id)

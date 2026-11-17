@@ -19,7 +19,11 @@ export function normalizeEmail(email: string): string {
   return (email ?? '').trim().toLowerCase()
 }
 
-function passwordError(pw: unknown): string | null {
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254
+}
+
+export function passwordError(pw: unknown): string | null {
   if (typeof pw !== 'string' || pw.length < MIN_PASSWORD_LENGTH) return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
   if (pw.length > MAX_PASSWORD_LENGTH) return `Password must be at most ${MAX_PASSWORD_LENGTH} characters.`
   return null
@@ -61,7 +65,7 @@ export async function createUser(
   actor: Staff,
 ): Promise<UserResult> {
   const email = normalizeEmail(input.email)
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return { ok: false, error: 'Enter a valid email address.' }
+  if (!isValidEmail(email)) return { ok: false, error: 'Enter a valid email address.' }
   const nErr = nameError(input.name)
   if (nErr) return { ok: false, error: nErr }
   if (!isRole(input.role)) return { ok: false, error: 'Unknown role.' }
@@ -151,7 +155,7 @@ export async function changeOwnPassword(
     where: { id: u.id },
     data: { passwordHash: await hashPassword(input.password), sessionVersion: { increment: 1 } },
   })
-  await logActivity(actor, 'update', 'AdminUser', u.id, `Changed own password (${u.email})`)
+  await logActivity(actor, 'update', 'user', u.id, `Changed own password (${u.email})`)
   return { ok: true }
 }
 

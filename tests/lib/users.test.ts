@@ -135,7 +135,7 @@ describe('changeOwnPassword', () => {
     expect(await verifyPassword('new password 12', after.passwordHash)).toBe(true)
     expect(await verifyPassword('old password 12', after.passwordHash)).toBe(false)
     expect(after.sessionVersion).toBe(u.sessionVersion + 1)
-    expect(await prisma.activityLog.count({ where: { action: 'update', entity: 'AdminUser', userId: u.id } })).toBe(1)
+    expect(await prisma.activityLog.count({ where: { action: 'update', entity: 'user', userId: u.id } })).toBe(1)
   })
   it('rejects short, mismatched or unchanged new passwords', async () => {
     const { me } = await editor()

@@ -3,7 +3,7 @@ import { createInterface } from 'node:readline'
 import { prisma } from '../src/lib/db'
 import { hashPassword } from '../src/lib/password'
 import { MIN_PASSWORD_LENGTH } from '../src/lib/auth'
-import { normalizeEmail } from '../src/lib/admin/users'
+import { isValidEmail, normalizeEmail, passwordError } from '../src/lib/admin/users'
 import { logActivity } from '../src/lib/admin/activity'
 
 // Lock-out recovery from the server shell (no web backdoor):
@@ -24,11 +24,12 @@ function parseArgs(argv: string[]): { email: string; name?: string } | null {
 function prompter() {
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: process.stdin.isTTY })
   let muted = false
-  // Hide typed characters while a password is being entered (only the prompt itself is echoed).
+  // Hide everything readline echoes while a password is being entered. The prompt is written directly to
+  // stdout (see askHidden), so no readline output — including line redraws that contain the typed text — passes.
   const out = rl as unknown as { _writeToOutput: (s: string) => void }
   const write = out._writeToOutput.bind(rl)
   out._writeToOutput = (s: string) => {
-    if (!muted || s.includes('password')) write(s)
+    if (!muted) write(s)
   }
   const lines: string[] = []
   const waiters: ((s: string) => void)[] = []
@@ -59,7 +60,7 @@ async function main() {
   }
   const email = normalizeEmail(args.email)
   const existing = await prisma.adminUser.findUnique({ where: { email } })
-  if (!existing && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!existing && !isValidEmail(email)) {
     console.error(`No account "${email}" exists, and a new account needs a valid email address.`)
     process.exit(2)
   }
@@ -72,8 +73,9 @@ async function main() {
     console.error('The passwords do not match. Nothing changed.')
     process.exit(1)
   }
-  if (pw.length < MIN_PASSWORD_LENGTH) {
-    console.error(`The password must be at least ${MIN_PASSWORD_LENGTH} characters. Nothing changed.`)
+  const pwError = passwordError(pw)
+  if (pwError) {
+    console.error(`${pwError} Nothing changed.`)
     process.exit(1)
   }
 

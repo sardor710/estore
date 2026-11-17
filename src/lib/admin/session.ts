@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { forbidden, redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
-import { SESSION_COOKIE, readSession } from '@/lib/auth'
+import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, createSession, readSession } from '@/lib/auth'
 import { can, isRole, type Permission, type Role } from '@/lib/permissions'
 
 export type Staff = { id: number; email: string; name: string; role: Role }
@@ -17,6 +17,17 @@ export async function staffFromToken(token: string | null | undefined): Promise<
   const u = await prisma.adminUser.findUnique({ where: { id: claims.uid } })
   if (!u || !u.active || u.sessionVersion !== claims.sv || !isRole(u.role)) return null
   return { id: u.id, email: u.email, name: u.name, role: u.role }
+}
+
+/**
+ * After the caller's own sessionVersion was bumped (own password change/reset): sets a fresh session cookie so
+ * this browser stays signed in while other sessions are revoked. Role and sv are re-read from the DB.
+ * Only callable where cookies can be written (server actions, route handlers).
+ */
+export async function reissueSessionCookie(staffId: number): Promise<void> {
+  const u = await prisma.adminUser.findUniqueOrThrow({ where: { id: staffId } })
+  if (!isRole(u.role)) throw new Error(`AdminUser ${staffId} has an unknown role`)
+  ;(await cookies()).set(SESSION_COOKIE, await createSession({ uid: u.id, role: u.role, sv: u.sessionVersion }), SESSION_COOKIE_OPTIONS)
 }
 
 /** Current staff member from the session cookie (memoised per request render). */
