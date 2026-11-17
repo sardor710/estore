@@ -6,12 +6,14 @@ import { getRegion } from '@/lib/regions'
 import { formatUzs } from '@/lib/money'
 import { Badge, PageTitle, card } from '@/components/admin/ui'
 import OrderStatusButtons from '@/components/admin/OrderStatusButtons'
+import { requirePermission } from '@/lib/admin/session'
 
 export const metadata = { title: 'Order' }
 
 const TONE = { NEW: 'blue', CONFIRMED: 'amber', DELIVERED: 'green', CANCELLED: 'red' } as const
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePermission('orders')
   const id = Number((await params).id)
   if (!Number.isInteger(id)) notFound()
   const o = await prisma.order.findUnique({ where: { id }, include: { lines: { orderBy: { id: 'asc' } } } })

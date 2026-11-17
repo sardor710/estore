@@ -5,6 +5,7 @@ import { loadEditorProduct } from '@/lib/admin/product-view'
 import { PageTitle } from '@/components/admin/ui'
 import ProductEditor from '@/components/admin/ProductEditor'
 import type { L10n } from '@/lib/localized'
+import { requirePermission } from '@/lib/admin/session'
 
 export const metadata = { title: 'Edit product' }
 
@@ -15,6 +16,7 @@ export default async function EditProductPage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ notice?: string }>
 }) {
+  await requirePermission('catalog')
   const id = Number((await params).id)
   if (!Number.isInteger(id)) notFound()
   const [product, cats, sp] = await Promise.all([loadEditorProduct(id), prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }), searchParams])

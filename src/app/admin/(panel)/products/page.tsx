@@ -2,10 +2,12 @@ import Link from 'next/link'
 import { listProducts } from '@/lib/admin/product-view'
 import { formatUzs } from '@/lib/money'
 import { Badge, PageTitle, btn, card } from '@/components/admin/ui'
+import { requirePermission } from '@/lib/admin/session'
 
 export const metadata = { title: 'Products' }
 
 export default async function ProductsPage() {
+  await requirePermission('catalog')
   const products = await listProducts()
   return (
     <>

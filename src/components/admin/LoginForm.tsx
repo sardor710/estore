@@ -16,10 +16,13 @@ export default function LoginForm({ configured }: { configured: boolean }) {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ user: fd.get('user'), password: fd.get('password') }),
+        body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
       })
       if (res.ok) {
-        window.location.assign('/admin/orders')
+        const body = (await res.json().catch(() => null)) as { home?: unknown } | null
+        // Only ever follow a same-site admin path.
+        const home = typeof body?.home === 'string' && /^\/admin(\/|$)/.test(body.home) ? body.home : '/admin'
+        window.location.assign(home)
         return
       }
       setError(
@@ -29,7 +32,7 @@ export default function LoginForm({ configured }: { configured: boolean }) {
             ? 'Admin not configured'
             : res.status === 403
               ? 'Request blocked (origin mismatch).'
-              : 'Wrong username or password.',
+              : 'Wrong email or password.',
       )
     } catch {
       setError('Network error. Try again.')
@@ -42,10 +45,10 @@ export default function LoginForm({ configured }: { configured: boolean }) {
     <form onSubmit={submit} className="space-y-4">
       {error ? <Notice kind="error">{error}</Notice> : null}
       <div>
-        <label htmlFor="admin-user" className="block">
-          <Label>Username</Label>
+        <label htmlFor="admin-email" className="block">
+          <Label>Email or username</Label>
         </label>
-        <input id="admin-user" name="user" autoComplete="username" required aria-label="Username" className={input} />
+        <input id="admin-email" name="email" autoComplete="username" required aria-label="Email or username" className={input} />
       </div>
       <div>
         <label htmlFor="admin-password" className="block">

@@ -3,10 +3,12 @@ import { PageTitle, Notice } from '@/components/admin/ui'
 import ImportForm from '@/components/admin/ImportForm'
 import { isTranslationConfigured } from '@/lib/translate'
 import type { L10n } from '@/lib/localized'
+import { requirePermission } from '@/lib/admin/session'
 
 export const metadata = { title: 'Import' }
 
 export default async function ImportPage() {
+  await requirePermission('catalog')
   const cats = await prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] })
   const categories = cats.map((c) => {
     const n = (c.name ?? {}) as L10n

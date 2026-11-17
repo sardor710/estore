@@ -34,25 +34,42 @@ describe('settings', () => {
     expect(maskToken(null)).toBe('')
     expect(maskToken('123456789:ABCDEFGHIJKLMNOPQRSTUV')).not.toContain('ABCDEFGHIJ')
     const token = '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    expect(await saveSettings({ minOrderUzs: 100000, telegramBotToken: token, telegramChatId: '-100123' })).toEqual({ ok: true })
-    const view = await getSettingsView()
+    expect(await saveSettings({ minOrderUzs: 100000, telegramBotToken: token, telegramChatId: '-100123' }, { integrations: true })).toMatchObject({
+      ok: true,
+      changed: ['minOrderUzs', 'telegramBotToken', 'telegramChatId'],
+    })
+    const view = await getSettingsView({ integrations: true })
     expect(JSON.stringify(view)).not.toContain(token)
     expect(view).toMatchObject({ minOrderUzs: 100000, telegramTokenSet: true, telegramChatId: '-100123' })
     // blank token keeps the stored one
-    await saveSettings({ minOrderUzs: 5, telegramBotToken: '', telegramChatId: '-100123' })
+    await saveSettings({ minOrderUzs: 5, telegramBotToken: '', telegramChatId: '-100123' }, { integrations: true })
     expect((await getSettings()).telegramBotToken).toBe(token)
-    await saveSettings({ minOrderUzs: 5, clearTelegramToken: true, telegramChatId: '' })
+    await saveSettings({ minOrderUzs: 5, clearTelegramToken: true, telegramChatId: '' }, { integrations: true })
     expect(await getSettings()).toMatchObject({ telegramBotToken: null, telegramChatId: null })
   })
   it('validates', async () => {
-    expect(await saveSettings({ minOrderUzs: -1, telegramChatId: '' })).toMatchObject({ ok: false, errors: { minOrderUzs: expect.any(String) } })
-    expect(await saveSettings({ minOrderUzs: 1.5, telegramChatId: '' })).toMatchObject({ ok: false })
-    expect(await saveSettings({ minOrderUzs: 1, telegramBotToken: 'nope', telegramChatId: '' })).toMatchObject({ ok: false })
-    expect(await saveSettings({ minOrderUzs: 1, telegramChatId: 'abc def' })).toMatchObject({ ok: false })
+    expect(await saveSettings({ minOrderUzs: -1, telegramChatId: '' }, { integrations: true })).toMatchObject({ ok: false, errors: { minOrderUzs: expect.any(String) } })
+    expect(await saveSettings({ minOrderUzs: 1.5, telegramChatId: '' }, { integrations: true })).toMatchObject({ ok: false })
+    expect(await saveSettings({ minOrderUzs: 1, telegramBotToken: 'nope', telegramChatId: '' }, { integrations: true })).toMatchObject({ ok: false })
+    expect(await saveSettings({ minOrderUzs: 1, telegramChatId: 'abc def' }, { integrations: true })).toMatchObject({ ok: false })
+  })
+  it('without settings.integrations: integration fields are hidden from the view and refused on save', async () => {
+    const token = '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    await saveSettings({ minOrderUzs: 1, telegramBotToken: token, telegramChatId: '-100123' }, { integrations: true })
+    const view = await getSettingsView({ integrations: false })
+    expect(view).toEqual({ minOrderUzs: 1, vipThresholdUzs: 10_000_000, lowStockThreshold: 3, integrations: false })
+    for (const sneaky of [{ telegramChatId: '-1' }, { telegramBotToken: '999:ZZZZZZZZZZZZZZZZZZZZZZZZ' }, { clearTelegramToken: true }]) {
+      expect(await saveSettings({ minOrderUzs: 2, ...sneaky }, { integrations: false })).toMatchObject({ ok: false, errors: { _: expect.any(String) } })
+    }
+    expect(await getSettings()).toMatchObject({ minOrderUzs: 1, telegramBotToken: token, telegramChatId: '-100123' })
+    expect(await saveSettings({ minOrderUzs: 7, vipThresholdUzs: 5_000_000, lowStockThreshold: 2 }, { integrations: false })).toMatchObject({ ok: true })
+    expect(await getSettings()).toMatchObject({ minOrderUzs: 7, vipThresholdUzs: 5_000_000, lowStockThreshold: 2, telegramBotToken: token })
+    expect((await saveSettings({ minOrderUzs: 7, vipThresholdUzs: 0 }, { integrations: false })).ok).toBe(false)
+    expect((await saveSettings({ minOrderUzs: 7, lowStockThreshold: -1 }, { integrations: false })).ok).toBe(false)
   })
   it('test message: skipped when unconfigured, sent/failed via telegram', async () => {
     expect(await sendTestMessage()).toBe('skipped')
-    await saveSettings({ minOrderUzs: 0, telegramBotToken: '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ', telegramChatId: '-1' })
+    await saveSettings({ minOrderUzs: 0, telegramBotToken: '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ', telegramChatId: '-1' }, { integrations: true })
     const ok = vi.fn(async () => new Response('{}', { status: 200 }))
     expect(await sendTestMessage(ok as never)).toBe('sent')
     expect(await sendTestMessage((async () => new Response('x', { status: 400 })) as never)).toBe('failed')

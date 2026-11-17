@@ -2,12 +2,14 @@ import Link from 'next/link'
 import { listOrders, orderCounts, isOrderStatus, ORDER_STATUSES } from '@/lib/admin/orders'
 import { formatUzs } from '@/lib/money'
 import { Badge, PageTitle, card } from '@/components/admin/ui'
+import { requirePermission } from '@/lib/admin/session'
 
 export const metadata = { title: 'Orders' }
 
 const STATUS_TONE = { NEW: 'blue', CONFIRMED: 'amber', DELIVERED: 'green', CANCELLED: 'red' } as const
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  await requirePermission('orders')
   const { status } = await searchParams
   const active = isOrderStatus(status) ? status : undefined
   const [orders, counts] = await Promise.all([listOrders(active), orderCounts()])
