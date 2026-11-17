@@ -67,3 +67,68 @@ describe('visitorHash', () => {
     expect(await visitorHash('1.2.3.4', DESKTOP, '2026-12-09')).toBe(h)
   })
 })
+
+describe('recordPageView caps and housekeeping', () => {
+  const NOW = new Date('2026-12-05T08:00:00Z')
+  const view = (over: Partial<import('@/lib/analytics/record').PageViewInput> = {}) =>
+    import('@/lib/analytics/record').then((m) => m.recordPageView({ path: '/uz', locale: 'uz', referrer: '', ip: '1.2.3.4', ua: DESKTOP, now: NOW, ...over }))
+
+  it('stores at most perVisitorPerDay views per visitor and day; other visitors and days are unaffected', async () => {
+    const { trackLimits } = await import('@/lib/analytics/record')
+    const old = trackLimits.perVisitorPerDay
+    trackLimits.perVisitorPerDay = 3
+    try {
+      for (let n = 0; n < 3; n++) expect(await view()).toBe(true)
+      expect(await view()).toBe(false)
+      expect(await prisma.pageView.count()).toBe(3)
+      expect(await view({ ip: '9.9.9.9' })).toBe(true)
+      expect(await view({ now: new Date('2026-12-06T08:00:00Z') })).toBe(true)
+    } finally {
+      trackLimits.perVisitorPerDay = old
+    }
+  })
+  it('the real default is 200 per visitor and day', async () => {
+    const { trackLimits } = await import('@/lib/analytics/record')
+    expect(trackLimits).toMatchObject({ perVisitorPerDay: 200, globalPerDay: 200_000 })
+  })
+  it('a restart (empty in-memory counters) still honours the cap through the DB count', async () => {
+    const { trackLimits, resetTrackState } = await import('@/lib/analytics/record')
+    trackLimits.perVisitorPerDay = 2
+    try {
+      await view()
+      await view()
+      resetTrackState()
+      expect(await view()).toBe(false)
+      expect(await prisma.pageView.count()).toBe(2)
+    } finally {
+      trackLimits.perVisitorPerDay = 200
+    }
+  })
+  it('honours the global per-day cap', async () => {
+    const { trackLimits } = await import('@/lib/analytics/record')
+    trackLimits.globalPerDay = 2
+    try {
+      expect(await view({ ip: '1.1.1.1' })).toBe(true)
+      expect(await view({ ip: '2.2.2.2' })).toBe(true)
+      expect(await view({ ip: '3.3.3.3' })).toBe(false)
+      expect(await prisma.pageView.count()).toBe(2)
+    } finally {
+      trackLimits.globalPerDay = 200_000
+    }
+  })
+  it('rolls up and prunes at most once per Tashkent day per process', async () => {
+    const { housekeepingIdle } = await import('@/lib/analytics/record')
+    const d1 = new Date('2026-12-03T08:00:00Z')
+    await view({ now: d1 }) // creates the 2026-12-03 salt
+    await housekeepingIdle()
+    const d2 = new Date('2026-12-04T08:00:00Z')
+    await view({ now: d2 }) // first view of a new day: housekeeping runs
+    await housekeepingIdle()
+    expect(await prisma.dailyTraffic.findUnique({ where: { day: '2026-12-03' } })).toMatchObject({ views: 1, visitors: 1 })
+    expect(await prisma.setting.findUnique({ where: { key: 'visitorSalt:2026-12-03' } })).toBeNull()
+    await prisma.dailyTraffic.deleteMany() // yesterday would be re-aggregated if housekeeping ran again
+    await view({ now: d2, ip: '5.5.5.5' })
+    await housekeepingIdle()
+    expect(await prisma.dailyTraffic.count()).toBe(0)
+  })
+})

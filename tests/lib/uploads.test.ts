@@ -79,3 +79,12 @@ describe('resolveUploadPath', () => {
     expect(p.startsWith(resolve(TMP))).toBe(true)
   })
 })
+
+describe('UPLOAD_PATH_RE', () => {
+  it('accepts only the stored shape /uploads/YYYY/MM/<hex>.<ext>', async () => {
+    const { UPLOAD_PATH_RE } = await import('@/lib/uploads')
+    expect(UPLOAD_PATH_RE.test('/uploads/2026/11/0a1b2c.png')).toBe(true)
+    for (const bad of ['/uploads/2026/13/0a1b.png', '/uploads/2026/11/../x.png', '/uploads/2026/11/zz.png', '/uploads/x.png', '/uploads/2026/11/a1.svg', 'https://x/uploads/2026/11/a1.png'])
+      expect(UPLOAD_PATH_RE.test(bad), bad).toBe(false)
+  })
+})

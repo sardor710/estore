@@ -6,6 +6,10 @@ import { join, resolve, sep } from 'node:path'
 export const uploadsDir = () => process.env.UPLOADS_DIR || join(process.cwd(), 'uploads')
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
+import { UPLOAD_PATH_RE } from './upload-path'
+
+export { UPLOAD_PATH_RE }
+
 export type ImageExt = 'jpg' | 'png' | 'webp' | 'gif'
 
 const startsWith = (b: Uint8Array, sig: number[], at = 0) => sig.every((v, i) => b[at + i] === v)

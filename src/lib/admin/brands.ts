@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { UPLOAD_PATH_RE } from '@/lib/upload-path'
 import { slugify } from '@/lib/importer/anker-parse'
 import { logActivity } from './activity'
 import { isHttpUrl, SLUG_RE } from './products-shared'
@@ -58,8 +59,7 @@ export async function saveBrand(input: BrandInput, actor: Staff): Promise<BrandR
   const slug = rawSlug || slugify(name)
   if (!SLUG_RE.test(slug)) return { ok: false, error: 'Slug may contain only a-z, 0-9 and single dashes.' }
   const logoUrl = typeof input?.logoUrl === 'string' ? input.logoUrl.trim() : ''
-  // /uploads/ paths: word characters, dots, dashes and slashes only, never a ".." segment.
-  if (logoUrl && !isHttpUrl(logoUrl) && !(/^\/uploads\/[\w./-]+$/.test(logoUrl) && !logoUrl.includes('..'))) {
+  if (logoUrl && !isHttpUrl(logoUrl) && !UPLOAD_PATH_RE.test(logoUrl)) {
     return { ok: false, error: 'Logo must be an http(s) URL or an /uploads/... path.' }
   }
   const sortOrder = Number.isInteger(input?.sortOrder) ? input.sortOrder : 0
@@ -90,9 +90,25 @@ export async function deleteBrand(id: number, actor: Staff): Promise<{ ok: true 
   const b = await prisma.brand.findUnique({ where: { id }, include: { _count: { select: { products: true } } } })
   if (!b) return { ok: false, error: 'Brand not found.' }
   if (b._count.products > 0) return { ok: false, error: `"${b.name}" is used by ${b._count.products} product(s). Change their brand first.` }
-  const r = await prisma.brand.deleteMany({ where: { id, products: { none: {} } } })
-  if (r.count !== 1) return { ok: false, error: 'The brand is in use or was already deleted.' }
+  const changed: { id: number; name: string; disabled: boolean }[] = []
+  const deleted = await prisma.$transaction(async (tx) => {
+    const r = await tx.brand.deleteMany({ where: { id, products: { none: {} } } })
+    if (r.count !== 1) return false
+    // A stale id would make the BRAND promotion unsaveable: drop it, and switch off a promotion left without targets.
+    for (const promo of await tx.promotion.findMany({ where: { targetType: 'BRAND' } })) {
+      const ids = Array.isArray(promo.targetIds) ? promo.targetIds : []
+      if (!ids.includes(id)) continue
+      const rest = ids.filter((x) => x !== id)
+      await tx.promotion.update({ where: { id: promo.id }, data: { targetIds: rest, ...(rest.length === 0 ? { enabled: false } : {}) } })
+      changed.push({ id: promo.id, name: promo.name, disabled: rest.length === 0 && promo.enabled })
+    }
+    return true
+  })
+  if (!deleted) return { ok: false, error: 'The brand is in use or was already deleted.' }
   await logActivity(actor, 'delete', 'brand', id, `Deleted brand "${b.name}"`)
+  for (const p of changed) {
+    await logActivity(actor, 'update', 'promotion', p.id, `Removed deleted brand #${id} from promotion "${p.name}"${p.disabled ? ' (no targets left: switched off)' : ''}`)
+  }
   return { ok: true }
 }
 

@@ -161,7 +161,7 @@ describe('customersCsv', () => {
     const lines = csv.slice(1).split('\r\n')
     expect(lines[0]).toBe('Name;Phone;Region;Segment;Orders;Spent (UZS);Last order;Blocked;Tags;Notes')
     expect(lines[1]).toContain('"Valiyev; Ali ""Boss"""')
-    expect(lines[1]).toContain(';+998900000001;')
+    expect(lines[1]).toContain(';\t+998900000001;') // tab prefix keeps Excel from mangling the number
     expect(lines[1]).toContain(';1;150000;')
     expect(lines[1]).toContain(`"'=HYPERLINK(""x"")"`)
     expect(lines[1]).toContain(';a, b;')

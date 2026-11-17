@@ -356,7 +356,13 @@ export async function bulkAction(ids: number[], a: BulkActionInput, actor: Staff
 export type InlineVariantResult = { ok: true; variant: { id: number; priceUzs: number; stock: number } } | { ok: false; error: string }
 
 /** Price and/or stock of one variant from the product list (whole numbers >= 0). */
-export async function updateVariantInline(variantId: number, patch: { priceUzs?: number; stock?: number }, actor: Staff): Promise<InlineVariantResult> {
+export async function updateVariantInline(
+  variantId: number,
+  patch: { priceUzs?: number; stock?: number },
+  actor: Staff,
+  /** Values the editor was looking at; when given, a field is only written if the DB still holds that value (else STALE). */
+  expected?: { priceUzs?: number; stock?: number },
+): Promise<InlineVariantResult> {
   if (!isInt(variantId)) return { ok: false, error: 'Variant not found.' }
   const data: { priceUzs?: number; stock?: number } = {}
   for (const k of ['priceUzs', 'stock'] as const) {
@@ -369,12 +375,23 @@ export async function updateVariantInline(variantId: number, patch: { priceUzs?:
   const cur = await prisma.variant.findUnique({ where: { id: variantId }, include: { product: { select: { id: true, status: true } } } })
   if (!cur) return { ok: false, error: 'Variant not found.' }
   if (cur.product.status === 'PUBLISHED' && data.priceUzs === 0) return { ok: false, error: 'This product is live: every variant needs a price above 0.' }
+  const guard: { priceUzs?: number; stock?: number } = {}
+  for (const k of ['priceUzs', 'stock'] as const) {
+    const e = expected?.[k]
+    if (data[k] === undefined || e === undefined) continue
+    if (!isInt(e) || e < 0) return { ok: false, error: 'STALE' }
+    guard[k] = e
+  }
   const v = await prisma.$transaction(async (tx) => {
-    const updated = await tx.variant.update({ where: { id: variantId }, data })
+    // Compare-and-set: a concurrent order/edit that changed the value since it was displayed makes this a no-op.
+    const r = await tx.variant.updateMany({ where: { id: variantId, ...guard }, data })
+    if (r.count !== 1) return null
+    const updated = await tx.variant.findUniqueOrThrow({ where: { id: variantId } })
     // Bump the product so an editor opened before this change refuses to overwrite it.
     await tx.product.update({ where: { id: cur.product.id }, data: { updatedAt: new Date() } })
     return updated
   })
+  if (!v) return { ok: false, error: 'STALE' }
   const parts = [
     data.priceUzs !== undefined && data.priceUzs !== cur.priceUzs ? `price ${cur.priceUzs} -> ${data.priceUzs}` : null,
     data.stock !== undefined && data.stock !== cur.stock ? `stock ${cur.stock} -> ${data.stock}` : null,

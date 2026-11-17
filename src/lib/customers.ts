@@ -233,7 +233,9 @@ export async function customersCsv(query: CustomerQuery, now: Date = new Date())
     lines.push(
       [
         cell(r.name),
-        cell(r.phone, false),
+        // Excel turns "+998901234567" into the number 998901234567; a leading TAB keeps it a text cell. The phone is
+        // normalised digits only, so it is never a formula (the free-text guard above is not needed for it).
+        `\t${r.phone}`,
         cell(r.region, false),
         r.segment,
         String(r.orders),

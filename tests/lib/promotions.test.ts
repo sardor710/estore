@@ -141,3 +141,16 @@ describe('admin brands', () => {
     ])
   })
 })
+
+describe('deleteBrand: BRAND promotions', () => {
+  it('drops the id from BRAND promotions, switches off an emptied one and logs both', async () => {
+    const a = await prisma.brand.create({ data: { name: 'A', slug: 'a' } })
+    const b = await prisma.brand.create({ data: { name: 'B', slug: 'b' } })
+    const both = await prisma.promotion.create({ data: { name: 'Both', kind: 'PERCENT', value: 5, targetType: 'BRAND', targetIds: [a.id, b.id] } })
+    const only = await prisma.promotion.create({ data: { name: 'Only', kind: 'PERCENT', value: 5, targetType: 'BRAND', targetIds: [a.id] } })
+    expect(await deleteBrand(a.id, actor)).toEqual({ ok: true })
+    expect(await prisma.promotion.findUniqueOrThrow({ where: { id: both.id } })).toMatchObject({ targetIds: [b.id], enabled: true })
+    expect(await prisma.promotion.findUniqueOrThrow({ where: { id: only.id } })).toMatchObject({ targetIds: [], enabled: false })
+    expect(await prisma.activityLog.count({ where: { entity: 'promotion', action: 'update' } })).toBe(2)
+  })
+})

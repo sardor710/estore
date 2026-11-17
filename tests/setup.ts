@@ -4,6 +4,9 @@ import { beforeEach } from 'vitest'
 
 beforeEach(async () => {
   const { prisma } = await import('@/lib/db')
+  const track = await import('@/lib/analytics/record')
+  await track.housekeepingIdle() // a background rollup from the previous test must not write after the wipe
+  track.resetTrackState()
   await prisma.activityLog.deleteMany()
   await prisma.pageView.deleteMany()
   await prisma.dailyTraffic.deleteMany()

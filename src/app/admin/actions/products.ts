@@ -97,9 +97,13 @@ export async function bulkProductsAction(ids: number[], action: BulkActionInput)
   return r
 }
 
-export async function updateVariantInlineAction(variantId: number, patch: { priceUzs?: number; stock?: number }): Promise<InlineVariantResult> {
+export async function updateVariantInlineAction(
+  variantId: number,
+  patch: { priceUzs?: number; stock?: number },
+  expected?: { priceUzs?: number; stock?: number },
+): Promise<InlineVariantResult> {
   const staff = await requirePermission('catalog')
-  const r = await updateVariantInline(variantId, patch, staff)
+  const r = await updateVariantInline(variantId, patch, staff, expected)
   if (r.ok) refreshStorefront()
   return r
 }

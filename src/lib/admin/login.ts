@@ -17,6 +17,8 @@ export function trackedIps(): number {
   return limiter.tracked()
 }
 
+const MAX_PASSWORD_LENGTH = 200
+
 // Unknown emails are checked against this hash so the response time does not reveal which emails exist.
 let dummyHash: Promise<string> | null = null
 const getDummyHash = () => (dummyHash ??= hashPassword(crypto.randomUUID()))
@@ -59,6 +61,8 @@ export async function attemptLogin(input: { email: string; password: string; ip:
   }
   const slot = limiter.reserve(input.ip, now)
   if (slot === null) return { status: 429 }
+  // Oversized passwords are refused before any scrypt work (cheap DoS guard); reserved attempt stays counted.
+  if (typeof input.password === 'string' && input.password.length > MAX_PASSWORD_LENGTH) return { status: 401 }
   const r = await authenticate(input.email ?? '', input.password ?? '')
   if (!r) return { status: 401 }
   limiter.release(input.ip, slot)

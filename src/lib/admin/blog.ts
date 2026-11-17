@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { locales } from '@/i18n/routing'
 import type { L10n } from '@/lib/localized'
 import { sanitizeHtml } from '@/lib/sanitize'
+import { UPLOAD_PATH_RE } from '@/lib/upload-path'
 import { asL10n, asTags } from '@/lib/blog'
 import { logActivity } from './activity'
 import { fromTashkentLocal, toTashkentLocal } from './promotions'
@@ -39,7 +40,7 @@ export type SaveResult = { ok: true; id: number } | { ok: false; error: string }
 export type SimpleResult = { ok: true } | { ok: false; error: string }
 
 const SLUG_RE = /^[a-z0-9-]{3,80}$/
-const COVER_RE = /^(https:\/\/\S+|\/uploads\/\d{4}\/\d{2}\/[0-9a-f]+\.(jpg|png|webp|gif))$/i
+const COVER_RE = { test: (s: string) => /^https:\/\/\S+$/i.test(s) || UPLOAD_PATH_RE.test(s) }
 const MAX_TAGS = 10
 const MAX_TAG = 40
 const LIMITS = { title: 200, excerpt: 500, seoTitle: 120, seoDescription: 320, contentHtml: 200_000 }

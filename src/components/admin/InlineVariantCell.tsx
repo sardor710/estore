@@ -51,13 +51,13 @@ export default function InlineVariantCell({
     start(async () => {
       let r: Awaited<ReturnType<typeof updateVariantInlineAction>>
       try {
-        r = await updateVariantInlineAction(variantId, { [field]: n })
+        r = await updateVariantInlineAction(variantId, { [field]: n }, { [field]: saved })
       } catch {
         return setError('Could not save.')
       } finally {
         inFlight.current = false
       }
-      if (!r.ok) return setError(r.error)
+      if (!r.ok) return setError(r.error === 'STALE' ? 'Changed elsewhere — reload' : r.error)
       const next = field === 'priceUzs' ? r.variant.priceUzs : r.variant.stock
       setSaved(next)
       setDraft(String(next))

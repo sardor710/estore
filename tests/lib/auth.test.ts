@@ -230,3 +230,13 @@ describe('attemptLogin throttle', () => {
     expect(trackedIps()).toBeLessThanOrEqual(10_000)
   }, 60_000)
 })
+
+describe('attemptLogin: password length cap', () => {
+  it('a password over 200 chars is a normal 401 and never reaches scrypt', async () => {
+    await seedUser('cap@shop.uz', 'cap password 12')
+    vi.mocked(verifyPassword).mockClear()
+    expect(await attemptLogin({ email: 'cap@shop.uz', password: 'x'.repeat(201), ip: '9.9.9.9' })).toEqual({ status: 401 })
+    expect(verifyPassword).not.toHaveBeenCalled()
+    expect((await attemptLogin({ email: 'cap@shop.uz', password: 'cap password 12', ip: '9.9.9.9' })).status).toBe(200)
+  })
+})

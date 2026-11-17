@@ -1,4 +1,5 @@
 import { locales } from '@/i18n/routing'
+import { UPLOAD_PATH_RE } from '@/lib/upload-path'
 import type { L10n } from '@/lib/localized'
 import type { FaqItem, Highlight, Section, SpecGroup } from '@/lib/catalog'
 
@@ -69,8 +70,6 @@ export function cleanL10n(v: unknown): L10n {
   return out
 }
 
-/** Files saved by the admin upload endpoint (served at /uploads/YYYY/MM/<random>.<ext>). */
-export const UPLOAD_PATH_RE = /^\/uploads\/\d{4}\/\d{2}\/[0-9a-f]+\.(jpg|png|webp|gif)$/i
 
 /** Product images: absolute http(s) URLs or our own uploads. */
 export function isProductImageUrl(s: unknown): boolean {

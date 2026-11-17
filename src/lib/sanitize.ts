@@ -1,6 +1,8 @@
 import sanitize from 'sanitize-html'
 
-const IMG_SRC = /^(https:\/\/|\/uploads\/\d{4}\/\d{2}\/[0-9a-f]+\.(jpg|png|webp|gif)$)/i
+import { UPLOAD_PATH_RE } from './upload-path'
+
+const IMG_SRC = { test: (s: string) => /^https:\/\//i.test(s) || UPLOAD_PATH_RE.test(s) }
 const OEMBED_URL = /^https:\/\/(www\.)?(youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,})/
 const YOUTUBE_EMBED = /^https:\/\/(www\.youtube\.com|www\.youtube-nocookie\.com)\/embed\/[\w-]+(\?[\w=&%.-]*)?$/i
 

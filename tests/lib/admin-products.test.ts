@@ -367,3 +367,20 @@ describe('bulk delete keeps PRODUCT promotions saveable', () => {
     expect((await prisma.promotion.findUniqueOrThrow({ where: { id: shared.id } })).targetIds).toEqual([b.id, c.id])
   })
 })
+
+describe('updateVariantInline: stale baseline', () => {
+  it('refuses a stock edit when the value changed since it was displayed; DB untouched', async () => {
+    const p = await mk('inline-stale', [{ sku: 'ST1', price: 100, stock: 5 }])
+    const v = p.variants[0]
+    await prisma.variant.update({ where: { id: v.id }, data: { stock: 3 } }) // an order sold 2 meanwhile
+    expect(await updateVariantInline(v.id, { stock: 9 }, actor, { stock: 5 })).toEqual({ ok: false, error: 'STALE' })
+    expect((await prisma.variant.findUniqueOrThrow({ where: { id: v.id } })).stock).toBe(3)
+    expect(await updateVariantInline(v.id, { stock: 9 }, actor, { stock: 3 })).toMatchObject({ ok: true, variant: { stock: 9 } })
+  })
+  it('guards price the same way', async () => {
+    const p = await mk('inline-stale-price', [{ sku: 'ST2', price: 100 }])
+    const id = p.variants[0].id
+    expect(await updateVariantInline(id, { priceUzs: 200 }, actor, { priceUzs: 999 })).toEqual({ ok: false, error: 'STALE' })
+    expect((await prisma.variant.findUniqueOrThrow({ where: { id } })).priceUzs).toBe(100)
+  })
+})
