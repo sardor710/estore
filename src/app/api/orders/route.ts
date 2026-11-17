@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     }
     if (!result.ok) {
       orderLimiter.release(key, slot) // only placed orders count towards the limit
-      return NextResponse.json({ error: result.error }, { status: 400 })
+      return NextResponse.json({ error: result.error }, { status: result.error === 'BLOCKED' ? 403 : 400 })
     }
     return NextResponse.json({ number: result.number }, { status: 201 })
   } catch (e) {

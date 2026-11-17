@@ -52,6 +52,18 @@ describe('POST /api/orders hardening', () => {
     for (let i = 0; i < 8; i++) expect((await order([{ variantId: v.id, qty: 0 }])).status).toBe(400)
     expect((await order([{ variantId: v.id, qty: 1 }])).status).toBe(201)
   })
+  it('blocked client -> 403 BLOCKED with nothing else revealed, no order, and the throttle budget is not used', async () => {
+    const v = await mkVariant()
+    await prisma.customer.create({ data: { phone: '+998901234567', name: 'Bad', region: 'tashkent-city', tags: [], blocked: true } })
+    for (let i = 0; i < 8; i++) {
+      const r = await order([{ variantId: v.id, qty: 1 }])
+      expect(r.status).toBe(403)
+      expect(await r.json()).toEqual({ error: 'BLOCKED' })
+    }
+    expect(await prisma.order.count()).toBe(0)
+    await prisma.customer.update({ where: { phone: '+998901234567' }, data: { blocked: false } })
+    expect((await order([{ variantId: v.id, qty: 1 }])).status).toBe(201)
+  })
   it('unexpected errors -> 500 SERVER (not INVALID)', async () => {
     const v = await mkVariant()
     vi.spyOn(prisma, '$transaction').mockRejectedValue(new Error('db down'))

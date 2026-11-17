@@ -139,6 +139,7 @@
       "INVALID": "Some details are invalid or an item is no longer available. Please check the form and your cart.",
       "NETWORK": "Could not send the order. Check your connection and try again.",
       "RATE_LIMITED": "Too many orders from your network in a short time. Please wait a few minutes and try again, or call us.",
+      "BLOCKED": "We can't accept this order online. Please call us.",
       "SERVER": "Something went wrong on our side. Please try again in a moment."
     }
   },

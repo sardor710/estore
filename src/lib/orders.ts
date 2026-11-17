@@ -8,6 +8,7 @@ import { getRegion } from '@/lib/regions'
 import { notifyNewOrder, type NotifyOrder } from '@/lib/telegram'
 import { isVariantId, MAX_LINE_QTY, type CartLine } from '@/lib/cart/cart'
 import { loadPricer } from '@/lib/promotions'
+import { upsertCustomerFromOrder } from '@/lib/customers'
 
 export type OrderStatus = 'NEW' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'
 export type CreateOrderInput = {
@@ -19,7 +20,7 @@ export type CreateOrderInput = {
   comment?: string
   locale: Locale
 }
-export type CreateOrderResult = { ok: true; number: number } | { ok: false; error: 'INVALID' | 'OUT_OF_STOCK' | 'BELOW_MIN' }
+export type CreateOrderResult = { ok: true; number: number } | { ok: false; error: 'INVALID' | 'OUT_OF_STOCK' | 'BELOW_MIN' | 'BLOCKED' }
 export type StatusResult = { ok: true } | { ok: false; error: 'INSUFFICIENT_STOCK' | 'BAD_TRANSITION' }
 
 export { MAX_LINE_QTY }
@@ -116,6 +117,9 @@ export async function createOrder(
   ) {
     return { ok: false, error: 'INVALID' }
   }
+  // A blocked client is refused before any stock/price work, with nothing but the code to say why.
+  const known = await prisma.customer.findUnique({ where: { phone }, select: { blocked: true } })
+  if (known?.blocked) return { ok: false, error: 'BLOCKED' }
   const { minOrderUzs } = await getSettings()
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -147,6 +151,7 @@ export async function createOrder(
         if (total < minOrderUzs) throw new Rollback('BELOW_MIN')
         const max = await tx.order.aggregate({ _max: { number: true } })
         const number = Math.max(max._max.number ?? 0, FIRST_ORDER_NUMBER - 1) + 1
+        await upsertCustomerFromOrder(tx, { phone, name, region: region.code })
         return tx.order.create({
           data: {
             number,

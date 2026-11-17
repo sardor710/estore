@@ -20,6 +20,7 @@ const { createUserAction, resetPasswordAction, updateUserAction } = await import
 const { changeOwnPasswordAction } = await import('@/app/admin/actions/account')
 const { savePromotionAction, togglePromotionAction, deletePromotionAction } = await import('@/app/admin/actions/promotions')
 const { saveBrandAction, deleteBrandAction } = await import('@/app/admin/actions/brands')
+const { updateCustomerAction } = await import('@/app/admin/actions/clients')
 const { hashPassword } = await import('@/lib/password')
 
 const saved = { ...process.env }
@@ -123,6 +124,16 @@ describe('server actions enforce permissions server-side', () => {
     expect(p).toMatchObject({ ok: true })
     expect(await togglePromotionAction((p as { id: number }).id, false)).toEqual({ ok: true })
     expect(await prisma.activityLog.count({ where: { userId: pm.id, entity: { in: ['brand', 'promotion'] } } })).toBe(3)
+  })
+
+  it('client action: blog editor 403, product manager allowed and logged', async () => {
+    const c = await prisma.customer.create({ data: { phone: '+998901234567', name: 'Ali', region: 'tashkent-city', tags: [] } })
+    await signIn('BLOG_EDITOR')
+    await expect(updateCustomerAction(c.id, { blocked: true })).rejects.toMatchObject(FORBIDDEN)
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: c.id } })).blocked).toBe(false)
+    const pm = await signIn('PRODUCT_MANAGER')
+    expect(await updateCustomerAction(c.id, { blocked: true, tags: ['wholesale'] })).toEqual({ ok: true })
+    expect(await prisma.activityLog.findFirst({ where: { entity: 'customer', entityId: String(c.id) } })).toMatchObject({ userId: pm.id, action: 'update' })
   })
 
   it('product save is logged even when the spec labels that follow it fail', async () => {

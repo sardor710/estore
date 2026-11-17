@@ -4,6 +4,7 @@ import middleware from '@/proxy'
 import { createSession, SESSION_COOKIE } from '@/lib/auth'
 import { adminApi } from '@/lib/admin/api'
 import { GET as ordersGET } from '@/app/api/admin/orders/route'
+import { GET as clientsExportGET } from '@/app/api/admin/clients/export/route'
 import { POST as statusPOST } from '@/app/api/admin/orders/[id]/status/route'
 import { prisma } from '@/lib/db'
 import type { Role } from '@/lib/permissions'
@@ -119,6 +120,17 @@ describe('route handlers re-verify the session', () => {
     const ok = await ordersGET(req('/api/admin/orders', { headers: { cookie: await cookie() } }), {})
     expect(ok.status).toBe(200)
     expect(await ok.json()).toMatchObject({ orders: [] })
+  })
+  it('GET /api/admin/clients/export: 401 without cookie, 403 for blog editor, CSV attachment for admin', async () => {
+    expect((await clientsExportGET(req('/api/admin/clients/export'), {})).status).toBe(401)
+    const { cookie: blog } = await staffCookie('BLOG_EDITOR')
+    expect((await clientsExportGET(req('/api/admin/clients/export', { headers: { cookie: blog } }), {})).status).toBe(403)
+    await prisma.customer.create({ data: { phone: '+998901234567', name: 'Ali', region: 'tashkent-city', tags: [] } })
+    const res = await clientsExportGET(req('/api/admin/clients/export?segment=NEW&sort=name', { headers: { cookie: await cookie() } }), {})
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('text/csv; charset=utf-8')
+    expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename="clients-\d{4}-\d{2}-\d{2}\.csv"$/)
+    expect(await res.text()).toContain('+998901234567')
   })
   it('cross-origin POST -> 403 even with a valid cookie', async () => {
     const res = await statusPOST(
