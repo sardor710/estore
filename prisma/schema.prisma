@@ -26,9 +26,8 @@ model Product {
   category         Category  @relation(fields: [categoryId], references: [id])
   templateOverride String?
   status           String    @default("DRAFT") // DRAFT | PUBLISHED
-  brand            String    @default("")
   brandId          Int?
-  brandRef         Brand?    @relation(fields: [brandId], references: [id])
+  brand            Brand?    @relation(fields: [brandId], references: [id])
   seoTitle         Json?
   seoDescription   Json?
   sourceUrl        String?   @unique

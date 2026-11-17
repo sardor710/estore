@@ -22,7 +22,6 @@ async function mkProduct(over: Record<string, unknown> = {}) {
     data: {
       slug: 'p1',
       categoryId: cat.id,
-      brand: 'Anker',
       title: { en: 'Laptop Charger Pro' },
       subtitle: { en: 'Fast charging' },
       shortSpec: { en: '100W Max' },

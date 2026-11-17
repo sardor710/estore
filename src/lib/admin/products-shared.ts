@@ -18,7 +18,7 @@ export type ProductInput = {
   slug: string
   categoryId: number
   templateOverride: 'SIMPLE' | 'DETAILED' | null
-  brand: string
+  brandId: number | null
   badge: string | null
   title: L10n
   subtitle: L10n

@@ -46,7 +46,6 @@ async function main() {
     const data = {
       categoryId: category.id,
       status: 'PUBLISHED',
-      brand: '',
       isDemo: true,
       badge: d.badge,
       title: { en: d.name },

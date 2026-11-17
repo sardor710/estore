@@ -167,3 +167,40 @@ describe('setOrderStatus', () => {
     expect(await setOrderStatus(987654, 'CONFIRMED')).toEqual({ ok: false, error: 'BAD_TRANSITION' })
   })
 })
+
+describe('promotions', () => {
+  async function categoryPromo(enabled = true) {
+    const cat = await prisma.category.findFirstOrThrow()
+    return prisma.promotion.create({
+      data: { name: 'Category -10%', kind: 'PERCENT', value: 10, targetType: 'CATEGORY', targetIds: [cat.id], enabled },
+    })
+  }
+
+  it('active category promo: createOrder total uses the discounted price and the line records the discount', async () => {
+    const v = await mkVariant({ sku: 'PR1', price: 1_290_000, stock: 5 })
+    const promo = await categoryPromo()
+    const r = await createOrder({ ...base, lines: [{ variantId: v.id, qty: 2 }] })
+    expect(r).toEqual({ ok: true, number: 1001 })
+    const o = await prisma.order.findUniqueOrThrow({ where: { number: 1001 }, include: { lines: true } })
+    expect(o.totalUzs).toBe(2 * 1_161_000)
+    expect(o.lines[0]).toMatchObject({ priceUzs: 1_161_000, originalPriceUzs: 1_290_000, discountUzs: 129_000, promotionId: promo.id })
+  })
+
+  it('promo switched off before submit: full price, no discount recorded', async () => {
+    const v = await mkVariant({ sku: 'PR2', price: 1_290_000, stock: 5 })
+    const promo = await categoryPromo()
+    await prisma.promotion.update({ where: { id: promo.id }, data: { enabled: false } })
+    expect(await createOrder({ ...base, lines: [{ variantId: v.id, qty: 1 }] })).toMatchObject({ ok: true })
+    const o = await prisma.order.findFirstOrThrow({ include: { lines: true } })
+    expect(o.totalUzs).toBe(1_290_000)
+    expect(o.lines[0]).toMatchObject({ priceUzs: 1_290_000, originalPriceUzs: 1_290_000, discountUzs: 0, promotionId: null })
+  })
+
+  it('quoteCart matches createOrder', async () => {
+    const v = await mkVariant({ sku: 'PR3', price: 1_290_000, stock: 5 })
+    await categoryPromo()
+    const q = await quoteCart([{ variantId: v.id, qty: 2 }], 'en')
+    expect(q.items[0].priceUzs).toBe(1_161_000)
+    expect(q.totalUzs).toBe(2 * 1_161_000)
+  })
+})

@@ -18,6 +18,8 @@ const { publishAction, saveProductAction, saveSettingsAction, setOrderStatusActi
 const { baselineOf } = await import('@/lib/admin/products')
 const { createUserAction, resetPasswordAction, updateUserAction } = await import('@/app/admin/actions/users')
 const { changeOwnPasswordAction } = await import('@/app/admin/actions/account')
+const { savePromotionAction, togglePromotionAction, deletePromotionAction } = await import('@/app/admin/actions/promotions')
+const { saveBrandAction, deleteBrandAction } = await import('@/app/admin/actions/brands')
 const { hashPassword } = await import('@/lib/password')
 
 const saved = { ...process.env }
@@ -104,6 +106,25 @@ describe('server actions enforce permissions server-side', () => {
     await expect(changeOwnPasswordAction({ current: 'x', password: 'new password 12', confirm: 'new password 12' })).rejects.toMatchObject(REDIRECT)
   })
 
+  it('promotion and brand actions: blog editor 403, product manager allowed and logged', async () => {
+    await signIn('BLOG_EDITOR')
+    const promo = { name: 'P', kind: 'PERCENT', value: 10, targetType: 'BRAND', targetIds: [1], enabled: true, startsAt: null, endsAt: null } as const
+    await expect(savePromotionAction({ ...promo, targetIds: [1] })).rejects.toMatchObject(FORBIDDEN)
+    await expect(togglePromotionAction(1, false)).rejects.toMatchObject(FORBIDDEN)
+    await expect(deletePromotionAction(1)).rejects.toMatchObject(FORBIDDEN)
+    await expect(saveBrandAction({ name: 'B', slug: '', logoUrl: '', sortOrder: 0 })).rejects.toMatchObject(FORBIDDEN)
+    await expect(deleteBrandAction(1)).rejects.toMatchObject(FORBIDDEN)
+
+    const pm = await signIn('PRODUCT_MANAGER')
+    const b = await saveBrandAction({ name: 'Anker', slug: '', logoUrl: '', sortOrder: 0 })
+    expect(b).toMatchObject({ ok: true })
+    const brandId = (b as { id: number }).id
+    const p = await savePromotionAction({ ...promo, targetIds: [brandId] })
+    expect(p).toMatchObject({ ok: true })
+    expect(await togglePromotionAction((p as { id: number }).id, false)).toEqual({ ok: true })
+    expect(await prisma.activityLog.count({ where: { userId: pm.id, entity: { in: ['brand', 'promotion'] } } })).toBe(3)
+  })
+
   it('product save is logged even when the spec labels that follow it fail', async () => {
     const pm = await signIn('PRODUCT_MANAGER')
     const cat = await prisma.category.create({ data: { slug: 'c', name: { en: 'c' } } })
@@ -116,7 +137,7 @@ describe('server actions enforce permissions server-side', () => {
       include: { variants: true },
     })
     const input = {
-      slug: p.slug, categoryId: cat.id, templateOverride: null, brand: '', badge: null,
+      slug: p.slug, categoryId: cat.id, templateOverride: null, brandId: null, badge: null,
       title: { en: 'Renamed' }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [], inTheBox: [], faq: [], specs: [],
       images: ['https://img/a.jpg'], reviewed: { uz: false, ru: false },
       variants: p.variants.map((v) => ({ id: v.id, sku: v.sku, name: { en: v.sku }, priceUzs: v.priceUzs, compareAtUzs: null, stock: v.stock, colorHex: null, imageIndex: null })),

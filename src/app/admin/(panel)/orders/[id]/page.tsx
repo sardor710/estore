@@ -84,7 +84,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   {l.variantName ? <span className="text-neutral-500"> ({l.variantName})</span> : null}
                 </td>
                 <td className="py-2 font-mono text-xs">{l.sku}</td>
-                <td className="py-2 text-right">{formatUzs(l.priceUzs, 'en')}</td>
+                <td className="py-2 text-right">
+                  {formatUzs(l.priceUzs, 'en')}
+                  {l.discountUzs > 0 && l.originalPriceUzs != null ? (
+                    <div className="text-xs text-neutral-500">
+                      <s>{formatUzs(l.originalPriceUzs, 'en')}</s> -{formatUzs(l.discountUzs, 'en')}
+                      {l.promotionId != null ? ` (promotion #${l.promotionId})` : ''}
+                    </div>
+                  ) : null}
+                </td>
                 <td className="py-2 text-right">{l.qty}</td>
                 <td className="py-2 text-right">{formatUzs(l.priceUzs * l.qty, 'en')}</td>
               </tr>

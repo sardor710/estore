@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { sanitizeHtml } from '@/lib/sanitize'
+import { upsertBrandByName } from '@/lib/admin/brands'
 import {
   ImportError,
   normalizeAnkerUrl,
@@ -175,13 +176,14 @@ export async function importAnkerProduct(
   const slug = await uniqueSlug(slugify(p.handle) || 'product')
   const specs = buildSpecs(p.specGroups)
   await upsertSpecLabels(p.specGroups)
+  const brandId = await upsertBrandByName('Anker')
 
   const product = await prisma.product.create({
     data: {
       slug,
       categoryId,
       status: 'DRAFT',
-      brand: 'Anker',
+      brandId,
       sourceUrl: norm,
       sourcePriceUsd: p.variants[0].priceUsd,
       title: { en: p.title },

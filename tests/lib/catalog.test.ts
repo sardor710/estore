@@ -172,6 +172,34 @@ describe('card shape', () => {
   })
 })
 
+describe('promotions in the catalog', () => {
+  it('card shows the effective min price with the original as compare-at; sale lists promo products', async () => {
+    const parent = await mkCat('audio')
+    const child = await mkCat('headphones', { parentId: parent.id })
+    await mkProduct({ slug: 'promo', categoryId: child.id, variants: [{ sku: 'P1', priceUzs: 1_290_000 }, { sku: 'P2', priceUzs: 1_500_000 }] })
+    await mkProduct({ slug: 'plain', categoryId: (await mkCat('cables')).id, variants: [{ sku: 'N1', priceUzs: 50_000 }] })
+    await prisma.promotion.create({ data: { name: 'Audio', kind: 'PERCENT', value: 10, targetType: 'CATEGORY', targetIds: [parent.id] } })
+
+    const page = await getCategoryPage('headphones')
+    expect(page!.products[0]).toMatchObject({ slug: 'promo', minPriceUzs: 1_161_000, compareAtUzs: 1_290_000 })
+    expect((await getSaleProducts()).map((p) => p.slug)).toEqual(['promo'])
+
+    const detail = await getProductBySlug('promo')
+    expect(detail!.variants.map((v) => [v.priceUzs, v.compareAtUzs])).toEqual([[1_161_000, 1_290_000], [1_350_000, 1_500_000]])
+    const plain = await getProductBySlug('plain')
+    expect(plain!.variants[0]).toMatchObject({ priceUzs: 50_000, compareAtUzs: null })
+  })
+  it('a disabled or expired promotion leaves prices alone', async () => {
+    const c = await mkCat('chargers')
+    await mkProduct({ slug: 'x', categoryId: c.id, variants: [{ sku: 'X1', priceUzs: 100_000 }] })
+    await prisma.promotion.create({ data: { name: 'off', kind: 'AMOUNT', value: 5_000, targetType: 'CATEGORY', targetIds: [c.id], enabled: false } })
+    await prisma.promotion.create({ data: { name: 'old', kind: 'AMOUNT', value: 5_000, targetType: 'CATEGORY', targetIds: [c.id], endsAt: new Date(Date.now() - 1000) } })
+    const [card] = await getNewArrivals()
+    expect(card).toMatchObject({ minPriceUzs: 100_000, compareAtUzs: null })
+    expect(await getSaleProducts()).toEqual([])
+  })
+})
+
 describe('categories', () => {
   it('builds a sorted tree', async () => {
     await mkCat('b', { sortOrder: 2 })

@@ -19,7 +19,7 @@ async function mk(slug: string, variants: { sku: string; price: number; stock?: 
 
 function inputOf(p: Awaited<ReturnType<typeof mk>>, patch: Partial<ProductInput> = {}): ProductInput {
   return {
-    slug: p.slug, categoryId: p.categoryId, templateOverride: null, brand: '', badge: null,
+    slug: p.slug, categoryId: p.categoryId, templateOverride: null, brandId: null, badge: null,
     title: { en: 'T' }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [], inTheBox: [], faq: [], specs: [],
     images: ['https://img/a.jpg'], reviewed: { uz: false, ru: false },
     variants: p.variants.map((v) => ({ id: v.id, sku: v.sku, name: { en: v.sku }, priceUzs: v.priceUzs, compareAtUzs: null, stock: v.stock, colorHex: null, imageIndex: null })),
@@ -57,6 +57,15 @@ describe('publish validation', () => {
 })
 
 describe('updateProduct', () => {
+  it('sets and clears the brand by id; rejects an unknown brand', async () => {
+    const p = await mk('br', [{ sku: 'BR1', price: 100 }])
+    const brand = await prisma.brand.create({ data: { name: 'Anker', slug: 'anker' } })
+    expect(await updateProduct(p.id, inputOf(p, { brandId: brand.id }))).toEqual({ ok: true })
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: p.id } })).brandId).toBe(brand.id)
+    expect(await updateProduct(p.id, inputOf(p, { brandId: 424242 }))).toMatchObject({ ok: false, errors: { brandId: expect.any(String) } })
+    expect(await updateProduct(p.id, inputOf(p, { brandId: null }))).toEqual({ ok: true })
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: p.id } })).brandId).toBeNull()
+  })
   it('saves fields, sanitizes html, syncs variants (add/update/remove)', async () => {
     const p = await mk('a', [{ sku: 'A1', price: 100 }, { sku: 'A2', price: 200 }])
     const [v1] = p.variants

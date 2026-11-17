@@ -80,6 +80,9 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
   if (!isInt(input.categoryId) || !(await prisma.category.findUnique({ where: { id: input.categoryId }, select: { id: true } }))) {
     errors.categoryId = 'Choose an existing category.'
   }
+  if (input.brandId !== null && (!isInt(input.brandId) || !(await prisma.brand.findUnique({ where: { id: input.brandId }, select: { id: true } })))) {
+    errors.brandId = 'Choose an existing brand (or none).'
+  }
   if (input.templateOverride !== null && input.templateOverride !== 'SIMPLE' && input.templateOverride !== 'DETAILED') {
     errors.templateOverride = 'Template must be SIMPLE, DETAILED or inherited.'
   }
@@ -156,7 +159,7 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
           slug,
           categoryId: input.categoryId,
           templateOverride: input.templateOverride,
-          brand: str(input.brand).trim(),
+          brandId: input.brandId,
           badge,
           title: cleanL10n(input.title),
           subtitle: cleanL10n(input.subtitle),

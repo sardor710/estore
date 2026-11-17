@@ -6,6 +6,7 @@ import { PageTitle } from '@/components/admin/ui'
 import ProductEditor from '@/components/admin/ProductEditor'
 import type { L10n } from '@/lib/localized'
 import { requirePermission } from '@/lib/admin/session'
+import { brandOptions } from '@/lib/admin/brands'
 
 export const metadata = { title: 'Edit product' }
 
@@ -19,7 +20,12 @@ export default async function EditProductPage({
   await requirePermission('catalog')
   const id = Number((await params).id)
   if (!Number.isInteger(id)) notFound()
-  const [product, cats, sp] = await Promise.all([loadEditorProduct(id), prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }), searchParams])
+  const [product, cats, brands, sp] = await Promise.all([
+    loadEditorProduct(id),
+    prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
+    brandOptions(),
+    searchParams,
+  ])
   if (!product) notFound()
   const categories = cats.map((c) => {
     const n = (c.name ?? {}) as L10n
@@ -35,7 +41,7 @@ export default async function EditProductPage({
         </Link>
       </p>
       <PageTitle>{title}</PageTitle>
-      <ProductEditor product={product} categories={categories} initialNotice={sp.notice} />
+      <ProductEditor product={product} categories={categories} brands={brands} initialNotice={sp.notice} />
     </>
   )
 }

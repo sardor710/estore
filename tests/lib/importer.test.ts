@@ -139,14 +139,14 @@ describe('importAnkerProduct', () => {
     expect(r1.created).toBe(true)
     const prod = await prisma.product.findUniqueOrThrow({
       where: { id: r1.productId },
-      include: { variants: true },
+      include: { variants: true, brand: true },
     })
     expect(prod.status).toBe('DRAFT')
     expect(prod.categoryId).toBe(chargers.id)
     expect(prod.slug).toBe('a120f-100w-usb-c-gan-charger-battery-care')
     expect(prod.sourceUrl).toBe(URL_A120F)
     expect(prod.sourcePriceUsd).toBe(59.99)
-    expect(prod.brand).toBe('Anker')
+    expect(prod.brand?.name).toBe('Anker')
     expect(prod.isDemo).toBe(false)
     expect(prod.reviewed).toEqual({ uz: false, ru: false })
     expect((prod.title as { en: string }).en).toBe('Anker Laptop Charger Pro')
@@ -165,6 +165,13 @@ describe('importAnkerProduct', () => {
     const r2 = await importAnkerProduct(URL_A120F, { fetchHtml: fetchFixture })
     expect(r2).toEqual({ productId: r1.productId, created: false })
     expect(await prisma.product.count()).toBe(1)
+  })
+
+  it('links the product to an existing Brand case-insensitively instead of creating a duplicate', async () => {
+    const existing = await prisma.brand.create({ data: { name: 'ANKER', slug: 'anker-official' } })
+    const r = await importAnkerProduct(URL_A120F, { fetchHtml: fetchFixture })
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })).brandId).toBe(existing.id)
+    expect(await prisma.brand.count()).toBe(1)
   })
 
   it('sanitizes description html', async () => {

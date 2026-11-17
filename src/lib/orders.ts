@@ -7,6 +7,7 @@ import { normalizeUzPhone } from '@/lib/phone'
 import { getRegion } from '@/lib/regions'
 import { notifyNewOrder, type NotifyOrder } from '@/lib/telegram'
 import { isVariantId, MAX_LINE_QTY, type CartLine } from '@/lib/cart/cart'
+import { loadPricer } from '@/lib/promotions'
 
 export type OrderStatus = 'NEW' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED'
 export type CreateOrderInput = {
@@ -47,18 +48,20 @@ export type QuoteItem = {
   title: string
   variantName: string
   image: string | null
+  /** Effective (after promotion) unit price */
   priceUzs: number
   stock: number
   available: boolean
 }
 export type Quote = { items: QuoteItem[]; totalUzs: number; minOrderUzs: number }
 
-/** Current DB prices for a cart. Unpublished/missing variants come back `available: false` and are excluded from the total. */
+/** Current DB prices (after promotions) for a cart. Unpublished/missing variants come back `available: false` and are excluded from the total. */
 export async function quoteCart(lines: CartLine[], locale: Locale): Promise<Quote> {
   const ids = [...new Set(lines.map((l) => l.variantId))]
-  const [rows, settings] = await Promise.all([
+  const [rows, settings, price] = await Promise.all([
     prisma.variant.findMany({ where: { id: { in: ids } }, include: { product: true } }),
     getSettings(),
+    loadPricer(),
   ])
   const byId = new Map(rows.map((r) => [r.id, r]))
   let total = 0
@@ -67,14 +70,15 @@ export async function quoteCart(lines: CartLine[], locale: Locale): Promise<Quot
     if (!v || !isSellable(v.product)) {
       return { variantId: l.variantId, qty: l.qty, title: '', variantName: '', image: null, priceUzs: 0, stock: 0, available: false }
     }
-    total += v.priceUzs * l.qty
+    const unit = price(v).priceUzs
+    total += unit * l.qty
     return {
       variantId: v.id,
       qty: l.qty,
       title: t(asL10n(v.product.title), locale),
       variantName: t(asL10n(v.name), locale),
       image: firstImage(v.product.images),
-      priceUzs: v.priceUzs,
+      priceUzs: unit,
       stock: v.stock,
       available: true,
     }
@@ -116,18 +120,24 @@ export async function createOrder(
       const order = await prisma.$transaction(async (tx) => {
         const rows = await tx.variant.findMany({ where: { id: { in: lines.map((l) => l.variantId) } }, include: { product: true } })
         const byId = new Map(rows.map((r) => [r.id, r]))
+        // Promotions are read inside the transaction: a promo switched off before submit no longer applies.
+        const price = await loadPricer(tx)
         let total = 0
         const snap = lines.map((l) => {
           const v = byId.get(l.variantId)
           if (!v || !isSellable(v.product)) throw new Rollback('INVALID')
           if (l.qty > v.stock) throw new Rollback('OUT_OF_STOCK')
-          total += v.priceUzs * l.qty
+          const p = price(v)
+          total += p.priceUzs * l.qty
           return {
             variantId: v.id,
             sku: v.sku,
             productTitle: t(asL10n(v.product.title), locale),
             variantName: t(asL10n(v.name), locale),
-            priceUzs: v.priceUzs,
+            priceUzs: p.priceUzs,
+            originalPriceUzs: p.originalUzs,
+            discountUzs: p.discountUzs,
+            promotionId: p.promotionId,
             qty: l.qty,
           }
         })

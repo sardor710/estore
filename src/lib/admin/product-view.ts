@@ -22,7 +22,7 @@ export type EditorProduct = {
 }
 
 export function rowToInput(p: {
-  slug: string; categoryId: number; templateOverride: string | null; brand: string; badge: string | null
+  slug: string; categoryId: number; templateOverride: string | null; brandId: number | null; badge: string | null
   title: unknown; subtitle: unknown; shortSpec: unknown; descriptionHtml: unknown; sections: unknown; highlights: unknown
   inTheBox: unknown; faq: unknown; specs: unknown; images: unknown; reviewed: unknown
   variants: { id: number; sku: string; name: unknown; priceUzs: number; compareAtUzs: number | null; stock: number; colorHex: string | null; imageIndex: number | null; sortOrder: number }[]
@@ -32,7 +32,7 @@ export function rowToInput(p: {
     slug: p.slug,
     categoryId: p.categoryId,
     templateOverride: p.templateOverride === 'SIMPLE' || p.templateOverride === 'DETAILED' ? p.templateOverride : null,
-    brand: p.brand,
+    brandId: p.brandId,
     badge: p.badge,
     title: l10n(p.title),
     subtitle: l10n(p.subtitle),

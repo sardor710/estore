@@ -16,6 +16,7 @@ import ImagesEditor from './ImagesEditor'
 import { FaqEditor, HighlightsEditor, InTheBoxEditor, SectionsEditor } from './ContentEditor'
 
 type Category = { id: number; label: string }
+type Brand = { id: number; label: string }
 type Msg = { kind: 'ok' | 'error' | 'warn' | 'info'; text: string } | null
 
 function Section({ title, children, error, id }: { title: string; children: React.ReactNode; error?: string; id: string }) {
@@ -34,7 +35,17 @@ function Section({ title, children, error, id }: { title: string; children: Reac
   )
 }
 
-export default function ProductEditor({ product, categories, initialNotice }: { product: EditorProduct; categories: Category[]; initialNotice?: string }) {
+export default function ProductEditor({
+  product,
+  categories,
+  brands,
+  initialNotice,
+}: {
+  product: EditorProduct
+  categories: Category[]
+  brands: Brand[]
+  initialNotice?: string
+}) {
   const [data, setData] = useState<ProductInput>(product.input)
   const [labels, setLabels] = useState<Record<string, L10n>>(product.labels)
   const [status, setStatus] = useState(product.status)
@@ -185,8 +196,16 @@ export default function ProductEditor({ product, categories, initialNotice }: { 
             </select>
           </label>
           <label>
-            <Label>Brand</Label>
-            <input className={input} value={data.brand} onChange={(e) => patch({ brand: e.target.value })} />
+            <Label hint="manage under Brands">Brand</Label>
+            <select className={input} value={data.brandId ?? ''} onChange={(e) => patch({ brandId: e.target.value ? Number(e.target.value) : null })}>
+              <option value="">No brand</option>
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+            {errors.brandId ? <p role="alert" className="mt-1 text-sm text-red-700">{errors.brandId}</p> : null}
           </label>
           <label>
             <Label hint="optional, e.g. New">Badge</Label>

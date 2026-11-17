@@ -3,6 +3,7 @@ import { isSellable, storefrontWhere } from '@/lib/visibility'
 import type { Locale } from '@/i18n/routing'
 import { locales } from '@/i18n/routing'
 import type { L10n } from '@/lib/localized'
+import { loadPricer, type Pricer } from '@/lib/promotions'
 
 export type TemplateKind = 'SIMPLE' | 'DETAILED'
 export type SortKey = 'new' | 'price-asc' | 'price-desc'
@@ -29,8 +30,9 @@ export type CardProduct = {
   shortSpec: L10n
   badge: string | null
   image: string | null
+  /** Effective (after promotion) price of the cheapest variant */
   minPriceUzs: number
-  /** compare-at of the cheapest variant, only when it is a real discount */
+  /** Original price when a promotion applies, else the cheapest variant's compare-at when it is a real discount */
   compareAtUzs: number | null
   hasMultiplePrices: boolean
   inStock: boolean
@@ -45,7 +47,9 @@ export type VariantView = {
   name: L10n
   colorHex: string | null
   imageIndex: number | null
+  /** Effective (after promotion) price */
   priceUzs: number
+  /** Original price when a promotion applies, else the stored compare-at */
   compareAtUzs: number | null
   stock: number
 }
@@ -83,6 +87,8 @@ const asL10n = (v: unknown): L10n => (v && typeof v === 'object' && !Array.isArr
 type ProductWithVariants = {
   id: number
   slug: string
+  categoryId: number
+  brandId: number | null
   title: unknown
   shortSpec: unknown
   badge: string | null
@@ -91,8 +97,14 @@ type ProductWithVariants = {
   variants: { id: number; priceUzs: number; compareAtUzs: number | null; stock: number; sortOrder: number }[]
 }
 
-function toCard(p: ProductWithVariants): CardProduct {
-  const vs = [...p.variants].sort((a, b) => a.priceUzs - b.priceUzs || a.sortOrder - b.sortOrder)
+/** Variant price after the best active promotion; compare-at becomes the original price when one applies. */
+function effective<V extends { priceUzs: number; compareAtUzs: number | null }>(v: V, p: { id: number; categoryId: number; brandId: number | null }, price: Pricer): V & { discounted: boolean } {
+  const r = price({ priceUzs: v.priceUzs, product: p })
+  return r.promotionId === null ? { ...v, discounted: false } : { ...v, priceUzs: r.priceUzs, compareAtUzs: r.originalUzs, discounted: true }
+}
+
+function toCard(p: ProductWithVariants, price: Pricer): CardProduct {
+  const vs = p.variants.map((v) => effective(v, p, price)).sort((a, b) => a.priceUzs - b.priceUzs || a.sortOrder - b.sortOrder)
   const cheapest = vs[0]
   const firstInStock = vs.find((v) => v.stock > 0)
   const images = asArray<string>(p.images)
@@ -115,12 +127,15 @@ function toCard(p: ProductWithVariants): CardProduct {
 const cardInclude = { variants: true } as const
 
 async function publishedCards(where: object = {}): Promise<CardProduct[]> {
-  const rows = await prisma.product.findMany({
-    where: { ...storefrontWhere(), ...where },
-    include: cardInclude,
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-  })
-  return rows.map(toCard)
+  const [rows, price] = await Promise.all([
+    prisma.product.findMany({
+      where: { ...storefrontWhere(), ...where },
+      include: cardInclude,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    }),
+    loadPricer(),
+  ])
+  return rows.map((r) => toCard(r, price))
 }
 
 // ---------- categories ----------
@@ -190,10 +205,11 @@ export async function getProductBySlug(
 ): Promise<ProductDetail | null> {
   const row = await prisma.product.findUnique({
     where: { slug },
-    include: { variants: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }, category: { include: { parent: true } } },
+    include: { variants: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }, category: { include: { parent: true } }, brand: true },
   })
   if (!row) return null
   if (!isSellable(row) && !opts.includeDraft) return null
+  const price = await loadPricer()
 
   const specs = asArray<SpecGroup>(row.specs)
   const keys = new Set<string>()
@@ -208,7 +224,7 @@ export async function getProductBySlug(
   return {
     id: row.id,
     slug: row.slug,
-    brand: row.brand,
+    brand: row.brand?.name ?? '',
     badge: row.badge,
     status: row.status,
     template: resolveTemplate(row, row.category),
@@ -228,16 +244,19 @@ export async function getProductBySlug(
       name: asL10n(row.category.name),
       parent: row.category.parent ? { slug: row.category.parent.slug, name: asL10n(row.category.parent.name) } : null,
     },
-    variants: row.variants.map((v) => ({
-      id: v.id,
-      sku: v.sku,
-      name: asL10n(v.name),
-      colorHex: v.colorHex,
-      imageIndex: v.imageIndex,
-      priceUzs: v.priceUzs,
-      compareAtUzs: v.compareAtUzs,
-      stock: v.stock,
-    })),
+    variants: row.variants.map((raw) => {
+      const v = effective(raw, row, price)
+      return {
+        id: v.id,
+        sku: v.sku,
+        name: asL10n(v.name),
+        colorHex: v.colorHex,
+        imageIndex: v.imageIndex,
+        priceUzs: v.priceUzs,
+        compareAtUzs: v.compareAtUzs,
+        stock: v.stock,
+      }
+    }),
     specLabels,
   }
 }
@@ -245,11 +264,14 @@ export async function getProductBySlug(
 export async function searchProducts(q: string, locale: Locale): Promise<CardProduct[]> {
   const needle = q.trim().toLowerCase()
   if (!needle) return []
-  const rows = await prisma.product.findMany({
-    where: storefrontWhere(),
-    include: cardInclude,
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-  })
+  const [rows, price] = await Promise.all([
+    prisma.product.findMany({
+      where: storefrontWhere(),
+      include: cardInclude,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    }),
+    loadPricer(),
+  ])
   const has = (field: unknown, l?: Locale) => {
     const f = asL10n(field)
     const vals = l ? [f[l]] : locales.map((x) => f[x])
@@ -264,28 +286,31 @@ export async function searchProducts(q: string, locale: Locale): Promise<CardPro
     if (score) scored.push({ row, score })
   }
   scored.sort((a, b) => b.score - a.score)
-  return scored.map((s) => toCard(s.row))
+  return scored.map((s) => toCard(s.row, price))
 }
 
+/** Products with a real compare-at discount or an active promotion on any variant. */
 export async function getSaleProducts(): Promise<CardProduct[]> {
-  const rows = await prisma.product.findMany({
-    where: { ...storefrontWhere(), variants: { some: { compareAtUzs: { not: null } } } },
-    include: cardInclude,
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-  })
+  const [rows, price] = await Promise.all([
+    prisma.product.findMany({ where: storefrontWhere(), include: cardInclude, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] }),
+    loadPricer(),
+  ])
   return rows
-    .filter((r) => r.variants.some((v) => v.compareAtUzs != null && v.compareAtUzs > v.priceUzs))
-    .map(toCard)
+    .filter((r) => r.variants.some((v) => (v.compareAtUzs != null && v.compareAtUzs > v.priceUzs) || effective(v, r, price).discounted))
+    .map((r) => toCard(r, price))
 }
 
 export async function getNewArrivals(limit = 8): Promise<CardProduct[]> {
-  const rows = await prisma.product.findMany({
-    where: storefrontWhere(),
-    include: cardInclude,
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: limit,
-  })
-  return rows.map(toCard)
+  const [rows, price] = await Promise.all([
+    prisma.product.findMany({
+      where: storefrontWhere(),
+      include: cardInclude,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+    }),
+    loadPricer(),
+  ])
+  return rows.map((r) => toCard(r, price))
 }
 
 export async function getRelated(productId: number, limit = 4): Promise<CardProduct[]> {
@@ -308,5 +333,6 @@ export async function getRelated(productId: number, limit = 4): Promise<CardProd
     })
     rows = [...rows, ...others]
   }
-  return rows.map(toCard)
+  const price = await loadPricer()
+  return rows.map((r) => toCard(r, price))
 }
