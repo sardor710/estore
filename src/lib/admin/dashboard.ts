@@ -76,7 +76,9 @@ export type DashboardData = {
   series: { day: string; revenueUzs: number; orders: number; visitors: number }[]
   ordersByStatus: Record<'NEW' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED', number>
   recentOrders: { id: number; number: number; status: string; name: string; totalUzs: number; createdAt: Date }[]
-  topProducts: { title: string; units: number; revenueUzs: number }[]
+  /** Both lists are cut from the full set of sold titles, so the leader of one ranking is never lost to the other. */
+  topProductsByUnits: { title: string; units: number; revenueUzs: number }[]
+  topProductsByRevenue: { title: string; units: number; revenueUzs: number }[]
   topCategories: { name: string; units: number; revenueUzs: number }[]
   salesByRegion: { code: string; name: string; orders: number; revenueUzs: number }[]
   topPages: RankRow[]
@@ -206,10 +208,13 @@ export async function getDashboard(range: DashboardRange, now: Date = new Date()
     p.revenueUzs += l.priceUzs * l.qty
     byTitle.set(l.productTitle, p)
   }
-  const topProducts = [...byTitle]
-    .sort((a, b) => b[1].units - a[1].units || b[1].revenueUzs - a[1].revenueUzs)
-    .slice(0, 10)
-    .map(([title, v]) => ({ title, ...v }))
+  const topBy = (cmp: (a: { units: number; revenueUzs: number }, b: { units: number; revenueUzs: number }) => number) =>
+    [...byTitle]
+      .map(([title, v]) => ({ title, ...v }))
+      .sort((a, b) => cmp(b, a) || a.title.localeCompare(b.title))
+      .slice(0, 10)
+  const topProductsByUnits = topBy((a, b) => a.units - b.units || a.revenueUzs - b.revenueUzs)
+  const topProductsByRevenue = topBy((a, b) => a.revenueUzs - b.revenueUzs || a.units - b.units)
 
   // Category via the variant that was sold; variants deleted since then cannot be attributed.
   const variantIds = [...new Set(lines.map((l) => l.variantId))]
@@ -248,10 +253,14 @@ export async function getDashboard(range: DashboardRange, now: Date = new Date()
       const target = v.stock <= 0 ? out : v.stock <= settings.lowStockThreshold ? low : null
       if (!target) continue
       target.total += 1
-      if (target.items.length < STOCK_LIST_CAP) target.items.push({ productId: p.id, title, variant: t(v.name as L10n, 'en'), sku: v.sku, stock: v.stock })
+      target.items.push({ productId: p.id, title, variant: t(v.name as L10n, 'en'), sku: v.sku, stock: v.stock })
     }
   }
-  low.items.sort((a, b) => a.stock - b.stock)
+  // Emptiest first, then cap: the most urgent variants must survive the cut.
+  for (const list of [low, out]) {
+    list.items.sort((a, b) => a.stock - b.stock || a.sku.localeCompare(b.sku))
+    list.items.length = Math.min(list.items.length, STOCK_LIST_CAP)
+  }
 
   return {
     kpis: {
@@ -266,7 +275,8 @@ export async function getDashboard(range: DashboardRange, now: Date = new Date()
     series: days.map((d) => perDay.get(d)!),
     ordersByStatus,
     recentOrders: recent,
-    topProducts,
+    topProductsByUnits,
+    topProductsByRevenue,
     topCategories: [...byCat].sort((a, b) => b[1].revenueUzs - a[1].revenueUzs).slice(0, 5).map(([name, v]) => ({ name, ...v })),
     salesByRegion: [...regions]
       .sort((a, b) => b[1].revenueUzs - a[1].revenueUzs)

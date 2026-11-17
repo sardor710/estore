@@ -55,7 +55,7 @@ describe('getDashboard', () => {
     expect(d.series).toEqual([{ day: '2026-12-02', revenueUzs: 1_500_000, orders: 2, visitors: 4 }])
     expect(d.ordersByStatus).toMatchObject({ NEW: 1, CONFIRMED: 1, DELIVERED: 1, CANCELLED: 1 })
     expect(d.salesByRegion[0]).toMatchObject({ code: 'tashkent-city', name: 'Tashkent city', revenueUzs: 1_500_000, orders: 2 })
-    expect(d.topProducts[0]).toMatchObject({ title: 'Phone', units: 2, revenueUzs: 1_500_000 })
+    expect(d.topProductsByUnits[0]).toMatchObject({ title: 'Phone', units: 2, revenueUzs: 1_500_000 })
     expect(d.sources.find((s) => s.label === 'Direct')?.value).toBe(4)
     expect(d.sources.find((s) => s.label === 'google.com')?.value).toBe(1)
     expect(d.devices).toEqual([{ label: 'mobile', value: 5 }])
@@ -66,8 +66,44 @@ describe('getDashboard', () => {
     expect(d.kpis.aovUzs.value).toBe(0)
     expect(d.kpis.conversionPct.value).toBe(0)
     expect(d.series).toHaveLength(7)
-    expect(d.topProducts).toEqual([])
+    expect(d.topProductsByUnits).toEqual([])
+    expect(d.topProductsByRevenue).toEqual([])
     expect(d.recentOrders).toEqual([])
+  })
+  it('top products by revenue is not cut from the by-units list', async () => {
+    const mk = (title: string, units: number, price: number) =>
+      prisma.order.create({
+        data: {
+          number: ++seq, status: 'DELIVERED', name: 'A', phone: '+998901234567', region: 'tashkent', address: 'x', locale: 'en', totalUzs: units * price,
+          createdAt: new Date('2026-12-03T10:00:00Z'),
+          lines: { create: [{ variantId: 1, sku: title, productTitle: title, variantName: 'v', priceUzs: price, qty: units }] },
+        },
+      })
+    for (let i = 0; i < 11; i++) await mk(`cheap-${String(i).padStart(2, '0')}`, 100 - i, 1000) // 11 titles with many units
+    await mk('premium', 1, 50_000_000) // 1 unit, highest revenue
+    const d = await getDashboard(resolveRange('custom', '2026-12-03', '2026-12-03', NOW), NOW)
+    expect(d.topProductsByUnits).toHaveLength(10)
+    expect(d.topProductsByUnits.map((p) => p.title)).not.toContain('premium')
+    expect(d.topProductsByRevenue[0].title).toBe('premium')
+    expect(d.topProductsByRevenue).toHaveLength(10)
+  })
+  it('stock lists keep the emptiest variants when capped', async () => {
+    const cat = await prisma.category.create({ data: { slug: 'c2', name: { en: 'C' } } })
+    await prisma.setting.create({ data: { key: 'lowStockThreshold', value: '50' } })
+    for (let i = 0; i < 25; i++) {
+      await prisma.product.create({
+        data: {
+          slug: `s${i}`, categoryId: cat.id, status: 'PUBLISHED', title: { en: `s${i}` }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [],
+          inTheBox: [], faq: [], specs: [], images: ['/a.jpg'], reviewed: { uz: true, ru: true },
+          variants: { create: [{ sku: `K${i}`, name: { en: 'v' }, priceUzs: 10, stock: 49 - i }] }, // stock 49..25
+        },
+      })
+    }
+    const d = await getDashboard(resolveRange('7d', undefined, undefined, NOW), NOW)
+    expect(d.lowStock.total).toBe(25)
+    expect(d.lowStock.items).toHaveLength(20)
+    expect(d.lowStock.items[0].stock).toBe(25)
+    expect(d.lowStock.items.at(-1)!.stock).toBe(44)
   })
   it('uses DailyTraffic for days whose raw rows were pruned', async () => {
     await prisma.dailyTraffic.create({ data: { day: '2026-12-03', views: 40, visitors: 12 } })
@@ -97,6 +133,27 @@ describe('getDashboard', () => {
 })
 
 describe('rollupAndPrune', () => {
+  it('is incremental: rolled days are left alone, yesterday is refreshed, salts of finished days are deleted', async () => {
+    await view('2026-12-03', 'a')
+    await view('2026-12-04', 'a')
+    await rollupAndPrune(NOW)
+    await view('2026-12-03', 'b') // late row on an already rolled day: not rescanned
+    await view('2026-12-04', 'b') // yesterday: refreshed
+    await rollupAndPrune(NOW)
+    expect(await prisma.dailyTraffic.findUnique({ where: { day: '2026-12-03' } })).toEqual({ day: '2026-12-03', views: 1, visitors: 1 })
+    expect(await prisma.dailyTraffic.findUnique({ where: { day: '2026-12-04' } })).toEqual({ day: '2026-12-04', views: 2, visitors: 2 })
+  })
+  it('deletes visitor salts of finished days only', async () => {
+    await prisma.setting.createMany({
+      data: [
+        { key: 'visitorSalt:2026-12-04', value: 'x' },
+        { key: 'visitorSalt:2026-12-05', value: 'y' },
+        { key: 'minOrderUzs', value: '5' },
+      ],
+    })
+    await rollupAndPrune(NOW)
+    expect((await prisma.setting.findMany({ orderBy: { key: 'asc' } })).map((r) => r.key)).toEqual(['minOrderUzs', 'visitorSalt:2026-12-05'])
+  })
   it('moves finished days into DailyTraffic, keeps today raw, deletes raw rows older than 180 days', async () => {
     await view('2026-12-03', 'a')
     await view('2026-12-03', 'a')

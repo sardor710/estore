@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { prisma } from '@/lib/db'
 import { tashkentDay, isBot, deviceOf, visitorHash } from '@/lib/analytics/visitor'
 
 const saved = { ...process.env }
@@ -57,5 +58,12 @@ describe('visitorHash', () => {
   })
   it('does not contain the raw ip', async () => {
     expect(await visitorHash('1.2.3.4', DESKTOP, '2026-12-01')).not.toContain('1.2.3.4')
+  })
+  it('is keyed by a random per-day salt stored in Setting, not by SESSION_SECRET', async () => {
+    const h = await visitorHash('1.2.3.4', DESKTOP, '2026-12-09')
+    const salt = await prisma.setting.findUnique({ where: { key: 'visitorSalt:2026-12-09' } })
+    expect(salt?.value).toMatch(/^[0-9a-f]{64}$/)
+    process.env.SESSION_SECRET = 'q'.repeat(40)
+    expect(await visitorHash('1.2.3.4', DESKTOP, '2026-12-09')).toBe(h)
   })
 })

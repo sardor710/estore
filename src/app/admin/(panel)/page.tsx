@@ -5,7 +5,7 @@ import { getStaff, requirePermission } from '@/lib/admin/session'
 import { getDashboard, isRangeKey, resolveRange, type RangeKey } from '@/lib/admin/dashboard'
 import { rollupAndPrune } from '@/lib/analytics/rollup'
 import { tashkentDay } from '@/lib/analytics/visitor'
-import { Badge, PageTitle, card } from '@/components/admin/ui'
+import { Badge, Notice, PageTitle, card } from '@/components/admin/ui'
 import KpiTiles, { fmtNum } from '@/components/admin/dashboard/KpiTiles'
 import RangePicker from '@/components/admin/dashboard/RangePicker'
 import RankList from '@/components/admin/dashboard/RankList'
@@ -30,7 +30,11 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const key: RangeKey = isRangeKey(rangeParam) ? rangeParam : '7d'
   const range = resolveRange(key, one(sp.from), one(sp.to), now)
 
-  await rollupAndPrune(now)
+  try {
+    await rollupAndPrune(now)
+  } catch (e) {
+    console.error('[dashboard] rollup failed', e) // housekeeping must never take the page down
+  }
   const d = await getDashboard(range, now)
   const first = range.days[0]
   const last = range.days[range.days.length - 1]
@@ -44,6 +48,11 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         {first === last ? first : `${first} to ${last}`} (Tashkent time). Revenue counts confirmed and delivered orders; visitors are daily unique visitors.
       </p>
 
+      {process.env.TRUST_PROXY !== '1' ? (
+        <div className="mb-3">
+          <Notice kind="warn">Visitor counts are approximate: set TRUST_PROXY=1 behind your reverse proxy. Without it visitors are told apart by browser only, so Visitors is undercounted and Conversion overstated.</Notice>
+        </div>
+      ) : null}
       <KpiTiles kpis={d.kpis} />
 
       <div className={`${card} mb-6 grid gap-6 lg:grid-cols-2`}>
@@ -89,8 +98,8 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
-        <RankList title="Top products (units)" items={d.topProducts.map((p) => ({ label: p.title, value: p.units, sub: som(p.revenueUzs) }))} />
-        <RankList title="Top products (revenue)" items={[...d.topProducts].sort((a, b) => b.revenueUzs - a.revenueUzs).map((p) => ({ label: p.title, value: p.revenueUzs, display: som(p.revenueUzs), sub: `${fmtNum(p.units)} units` }))} />
+        <RankList title="Top products (units)" items={d.topProductsByUnits.map((p) => ({ label: p.title, value: p.units, sub: som(p.revenueUzs) }))} />
+        <RankList title="Top products (revenue)" items={d.topProductsByRevenue.map((p) => ({ label: p.title, value: p.revenueUzs, display: som(p.revenueUzs), sub: `${fmtNum(p.units)} units` }))} />
         <RankList title="Top categories (revenue)" items={d.topCategories.map((c) => ({ label: c.name, value: c.revenueUzs, display: som(c.revenueUzs), sub: `${fmtNum(c.units)} units` }))} />
         <RankList title="Sales by region" items={d.salesByRegion.map((r) => ({ label: r.name, value: r.revenueUzs, display: som(r.revenueUzs), sub: `${r.orders} orders` }))} />
         <RankList title="Top pages" items={d.topPages} />
