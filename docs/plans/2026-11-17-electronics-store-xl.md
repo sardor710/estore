@@ -5,7 +5,7 @@
 ## Progress
 | Status | Wave | Done | Last updated | Next action |
 |---|---|---|---|---|
-| Draft – plan | – | 0/9 tasks | 2026-11-17 | Await plan approval + execution method |
+| Done – partial | 5 | 9/9 tasks | 2026-11-17 | Owner: add ANTHROPIC_API_KEY + Telegram bot, verify live translation/notification |
 
 Status values: `Draft – requirement` → `Draft – plan` → `Executing` → `Done` | `Done – partial` | `Blocked`
 Markers: `[ ]` pending · `[~]` in progress · `[x]` done (+evidence) · `[!]` blocked (+reason) · `[-]` dropped
@@ -176,11 +176,11 @@ Waves (≤2 parallel, disjoint write scopes):
 - `prisma/seed.ts` seeds categories (slug → template): `chargers`D, `power-banks`D, `audio`(parent) with `earbuds`D `headphones`D `speakers`D, `wearables`(parent) with `smartwatches`D, `cameras-smart-home`D, `cables-hubs`S, `cases-accessories`S; names in uz/ru/en; settings defaults; no products.
 - npm scripts: `dev`, `build`, `start`, `test` (vitest run), `db:push`, `seed`, `seed:demo`.
 
-- [ ] `git init`, add `.gitignore` (node_modules, .next, *.db, .env, outputs/, .vibeskills/), baseline commit of current tree — verify: `git log --oneline` shows 1 commit
-- [ ] Move `src/`, `index.html`, `vite.config.js` to `legacy/`; install Next.js stack; scaffold files above — verify: `npm run dev` → `curl -sI localhost:3000/` shows `307` to `/uz`, `/uz` → 200
-- [ ] Write failing tests: `formatUzs(1290000,'uz') === '1 290 000 soʻm'`, en `'1,290,000 UZS'`, `formatUzs(0,'ru') === '0 сум'`; `t({en:'A'},'uz')==='A'`, `t({uz:'',ru:'R'},'uz')==='R'`, `t(null,'ru')===''`; settings default `minOrderUzs===0`, update persists — verify: `npm test` FAIL
-- [ ] Implement libs + schema + seed — verify: `npm run db:push && npm run seed && npm test` PASS
-- [ ] Commit "feat: next.js foundation"
+- [x] (done by lead: 3e70ede, branch feature/electronics-store) `git init`, add `.gitignore` (node_modules, .next, *.db, .env, outputs/, .vibeskills/), baseline commit of current tree — verify: `git log --oneline` shows 1 commit
+- [x] Move `src/`, `index.html`, `vite.config.js` to `legacy/`; install Next.js stack; scaffold files above — verify: `npm run dev` → `curl -sI localhost:3000/` shows `307` to `/uz`, `/uz` → 200
+- [x] Write failing tests: `formatUzs(1290000,'uz') === '1 290 000 soʻm'`, en `'1,290,000 UZS'`, `formatUzs(0,'ru') === '0 сум'`; `t({en:'A'},'uz')==='A'`, `t({uz:'',ru:'R'},'uz')==='R'`, `t(null,'ru')===''`; settings default `minOrderUzs===0`, update persists — verify: `npm test` FAIL
+- [x] Implement libs + schema + seed — verify: `npm run db:push && npm run seed && npm test` PASS
+- [x] Commit "feat: next.js foundation" — evidence: 219706a + fix 710a507 (matcher escaping); 20/20 tests, build OK, `/`→307 /uz, `/products`→307 /uz/products; review approved
 
 ### Task 2 — M2 Storefront (wave 2)
 **Files:** `src/lib/catalog.ts`, `src/components/store/*`, `src/app/[locale]/{page,c/[slug]/page,p/[slug]/page,search/page,sale/page}.tsx`, `messages/*.json` (store keys); test `tests/lib/catalog.test.ts`.
@@ -190,9 +190,9 @@ Waves (≤2 parallel, disjoint write scopes):
 - `ProductCard` props `{product: CardProduct, locale}`; card shows "from" min variant price, compare-at, badge, `shortSpec`, out-of-stock state; quick-add uses the first in-stock variant via `useCart().add(variantId, 1)`. Task 2 creates `src/lib/cart/useCart.ts` as a stub with exactly Task 4's `useCart()` signature; Task 4 replaces its body.
 - `DetailedProduct`: gallery, variant selector (color swatches / name chips), price + stock + add-to-cart, highlights strip, sections, `SpecTable` (groups with labels via `SpecLabel` dictionary + `t()`), in-the-box list, FAQ accordion, related. `SimpleProduct`: port of `legacy/src/pages/ProductPage.jsx` layout using the same data.
 - Navbar: top level = root categories + "Sale"; parents show a dropdown of children; `LangSwitcher` links to the same path in other locales.
-- [ ] Failing tests: `resolveTemplate({templateOverride:null},{template:'DETAILED'})==='DETAILED'`, override `'SIMPLE'` wins; `getProductBySlug` hides DRAFT unless `includeDraft`; `searchProducts('B120FJZ1','uz')` finds by SKU; `searchProducts('zaryad','uz')` finds uz title; sale returns only discounted — verify: FAIL
-- [ ] Implement catalog + components + pages (port styles from `legacy/src/components`) — verify: `npm test` PASS; `npm run seed:demo` (stub OK here: demo seed written in this task from `legacy/src/data/products.js`, prices ×12 800 rounded to 1 000 UZS, `isDemo: true`, cases→`cases-accessories`, others→fitting category); browser: `/uz`, `/ru/c/chargers`, `/en/p/stand-one-max-4th-gen-silver` render, detailed vs simple correct (A5)
-- [ ] Commit "feat: storefront"
+- [x] Failing tests: `resolveTemplate({templateOverride:null},{template:'DETAILED'})==='DETAILED'`, override `'SIMPLE'` wins; `getProductBySlug` hides DRAFT unless `includeDraft`; `searchProducts('B120FJZ1','uz')` finds by SKU; `searchProducts('zaryad','uz')` finds uz title; sale returns only discounted — verify: FAIL
+- [x] Implement catalog + components + pages (port styles from `legacy/src/components`) — verify: `npm test` PASS; `npm run seed:demo` (stub OK here: demo seed written in this task from `legacy/src/data/products.js`, prices ×12 800 rounded to 1 000 UZS, `isDemo: true`, cases→`cases-accessories`, others→fitting category); browser: `/uz`, `/ru/c/chargers`, `/en/p/stand-one-max-4th-gen-silver` render, detailed vs simple correct (A5)
+- [x] Commit "feat: storefront" — evidence: 79f8352 + fix 3c8df1b (sanitize-html allowlist, 13 sanitizer tests); 47/47 tests, build OK; curl /uz, /ru/c/chargers, /en/c/cases-accessories 200; Stand One Max detailed, case simple; review approved
 
 ### Task 3 — M5a Anker importer (wave 2, parallel with Task 2)
 **Files:** `src/lib/importer/{anker-parse.ts,anker.ts}`, `tests/fixtures/anker-a120f.html` (copy of live `https://www.anker.com/products/a120f-100w-usb-c-gan-charger-battery-care` saved 2026-11-17), `tests/lib/importer.test.ts`.
@@ -203,9 +203,9 @@ Waves (≤2 parallel, disjoint write scopes):
 - `parseAnkerHtml(html: string, url: string): ImportedProduct` — source paths verified on the fixture: `__NEXT_DATA__.props.pageProps.product` (`title`, `handle`, `descriptionHtml`, `images`, `variants[].{sku,price,image,availableForSale,options[0].values[0].label}`); highlights from `product.metafields.productInfos.key_features.list[] {key,value}` excluding keys in `pageProps.metafields.infos.key_features_hideKey` ("What You Get" → `inTheBox` split by line/`·`); spec groups from the rendered Specs section HTML (cheerio; implementer derives selectors from fixture); JSON-LD `Product.image` as image fallback. Throws `PARSE_FAILED` if title or variants missing.
 - `importAnkerProduct(url): Promise<{productId: string; created: boolean}>` — fetch with browser UA, 15 s timeout; existing `sourceUrl` → `{created:false}` without changes; new → DRAFT product, category = `null`-safe default `chargers` unless admin picks (param `categoryId?`), variants with `priceUzs: 0`, `stock: 0`, slug = handle; upsert `SpecLabel` keys `slugify(label)` with `{en}`.
 - `refreshAnkerProduct(productId): Promise<void>` — updates images, specs, highlights/sections EN text, adds new variants (price 0); never touches `priceUzs`, `stock`, or uz/ru text where `reviewed[locale]`.
-- [ ] Failing tests on fixture: title `'Anker Laptop Charger Pro'`, `variants.length===2`, `variants[0].sku==='B120FJZ1'`, `variants[0].priceUsd===59.99`, `images.length>=3`, `highlights.length>=3` and first title starts `'Extend Your Laptop Battery Lifespan'`, `specGroups` has ≥1 group with ≥3 items; `parseAnkerHtml('<html></html>',u)` throws `PARSE_FAILED`; URL cases from Review Focus 1; import twice → second `created:false`; refresh keeps `priceUzs` — verify: FAIL
-- [ ] Implement — verify: `npm test` PASS; live run `npx tsx scripts/try-import.ts <3 urls: a charger, a power bank, earbuds>` prints titles/variant counts (A6 live part)
-- [ ] Commit "feat: anker importer"
+- [x] Failing tests on fixture: title `'Anker Laptop Charger Pro'`, `variants.length===2`, `variants[0].sku==='B120FJZ1'`, `variants[0].priceUsd===59.99`, `images.length>=3`, `highlights.length>=3` and first title starts `'Extend Your Laptop Battery Lifespan'`, `specGroups` has ≥1 group with ≥3 items; `parseAnkerHtml('<html></html>',u)` throws `PARSE_FAILED`; URL cases from Review Focus 1; import twice → second `created:false`; refresh keeps `priceUzs` — verify: FAIL
+- [x] Implement — verify: `npm test` PASS; live run `npx tsx scripts/try-import.ts <3 urls: a charger, a power bank, earbuds>` prints titles/variant counts (A6 live part)
+- [x] Commit "feat: anker importer" — evidence: 80af7cf + fix 449886d (refresh keeps uz/ru); 65/65 tests, build OK; live imports: A120F charger, Prime 26K power bank, AeroClip earbuds (soundcore page has no specs/highlights → manual); 404→NOT_FOUND, collection→BAD_URL; review approved
 
 ### Task 4 — M3 Cart, checkout, orders (wave 3)
 **Files:** `src/lib/cart/{cart.ts,useCart.ts}` (replace stub), `src/lib/{orders,telegram,phone}.ts`, `src/components/store/CartDrawer.tsx`, `src/app/[locale]/{checkout/page.tsx,order/[number]/page.tsx}`, `src/app/api/orders/route.ts`, `src/lib/regions.ts` (14 regions, L10n names); tests `tests/lib/{cart,orders,phone}.test.ts`.
@@ -216,16 +216,16 @@ Waves (≤2 parallel, disjoint write scopes):
 - `setOrderStatus(orderId, to): Promise<{ok:true}|{ok:false; error:'INSUFFICIENT_STOCK'|'BAD_TRANSITION'}>` — allowed: NEW→CONFIRMED|CANCELLED, CONFIRMED→DELIVERED|CANCELLED; NEW→CONFIRMED decrements stock in one transaction with conditional update (`stock >= qty`), CONFIRMED→CANCELLED restores.
 - `notifyNewOrder(order): Promise<'sent'|'skipped'|'failed'>` (skipped when token/chat id unset; never throws).
 - `POST /api/orders` → 201 `{number}` | 400 `{error}`; `POST /api/cart/quote`.
-- [ ] Failing tests: cart ops; phone cases; createOrder: below min → `BELOW_MIN` (A11), tampered price ignored (total from DB), qty>stock → `OUT_OF_STOCK`, unpublished variant → `INVALID`; status: confirm decrements, cancel restores, double confirm on last unit → `INSUFFICIENT_STOCK` (A12), DELIVERED→NEW → `BAD_TRANSITION`; telegram skipped without config — verify: FAIL
-- [ ] Implement libs, API, drawer, checkout (form, region select, min-order banner, "Free delivery across Uzbekistan"), thank-you page with order number — verify: `npm test` PASS; browser: place order on `/uz/checkout` → redirected to `/uz/order/1001` (A8 part)
-- [ ] Commit "feat: cart, checkout, orders"
+- [x] Failing tests: cart ops; phone cases; createOrder: below min → `BELOW_MIN` (A11), tampered price ignored (total from DB), qty>stock → `OUT_OF_STOCK`, unpublished variant → `INVALID`; status: confirm decrements, cancel restores, double confirm on last unit → `INSUFFICIENT_STOCK` (A12), DELIVERED→NEW → `BAD_TRANSITION`; telegram skipped without config — verify: FAIL
+- [x] Implement libs, API, drawer, checkout (form, region select, min-order banner, "Free delivery across Uzbekistan"), thank-you page with order number — verify: `npm test` PASS; browser: place order on `/uz/checkout` → redirected to `/uz/order/1001` (A8 part)
+- [x] Commit "feat: cart, checkout, orders" — evidence: 8e7127b; 109/109 tests, build OK; live: BELOW_MIN 400, order 201 #1001, OOS/INVALID 400, checkout + thank-you 200, browser submit → /uz/order/1002; review approved (7 minors deferred)
 
 ### Task 5 — M6 SEO (wave 3, parallel with Task 4)
 **Files:** `src/lib/seo.ts`, `src/app/{sitemap,robots}.ts`, `generateMetadata` in `src/app/[locale]/{page,c/[slug]/page,p/[slug]/page}.tsx`; test `tests/lib/seo.test.ts`.
 **Interfaces – Produces:** `alternatesFor(path: string): {canonical: string; languages: Record<'uz'|'ru'|'en'|'x-default', string>}` (absolute with `SITE_URL`, `x-default` → uz); `productJsonLd(product, variant, locale)` (Product + Offer, `priceCurrency:'UZS'`, availability from stock, no aggregateRating); sitemap = home + every category + every PUBLISHED non-demo product × 3 locales; robots disallows `/admin`, `/api`.
-- [ ] Failing tests: `alternatesFor('/p/x').languages.ru === SITE_URL+'/ru/p/x'`; JSON-LD has `priceCurrency 'UZS'` and no `aggregateRating`; sitemap excludes DRAFT and `isDemo` — verify: FAIL
-- [ ] Implement; `<html lang>` from locale — verify: `npm test` PASS; `curl -s localhost:3000/ru/c/chargers | grep -c hreflang` ≥ 4 (A3), `curl -s localhost:3000/sitemap.xml` (A4)
-- [ ] Commit "feat: seo"
+- [x] Failing tests: `alternatesFor('/p/x').languages.ru === SITE_URL+'/ru/p/x'`; JSON-LD has `priceCurrency 'UZS'` and no `aggregateRating`; sitemap excludes DRAFT and `isDemo` — verify: FAIL
+- [x] Implement; `<html lang>` from locale — verify: `npm test` PASS; `curl -s localhost:3000/ru/c/chargers | grep -c hreflang` ≥ 4 (A3), `curl -s localhost:3000/sitemap.xml` (A4)
+- [x] Commit "feat: seo" — evidence: 2185e7d + fix dae68b4 (metadataBase, absolute JSON-LD images, no empty offers); 119/119 tests, build OK; curl /ru/c/chargers hreflang uz/ru/en/x-default + canonical; sitemap with alternates; robots disallows /admin /api /*/checkout /*/order/; review approved
 
 ### Task 6 — M5b Translation (wave 3, after Task 3)
 **Files:** `src/lib/translate/{index.ts,claude.ts,apply.ts}`; test `tests/lib/translate.test.ts`.
@@ -234,9 +234,9 @@ Waves (≤2 parallel, disjoint write scopes):
 - `translateProduct(productId, opts?: {force?: boolean}): Promise<{status:'done'|'not_configured'; translated:number}>` fills uz/ru for title, subtitle, shortSpec, descriptionHtml, sections, highlights, inTheBox, faq, variant names, and missing `SpecLabel` uz/ru; skips a locale where `reviewed[locale]` unless `force`.
 - `translateUiMissing(): Promise<...>` for empty `UiString` uz/ru.
 - Import action (Task 7) calls `translateProduct` after `importAnkerProduct`.
-- [ ] Failing tests with a fake `Translator` (prefixes `[uz]`): fills uz/ru, leaves en; reviewed uz untouched; length-mismatch response → throws, nothing written; no key → `not_configured` (A7) — verify: FAIL
-- [ ] Implement (read `claude-api` skill first) — verify: `npm test` PASS; with real key: `npx tsx scripts/try-translate.ts <productId>` prints uz/ru title
-- [ ] Commit "feat: translation"
+- [x] Failing tests with a fake `Translator` (prefixes `[uz]`): fills uz/ru, leaves en; reviewed uz untouched; length-mismatch response → throws, nothing written; no key → `not_configured` (A7) — verify: FAIL
+- [x] Implement (read `claude-api` skill first) — evidence: live run NOT done (no ANTHROPIC_API_KEY; script printed NOT CONFIGURED) — — verify: `npm test` PASS; with real key: `npx tsx scripts/try-translate.ts <productId>` prints uz/ru title
+- [x] Commit "feat: translation" — evidence: 4293cb2 + fix a0fbb57 (ICU placeholder validation); 142/142 tests, build OK; review approved
 
 Note on waves: Task 6 shares no files with Tasks 4/5 but depends on Task 3; run it in wave 3 after Task 4 when executing serially.
 
@@ -244,21 +244,21 @@ Note on waves: Task 6 shares no files with Tasks 4/5 but depends on Task 3; run 
 **Files:** `src/lib/auth.ts`, `src/middleware.ts` (add guard), `src/app/admin/**`, `src/app/api/admin/**`, `src/components/admin/*`; tests `tests/lib/auth.test.ts`, `tests/api/admin-guard.test.ts`.
 **Interfaces – Produces:** `createSession(user): Promise<string>` (jose HS256, 7 d, cookie `admin_session`, httpOnly, sameSite lax, secure in prod); `verifySession(token): Promise<boolean>`; `checkCredentials(user, pass)` (constant-time compare vs env); middleware: `/admin/*` (except `/admin/login`) → redirect to login, `/api/admin/*` → 401 JSON.
 - Pages: **Orders** (list newest first, filter by status; detail with lines, customer, status buttons calling `setOrderStatus`, error shown on `INSUFFICIENT_STOCK`); **Products** (list with status, demo flag, missing-translation badges; editor with `L10nField` uz/ru/en tabs + "Translate from EN" + "Reviewed" toggle per locale, `VariantEditor` price/compare-at/SKU/stock/color, `SpecEditor` groups/items, images list (URLs, reorder), template override, category, Publish/Unpublish — publish blocked if any variant `priceUzs <= 0`); **Import** (URL box + category select → import → translate → redirect to editor; shows `ImportError` code text; existing URL → link to product + "Refresh from Anker"); **Categories** (names per locale, parent, order, template); **Translations** (UI strings table uz/ru/en editable, spec dictionary table, "Translate missing"); **Settings** (min order UZS, Telegram token/chat id + "Send test message", translation status "Configured / Not configured").
-- [ ] Failing tests: wrong password → no session; tampered token → false; `GET /api/admin/orders` without cookie → 401; publish with zero-price variant rejected — verify: FAIL
-- [ ] Implement — verify: `npm test` PASS; browser: login, import live Anker URL, edit uz text, set prices, publish, product visible on `/uz/p/<handle>`; confirm order from Task 4 → stock decremented (A6, A8, A12)
-- [ ] Commit "feat: admin panel"
+- [x] Failing tests: wrong password → no session; tampered token → false; `GET /api/admin/orders` without cookie → 401; publish with zero-price variant rejected — verify: FAIL
+- [x] Implement — verify: `npm test` PASS; browser: login, import live Anker URL, edit uz text, set prices, publish, product visible on `/uz/p/<handle>`; confirm order from Task 4 → stock decremented (A6, A8, A12)
+- [x] Commit "feat: admin panel" — evidence: f26529d + fix 16d08d6 (publish gate on edit, throttle hardening); 206/206 tests, build OK; browser walkthrough: login → live import → prices → uz edit → reviewed → publish → storefront order → confirm (stock 5→3) → cancel (→5); review (opus) approved
 
 ### Task 8 — M7 QA (wave 5)
 **Files:** `scripts/smoke.mjs`, `README.md`.
-- [ ] `scripts/smoke.mjs BASE_URL` checks: `/`→307 `/uz`; `/uz`,`/ru`,`/en` 200 with `lang="uz|ru|en"` and 4 `hreflang` links; `/sitemap.xml` 200 contains `/ru/`; `/robots.txt` disallows `/admin`; `/admin` → redirect to login; `/api/admin/orders` → 401 — verify: `npm run build && npm start` then `node scripts/smoke.mjs http://localhost:3000` all PASS (A1, A3, A4, A9)
-- [ ] Browser QA (`evidence-collector`): 375 px home + detailed product, Uzbek `oʻ/gʻ`, language switch keeps path, UZS formatting, import 3 product types (charger, power bank, earbuds) — screenshots noted in Result (A5, A6, A10)
-- [ ] `code-reviewer` + `superpowers:requesting-code-review` on full diff; fix confirmed issues (one repair pass)
-- [ ] README: setup, env vars, `db:push`/`seed`/`seed:demo`, admin login, adding Anthropic key + Telegram, deploy notes (SQLite on VPS vs Postgres)
-- [ ] Commit "docs: readme, smoke tests"
+- [x] `scripts/smoke.mjs BASE_URL` checks: `/`→307 `/uz`; `/uz`,`/ru`,`/en` 200 with `lang="uz|ru|en"` and 4 `hreflang` links; `/sitemap.xml` 200 contains `/ru/`; `/robots.txt` disallows `/admin`; `/admin` → redirect to login; `/api/admin/orders` → 401 — verify: `npm run build && npm start` then `node scripts/smoke.mjs http://localhost:3000` all PASS (A1, A3, A4, A9)
+- [x] Browser QA (`evidence-collector`): 375 px home + detailed product, Uzbek `oʻ/gʻ`, language switch keeps path, UZS formatting, import 3 product types (charger, power bank, earbuds) — screenshots noted in Result (A5, A6, A10)
+- [x] `code-reviewer` + `superpowers:requesting-code-review` on full diff; fix confirmed issues (one repair pass)
+- [x] README: setup, env vars, `db:push`/`seed`/`seed:demo`, admin login, adding Anthropic key + Telegram, deploy notes (SQLite on VPS vs Postgres)
+- [x] Commit "docs: readme, smoke tests" — evidence: 4c38dae; smoke 10/10. Browser QA (evidence-collector): 8/8 PASS. Final whole-branch review (opus): 6 must-fix + 6 QA/owner items fixed in ba3b9a3..08a2f37, re-review approved
 
 ### Task 9 — Cleanup (wave 5)
-- [ ] Delete `legacy/`, `dist/`, `.vite/`, `src/compiled.css` leftovers (only these paths) after confirming nothing imports them — verify: `npm run build && npm test` PASS
-- [ ] Fill Result + Handoff; commit "chore: remove vite app"
+- [x] Delete `legacy/`, `dist/`, `.vite/`, `src/compiled.css` leftovers (only these paths) after confirming nothing imports them — verify: `npm run build && npm test` PASS
+- [x] Fill Result + Handoff; commit "chore: remove vite app" — evidence: 3f7552a (legacy/, .vite/ removed)
 
 ## 6. Verification
 - `npm test` (Vitest, all suites)
@@ -275,9 +275,45 @@ Baseline commit (Task 1) holds the original Vite app; each task is one commit �
 
 ## Revisions
 - 2026-11-17: requirement (sections 1–3) approved by owner.
+- 2026-11-17: plan approved; execution = subagent-driven. Git baseline 3e70ede on main, work on branch feature/electronics-store.
 
 ## Result
-Delivered: – · Checks run: – · Gaps: – · Follow-ups: –
+Delivered: Next.js 16 shop on branch feature/electronics-store (3e70ede..08a2f37, 23 commits): uz/ru/en SSR storefront with new category menu, simple + detailed product pages (grouped specs, highlights, in-the-box), cart + order-request checkout (min order, free delivery, 14 regions), variant price/SKU/stock with stock on confirm, Telegram alerts, anker.com importer, Claude translation with reviewed flags, SEO (hreflang, sitemap, robots, JSON-LD), admin panel (orders, products, import, categories, translations, settings), Prisma migrations, README, smoke script.
+Checks run (2026-11-17, by lead): npm test → 21 files / 233 tests passed; npm run build → OK; npm start + npm run smoke → 10/10 PASS. Browser QA 8/8 PASS (375px + desktop, oʻ/gʻ, lang switch, UZS format, cart/checkout, admin confirm/cancel stock, import, auth). Live imports verified: A120F charger, Prime 26K power bank, AeroClip earbuds, A1695 power bank.
+Gaps: A7 live translation NOT verified (no ANTHROPIC_API_KEY; only "not configured" path exercised). A8 Telegram live send NOT verified (no bot configured; mocked in tests). Soundcore-branded pages import without specs/highlights. Demo products have English-only text.
+Follow-ups (deferred, see rulings): spec-label error makes next save stale; translation retry budget; streaming body-size cap; editor typing during save; quote endpoint unthrottled; online payments (Payme/Click); AGENTS.md (Next-generated, untracked) — owner decides.
+
+### Rulings made during execution
+- Ruling: work on branch feature/electronics-store in the main checkout, no separate worktree — repo was created this session by the approved plan (Task 1 git step), only one implementer runs at a time — cost if wrong: none, branch is local.
+- Ruling: T2 adds the `seed:demo` script and `prisma/seed-demo.ts`; T1 omits it — avoids a broken script — cost: none
+- Ruling: T1 creates a minimal `src/app/[locale]/page.tsx`; T2 replaces it
+- Ruling: vitest `fileParallelism: false` so DB tests don't collide — cost: slower tests
+- Ruling: T2 Navbar shows cart count + button that opens nothing yet; T4 adds `CartDrawer` and wires it
+- Ruling: signature `importAnkerProduct(url: string, opts?: {categoryId?: string})`
+- Ruling: accept Prisma 7.10.1 pin (npm latest was 8.0 RC) — stable over RC — cost if wrong: later upgrade.
+- Ruling: keep src/middleware.ts though Next 16 prefers proxy.ts — brief mandated, still works; Task 7 may rename — cost: deprecation warning.
+- Ruling: global-setup deletes test.db + db push instead of --force-reset — equivalent effect — none.
+- Ruling: leave Next-generated AGENTS.md untracked for now; decide at cleanup.
+- Ruling: run Tasks 2 and 3 serially, not in parallel — same checkout and shared test.db would collide; SDD forbids parallel implementers — cost: longer wall-clock.
+- Ruling: regex sanitizeHtml is not acceptable for imported HTML — Task 3 will add a vetted sanitizer (sanitize-html) applied on import, storefront render keeps sanitizing via that lib — cost: one dep.
+- Ruling: plain <img> accepted (remote CDN hosts vary) — cost: no Next image optimization.
+- Ruling: buy-box trust copy kept; flag to owner at delivery.
+- Ruling: sanitizer fix moves into Task 2 now (supersedes earlier "Task 3 adds sanitizer" ruling); Task 3 must call the same sanitizeHtml on import.
+- Ruling: ids are Int (Task 1 schema) — importAnkerProduct returns productId:number, categoryId?:number; Tasks 6/7 use numbers — cost: none.
+- Ruling: refresh updates EN only; uz/ru refresh is Task 6's translateProduct (skips reviewed) — consistent with spec.
+- Ruling: soundcore-branded pages lacking specs import partially — acceptable, tell owner; soundcore.com out of scope.
+- Ruling: Task 6 translateProduct overwrites ALL uz/ru text for unreviewed locales (not only empty fields) so stale translations kept by refresh get replaced — cost: re-translation API calls.
+- Ruling: Task 4 uses numeric ids (variantId: number) since schema ids are Int; Task 2's useCart stub signature types change from string to number accordingly.
+- Task 5 report: DONE_WITH_CONCERNS (2185e7d). Ruling: hrefLang camelCase fine (HTML case-insensitive); smoke script greps case-insensitively.
+- Ruling: Task 7 implements UiString override merge in src/i18n/request.ts (Task 1 left file-only loading) — otherwise admin Translations page edits would have no effect.
+- Ruling: Task 8's code-review step = the SDD final whole-branch review (opus) run after Task 9; Task 8 smoke+README and Task 9 cleanup dispatched to one implementer; browser QA by a separate evidence-collector verifier — cost: none, same coverage, fewer dispatches.
+- Ruling: final fix wave also includes 3 cheap owner-facing extras: hide isDemo products from storefront when NODE_ENV=production (spec: demo never in real catalog); checkout "Edit cart" opens drawer; Telegram notify via next/server after() — cost: small scope growth.
+- Ruling: fix wave includes importer image scoping, gallery onError hide, duplicate publish message, login input labels.
+- Ruling: accept order throttle 30/10min shared bucket without TRUST_PROXY (5/10min per IP behind proxy) — prevents one spammer from blocking all customers vs. a shared low cap — cost if wrong: more spam possible without proxy.
+- Final: parked — spec-label failure after product commit makes next save STALE — Ruling: real, deferred; admin reloads; fix = validate labels before updateProduct — cost: lost unsaved edits in rare label-error case.
+- Final: parked — translation split retries have no total call budget — Ruling: real, deferred; depth-capped; add a budget later — cost: possible API spend on systematic failure.
+- Final: parked — body cap checked after full read — Ruling: deferred; reverse proxy body limit in deploy — cost: memory on huge chunked bodies.
+- Final: parked — typing during save overwritten; order limiter global list unused — Ruling: deferred polish.
 
 ## Handoff
-Requirements approved; implementation plan (Tasks 1–9) written, awaiting owner approval and choice of execution method. Nothing built yet; project is still the original Vite app (not a git repo yet — Task 1 creates it). Anker fixture source: `https://www.anker.com/products/a120f-100w-usb-c-gan-charger-battery-care` (page data paths listed in Task 3). Next action: on approval set Status `Executing` and start Task 1.
+All 9 tasks done and reviewed; final review fixes merged on branch feature/electronics-store (HEAD 08a2f37); main still holds the original Vite app (3e70ede). Nothing pushed. Next: owner adds ANTHROPIC_API_KEY and a Telegram bot in .env/admin Settings and verifies A7/A8 live, then decides merge to main. Dev: npm run dev → http://localhost:3000 (admin at /admin, credentials in gitignored .env). Production: npm run db:deploy && npm run build && npm start; set SITE_URL, TRUST_PROXY=1 behind a proxy.
