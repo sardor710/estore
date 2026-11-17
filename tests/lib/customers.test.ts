@@ -166,4 +166,9 @@ describe('customersCsv', () => {
     expect(lines[1]).toContain(`"'=HYPERLINK(""x"")"`)
     expect(lines[1]).toContain(';a, b;')
   })
+  it('Last order is the Asia/Tashkent calendar day (UTC 22:00 is already the next day)', async () => {
+    await mkCustomer('+998900000001', 'Night Owl')
+    await mkOrder('+998900000001', 'CONFIRMED', 1000, new Date('2026-11-10T22:00:00Z'))
+    expect((await customersCsv({}, NOW)).split('\r\n')[1]).toContain(';2026-11-11;')
+  })
 })

@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/admin/session'
 import { getCustomer, type Segment } from '@/lib/customers'
 import { getRegion } from '@/lib/regions'
 import { formatUzs } from '@/lib/money'
+import { tashkentDay } from '@/lib/analytics/visitor'
 import { Badge, PageTitle, card } from '@/components/admin/ui'
 import ClientEditor from '@/components/admin/ClientEditor'
 
@@ -71,7 +72,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                         <Badge tone={STATUS_TONE[o.status as keyof typeof STATUS_TONE] ?? 'neutral'}>{o.status}</Badge>
                       </span>
                       <span className="text-sm text-neutral-700">
-                        {formatUzs(o.totalUzs, 'en')} <span className="ml-2 text-xs text-neutral-500">{o.createdAt.toISOString().slice(0, 10)}</span>
+                        {formatUzs(o.totalUzs, 'en')} <span className="ml-2 text-xs text-neutral-500">{tashkentDay(o.createdAt)}</span>
                       </span>
                     </Link>
                   </li>

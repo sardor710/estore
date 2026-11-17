@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { requirePermission } from '@/lib/admin/session'
 import { CUSTOMERS_PAGE_SIZE, SEGMENTS, isCustomerSort, isSegment, listCustomers, type CustomerSort, type Segment } from '@/lib/customers'
 import { formatUzs } from '@/lib/money'
+import { getRegion } from '@/lib/regions'
+import { tashkentDay } from '@/lib/analytics/visitor'
 import { Badge, PageTitle, btn, btnGhost, card, input } from '@/components/admin/ui'
 
 export const metadata = { title: 'Clients' }
@@ -81,10 +83,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
         </div>
       ) : (
         <div className={`${card} overflow-x-auto`}>
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[840px] text-left text-sm">
             <thead className="text-xs uppercase text-neutral-500">
               <tr>
                 <th className="pb-2">Client</th>
+                <th className="pb-2">Region</th>
                 <th className="pb-2">Segment</th>
                 <th className="pb-2 text-right">Orders</th>
                 <th className="pb-2 text-right">Spent</th>
@@ -105,12 +108,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                     ) : null}
                     <div className="text-xs text-neutral-500">{c.phone}</div>
                   </td>
+                  <td className="py-2 pr-3 text-neutral-700">{getRegion(c.region)?.name.en ?? c.region}</td>
                   <td className="py-2 pr-3">
                     <Badge tone={SEGMENT_TONE[c.segment]}>{c.segment}</Badge>
                   </td>
                   <td className="py-2 pr-3 text-right">{c.orders}</td>
                   <td className="whitespace-nowrap py-2 pr-3 text-right">{formatUzs(c.spentUzs, 'en')}</td>
-                  <td className="whitespace-nowrap py-2 pl-3 text-xs text-neutral-600">{c.lastOrderAt ? c.lastOrderAt.toISOString().slice(0, 10) : '-'}</td>
+                  <td className="whitespace-nowrap py-2 pl-3 text-xs text-neutral-600">{c.lastOrderAt ? tashkentDay(c.lastOrderAt) : '-'}</td>
                 </tr>
               ))}
             </tbody>
