@@ -27,6 +27,10 @@ model Product {
   templateOverride String?
   status           String    @default("DRAFT") // DRAFT | PUBLISHED
   brand            String    @default("")
+  brandId          Int?
+  brandRef         Brand?    @relation(fields: [brandId], references: [id])
+  seoTitle         Json?
+  seoDescription   Json?
   sourceUrl        String?   @unique
   sourcePriceUsd   Float?
   title            Json
@@ -48,17 +52,17 @@ model Product {
 }
 
 model Variant {
-  id            Int      @id @default(autoincrement())
-  productId     Int
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku           String   @unique
-  name          Json
-  colorHex      String?
-  imageIndex    Int?
-  priceUzs      Int
-  compareAtUzs  Int?
-  stock         Int      @default(0)
-  sortOrder     Int      @default(0)
+  id           Int     @id @default(autoincrement())
+  productId    Int
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku          String  @unique
+  name         Json
+  colorHex     String?
+  imageIndex   Int?
+  priceUzs     Int
+  compareAtUzs Int?
+  stock        Int     @default(0)
+  sortOrder    Int     @default(0)
 }
 
 model SpecLabel {
@@ -81,18 +85,24 @@ model Order {
   paymentProvider String?
   createdAt       DateTime    @default(now())
   lines           OrderLine[]
+
+  @@index([phone])
+  @@index([createdAt])
 }
 
 model OrderLine {
-  id           Int    @id @default(autoincrement())
-  orderId      Int
-  order        Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variantId    Int
-  sku          String
-  productTitle String
-  variantName  String
-  priceUzs     Int
-  qty          Int
+  id               Int    @id @default(autoincrement())
+  orderId          Int
+  order            Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId        Int
+  sku              String
+  productTitle     String
+  variantName      String
+  priceUzs         Int
+  qty              Int
+  originalPriceUzs Int?
+  discountUzs      Int    @default(0)
+  promotionId      Int?
 }
 
 model Setting {
@@ -103,4 +113,104 @@ model Setting {
 model UiString {
   key   String @id
   value Json
+}
+
+model AdminUser {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
+  name           String
+  role           String
+  passwordHash   String
+  active         Boolean   @default(true)
+  sessionVersion Int       @default(0)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  userEmail String
+  action    String // create | update | delete | status | login
+  entity    String
+  entityId  String?
+  summary   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model PageView {
+  id           Int      @id @default(autoincrement())
+  day          String // YYYY-MM-DD (Asia/Tashkent)
+  path         String
+  locale       String
+  referrerHost String?
+  device       String // mobile | tablet | desktop
+  visitorHash  String
+  createdAt    DateTime @default(now())
+
+  @@index([day])
+}
+
+model DailyTraffic {
+  day      String @id
+  views    Int
+  visitors Int
+}
+
+model Brand {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  slug      String    @unique
+  logoUrl   String?
+  sortOrder Int       @default(0)
+  products  Product[]
+}
+
+model Promotion {
+  id         Int       @id @default(autoincrement())
+  name       String
+  kind       String // PERCENT | AMOUNT
+  value      Int
+  targetType String // PRODUCT | CATEGORY | BRAND
+  targetIds  Json
+  enabled    Boolean   @default(true)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Customer {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  name      String
+  region    String
+  notes     String   @default("")
+  tags      Json
+  blocked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BlogPost {
+  id             Int       @id @default(autoincrement())
+  slug           String    @unique
+  status         String    @default("DRAFT")
+  publishedAt    DateTime?
+  title          Json
+  excerpt        Json
+  contentHtml    Json
+  seoTitle       Json
+  seoDescription Json
+  coverImage     String?
+  tags           Json
+  reviewed       Json
+  authorId       Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, publishedAt])
 }

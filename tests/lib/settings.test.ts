@@ -7,6 +7,8 @@ describe('settings', () => {
       minOrderUzs: 0,
       telegramBotToken: null,
       telegramChatId: null,
+      vipThresholdUzs: 10_000_000,
+      lowStockThreshold: 3,
     })
   })
   it('persists updates', async () => {
@@ -18,7 +20,14 @@ describe('settings', () => {
     await updateSettings({ telegramChatId: null })
     expect((await getSettings()).telegramChatId).toBeNull()
   })
+  it('round-trips vip and low-stock thresholds', async () => {
+    await updateSettings({ vipThresholdUzs: 5_000_000, lowStockThreshold: 7 })
+    const s = await getSettings()
+    expect(s.vipThresholdUzs).toBe(5_000_000)
+    expect(s.lowStockThreshold).toBe(7)
+  })
   it('is reset between tests', async () => {
     expect((await getSettings()).minOrderUzs).toBe(0)
+    expect((await getSettings()).vipThresholdUzs).toBe(10_000_000)
   })
 })
