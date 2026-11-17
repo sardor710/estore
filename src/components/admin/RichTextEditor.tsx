@@ -4,7 +4,7 @@ import { useId } from 'react'
 import { CKEditor } from '@ckeditor/ckeditor5-react'
 import {
   Alignment, AutoLink, Bold, BlockQuote, ClassicEditor, Essentials, GeneralHtmlSupport, Heading, Image, ImageCaption,
-  ImageStyle, ImageToolbar, ImageUpload, Italic, Link, List, MediaEmbed, Paragraph, SimpleUploadAdapter, Strikethrough,
+  ImageStyle, ImageToolbar, ImageUpload, Italic, Link, List, MediaEmbed, Paragraph, SimpleUploadAdapter, SourceEditing, Strikethrough,
   Table, TableToolbar, Underline,
 } from 'ckeditor5'
 import 'ckeditor5/ckeditor5.css'
@@ -47,12 +47,12 @@ export default function RichTextEditor({
             plugins: [
               Essentials, Paragraph, Heading, Bold, Italic, Underline, Strikethrough, Link, AutoLink, List, BlockQuote, Alignment,
               Table, TableToolbar, Image, ImageCaption, ImageStyle, ImageToolbar, ImageUpload, SimpleUploadAdapter, MediaEmbed,
-              GeneralHtmlSupport,
+              GeneralHtmlSupport, SourceEditing,
             ],
             toolbar: {
               items: [
                 'undo', 'redo', '|', 'heading', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'link', '|',
-                'bulletedList', 'numberedList', 'blockQuote', '|', 'alignment', '|', 'insertTable', 'uploadImage', 'mediaEmbed',
+                'bulletedList', 'numberedList', 'blockQuote', '|', 'alignment', '|', 'insertTable', 'uploadImage', 'mediaEmbed', '|', 'sourceEditing',
               ],
               shouldNotGroupWhenFull: true,
             },
@@ -65,7 +65,14 @@ export default function RichTextEditor({
               ],
             },
             link: { defaultProtocol: 'https://' },
-            alignment: { options: ['left', 'center', 'right'] },
+            // Class-based (not inline style) so the output survives the sanitizer.
+            alignment: {
+              options: [
+                { name: 'left', className: 'text-align-left' },
+                { name: 'center', className: 'text-align-center' },
+                { name: 'right', className: 'text-align-right' },
+              ],
+            },
             image: {
               toolbar: ['imageStyle:inline', 'imageStyle:block', 'imageStyle:side', '|', 'toggleImageCaption', 'imageTextAlternative'],
             },
@@ -74,8 +81,15 @@ export default function RichTextEditor({
             // Same-origin XHR: the browser attaches the session cookie and an Origin header, which adminApi's CSRF check requires.
             simpleUpload: { uploadUrl: UPLOAD_URL, withCredentials: true },
             htmlSupport: {
-              // Mirrors the classes sanitizeHtml keeps; anything else is dropped by the editor and the server.
-              allow: [{ name: /^(div|span)$/, classes: [/^text-align-.+$/, /^image-style-.+$/] }],
+              // Everything sanitizeHtml keeps, so imported markup (div > ul > li > span > strong ...) is preserved on
+              // open/save instead of being flattened by the editor schema. Anything else is dropped here and on the server.
+              allow: [
+                {
+                  name: /^(div|span|p|a|b|i|u|s|strong|em|ul|ol|li|blockquote|h2|h3|h4|table|thead|tbody|tfoot|tr|th|td|figure|figcaption|img|br)$/,
+                  classes: [/^text-align-.+$/, /^image-style-.+$/, 'image', 'image-inline', 'table', 'media'],
+                  attributes: { rel: true, alt: true, width: true, height: true, colspan: true, rowspan: true, 'data-oembed-url': true },
+                },
+              ],
             },
           }}
         />

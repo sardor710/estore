@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 
-export const UPLOADS_DIR = join(process.cwd(), 'uploads')
+/** Storage root; `UPLOADS_DIR` overrides it (tests use a temp dir). Read lazily on every call. */
+export const uploadsDir = () => process.env.UPLOADS_DIR || join(process.cwd(), 'uploads')
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 export type ImageExt = 'jpg' | 'png' | 'webp' | 'gif'
@@ -35,7 +36,7 @@ export async function saveUpload(file: File, now: Date = new Date()): Promise<{ 
   const yyyy = String(now.getUTCFullYear())
   const mm = String(now.getUTCMonth() + 1).padStart(2, '0')
   const name = `${randomBytes(16).toString('hex')}.${ext}`
-  const dir = join(UPLOADS_DIR, yyyy, mm)
+  const dir = join(uploadsDir(), yyyy, mm)
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, name), bytes)
   return { ok: true, url: `/uploads/${yyyy}/${mm}/${name}` }
@@ -48,7 +49,7 @@ export function resolveUploadPath(segments: string[]): string | null {
   if (segments.length !== 3) return null
   const rel = segments.join('/')
   if (!SEG.test(rel)) return null
-  const base = resolve(UPLOADS_DIR)
+  const base = resolve(uploadsDir())
   const full = resolve(base, ...segments)
   return full.startsWith(base + sep) ? full : null
 }

@@ -43,7 +43,7 @@ describe('sanitizeHtml rich content', () => {
     const out = sanitizeHtml('<img src=x onerror=alert(1)>')
     expect(out).not.toMatch(/onerror/i)
     expect(out).not.toContain('src="x"')
-    expect(sanitizeHtml('<img src="/uploads/2026/11/a.png" alt="a" width="10" height="5">')).toContain('src="/uploads/2026/11/a.png"')
+    expect(sanitizeHtml('<img src="/uploads/2026/11/ab.png" alt="a" width="10" height="5">')).toContain('src="/uploads/2026/11/ab.png"')
     expect(sanitizeHtml('<img src="//evil.test/a.png">')).not.toContain('img')
     expect(sanitizeHtml('<img src="/other/a.png">')).not.toContain('img')
   })
@@ -89,7 +89,32 @@ describe('sanitizeHtml on real CKEditor output', () => {
       '<figure class="media"><div data-oembed-url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"><div><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" width="1280" height="720" style="width: 100%;" frameborder="0" allow="autoplay" allowfullscreen=""></iframe></div></div></figure>'
     const out = sanitizeHtml(yt)
     expect(out).toContain('<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"')
-    expect(out).not.toMatch(/style|frameborder|data-oembed|allow="/)
+    expect(out).toContain('data-oembed-url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"')
+    expect(out).not.toMatch(/style|frameborder|allow="/)
     expect(sanitizeHtml(out)).toBe(out)
+  })
+
+  it('drops a non-YouTube data-oembed-url', () => {
+    expect(sanitizeHtml('<div data-oembed-url="https://evil.test/watch?v=abcdefgh">x</div>')).toBe('<div>x</div>')
+    expect(sanitizeHtml('<div data-oembed-url="javascript:alert(1)">x</div>')).toBe('<div>x</div>')
+    expect(sanitizeHtml('<div data-oembed-url="https://youtu.be/dQw4w9WgXcQ">x</div>')).toContain('data-oembed-url')
+  })
+  it('keeps class-based alignment from the editor', () => {
+    expect(sanitizeHtml('<p class="text-align-center">x</p>')).toBe('<p class="text-align-center">x</p>')
+    expect(sanitizeHtml('<p style="text-align:center">x</p>')).toBe('<p>x</p>')
+  })
+  it('upgrades http images to https instead of dropping them', () => {
+    expect(sanitizeHtml('<img src="http://x.test/a.png" alt="a">')).toContain('src="https://x.test/a.png"')
+  })
+  it('only accepts the exact stored upload path shape', () => {
+    expect(sanitizeHtml('<img src="/uploads/../x.png">')).not.toContain('img')
+    expect(sanitizeHtml('<img src="/uploads/2026/11/../../x.png">')).not.toContain('img')
+    expect(sanitizeHtml('<img src="/uploads/2026/11/zz.png">')).not.toContain('img')
+    expect(sanitizeHtml('<img src="/uploads/2026/11/ab12.svg">')).not.toContain('img')
+    expect(sanitizeHtml('<img src="/uploads/2026/11/ab12.png">')).toContain('img')
+  })
+  it('keeps imported Anker-style nested markup structure', () => {
+    const h = '<div><ul><li><span><strong>A</strong></span></li></ul></div>'
+    expect(sanitizeHtml(h)).toBe(h)
   })
 })

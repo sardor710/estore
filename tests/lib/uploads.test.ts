@@ -1,7 +1,12 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { existsSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
-import { sniffImage, saveUpload, resolveUploadPath, UPLOADS_DIR } from '@/lib/uploads'
+import { sniffImage, saveUpload, resolveUploadPath, uploadsDir } from '@/lib/uploads'
+
+const TMP = mkdtempSync(join(tmpdir(), 'estore-uploads-'))
+process.env.UPLOADS_DIR = TMP
+afterAll(() => rmSync(TMP, { recursive: true, force: true }))
 
 const bytes = (...b: number[]) => new Uint8Array([...b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 const ascii = (s: string) => new TextEncoder().encode(s)
@@ -69,7 +74,8 @@ describe('resolveUploadPath', () => {
   })
   it('maps a valid path inside uploads/', () => {
     const p = resolveUploadPath(['2026', '11', 'abc.png'])!
-    expect(p).toBe(join(resolve(UPLOADS_DIR), '2026', '11', 'abc.png'))
-    expect(p.startsWith(resolve(UPLOADS_DIR) + sep)).toBe(true)
+    expect(p).toBe(join(resolve(uploadsDir()), '2026', '11', 'abc.png'))
+    expect(p.startsWith(resolve(uploadsDir()) + sep)).toBe(true)
+    expect(p.startsWith(resolve(TMP))).toBe(true)
   })
 })

@@ -1,6 +1,7 @@
 import sanitize from 'sanitize-html'
 
-const IMG_SRC = /^(https:\/\/|\/uploads\/)/i
+const IMG_SRC = /^(https:\/\/|\/uploads\/\d{4}\/\d{2}\/[0-9a-f]+\.(jpg|png|webp|gif)$)/i
+const OEMBED_URL = /^https:\/\/(www\.)?(youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,})/
 const YOUTUBE_EMBED = /^https:\/\/(www\.youtube\.com|www\.youtube-nocookie\.com)\/embed\/[\w-]+(\?[\w=&%.-]*)?$/i
 
 /** Allowlist sanitizer for admin/imported description HTML (server-side). */
@@ -14,6 +15,7 @@ export function sanitizeHtml(html: string): string {
       a: ['href', 'rel'],
       img: ['src', 'alt', 'width', 'height'],
       iframe: ['src', 'allowfullscreen', 'loading', 'referrerpolicy'],
+      div: ['data-oembed-url'],
       th: ['colspan', 'rowspan'],
       td: ['colspan', 'rowspan'],
     },
@@ -34,7 +36,13 @@ export function sanitizeHtml(html: string): string {
       a: sanitize.simpleTransform('a', { rel: 'noopener noreferrer' }),
       img: (tagName, attribs) => {
         const out = { ...attribs }
+        if (out.src) out.src = out.src.replace(/^http:\/\//i, 'https://')
         for (const k of ['width', 'height']) if (k in out && !/^\d{1,5}$/.test(out[k])) delete out[k]
+        return { tagName, attribs: out }
+      },
+      div: (tagName, attribs) => {
+        const out = { ...attribs }
+        if (out['data-oembed-url'] !== undefined && !OEMBED_URL.test(out['data-oembed-url'])) delete out['data-oembed-url']
         return { tagName, attribs: out }
       },
       iframe: (tagName, attribs) => ({
