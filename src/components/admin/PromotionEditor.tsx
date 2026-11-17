@@ -91,8 +91,8 @@ export default function PromotionEditor({ initial, options }: { initial: Promoti
             <input
               className="w-32 rounded border border-neutral-300 px-2 py-0.5 text-right"
               type="number"
-              min={1}
-              step={1000}
+              min={0}
+              step="any"
               value={example}
               onChange={(e) => setExample(Math.max(0, Math.round(Number(e.target.value) || 0)))}
             />

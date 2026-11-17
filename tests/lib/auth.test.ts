@@ -144,6 +144,7 @@ describe('attemptLogin: staff accounts', () => {
     const r = await attemptLogin({ email: ' PM@shop.uz ', password: 'pm password 12', ip: '1.1.1.1' })
     expect(r).toMatchObject({ status: 200, role: 'PRODUCT_MANAGER' })
     expect(await readSession((r as { token: string }).token)).toEqual({ uid: u.id, role: 'PRODUCT_MANAGER', sv: 0 })
+    expect((await prisma.adminUser.findUniqueOrThrow({ where: { id: u.id } })).lastLoginAt).not.toBeNull()
   })
   it('wrong password, unknown email and disabled user all give the same 401', async () => {
     await seedUser('a@shop.uz', 'a password 123')
