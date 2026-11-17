@@ -4,6 +4,7 @@ import { hasLocale, NextIntlClientProvider } from 'next-intl'
 import { setRequestLocale } from 'next-intl/server'
 import { routing } from '@/i18n/routing'
 import StoreShell from '@/components/store/StoreShell'
+import TrackPageView from '@/components/TrackPageView'
 import type { Locale } from '@/i18n/routing'
 import type { Metadata } from 'next'
 import { SITE_URL } from '@/lib/seo'
@@ -38,6 +39,7 @@ export default async function LocaleLayout({
       <body>
         <NextIntlClientProvider>
           <StoreShell locale={locale as Locale}>{children}</StoreShell>
+          <TrackPageView />
         </NextIntlClientProvider>
       </body>
     </html>
