@@ -44,16 +44,28 @@ const COMMANDS: Record<'uz' | 'ru' | 'en', { command: string; description: strin
   uz: [
     { command: 'start', description: 'Do‘konni ochish' },
     { command: 'orders', description: 'Mening buyurtmalarim' },
+    { command: 'notifications', description: 'Buyurtma xabarlari' },
+    { command: 'language', description: 'Bot tili' },
+    { command: 'account', description: 'Bogʻlangan akkaunt' },
+    { command: 'logout', description: 'Barcha qurilmalardan chiqish' },
     { command: 'help', description: 'Yordam' },
   ],
   ru: [
     { command: 'start', description: 'Открыть магазин' },
     { command: 'orders', description: 'Мои заказы' },
+    { command: 'notifications', description: 'Уведомления о заказах' },
+    { command: 'language', description: 'Язык бота' },
+    { command: 'account', description: 'Привязанный аккаунт' },
+    { command: 'logout', description: 'Выйти на всех устройствах' },
     { command: 'help', description: 'Помощь' },
   ],
   en: [
     { command: 'start', description: 'Open the shop' },
     { command: 'orders', description: 'My orders' },
+    { command: 'notifications', description: 'Order updates' },
+    { command: 'language', description: 'Bot language' },
+    { command: 'account', description: 'Linked account' },
+    { command: 'logout', description: 'Sign out on all devices' },
     { command: 'help', description: 'Help' },
   ],
 }

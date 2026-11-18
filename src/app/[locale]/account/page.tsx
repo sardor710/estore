@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
-import { ChevronRight, Heart, MapPin, Package, UserRound } from 'lucide-react'
+import { ChevronRight, Heart, MapPin, MessageSquare, Package, UserRound } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
 import { requireAccountCustomer } from '@/lib/account/session'
 import { listAccountOrders } from '@/lib/account/orders'
@@ -39,6 +39,7 @@ export default async function AccountOverviewPage({ params }: { params: Promise<
     { href: '/account/orders', label: t('nav.orders'), hint: t('overview.ordersHint'), Icon: Package },
     { href: '/account/addresses', label: t('nav.addresses'), hint: t('overview.addressesHint'), Icon: MapPin },
     { href: '/account/favorites', label: t('nav.favorites'), hint: t('overview.favoritesHint'), Icon: Heart },
+    { href: '/account/messages', label: t('nav.messages'), hint: t('overview.messagesHint'), Icon: MessageSquare },
     { href: '/account/profile', label: t('nav.profile'), hint: t('overview.profileHint'), Icon: UserRound },
   ]
 

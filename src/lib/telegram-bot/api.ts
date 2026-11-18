@@ -101,9 +101,15 @@ export async function sendBotMessage(
   return r !== null
 }
 
-/** Replaces a bot message's text; its inline buttons are dropped. Never throws. */
-export async function editBotMessage(chatId: string | number, messageId: number, text: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
-  const r = await botCall('editMessageText', { chat_id: chatId, message_id: messageId, text }, fetchImpl)
+/** Replaces a bot message's text; its inline buttons are dropped unless new inline `replyMarkup` is given. Never throws. */
+export async function editBotMessage(
+  chatId: string | number,
+  messageId: number,
+  text: string,
+  fetchImpl: typeof fetch = fetch,
+  replyMarkup?: ReplyMarkup,
+): Promise<boolean> {
+  const r = await botCall('editMessageText', { chat_id: chatId, message_id: messageId, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }, fetchImpl)
   return r !== null
 }
 

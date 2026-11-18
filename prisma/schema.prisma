@@ -208,6 +208,7 @@ model Customer {
   addresses        CustomerAddress[]
   favorites        Favorite[]
   logins           CustomerLogin[]
+  messages         CustomerMessage[]
 }
 
 /// Website sign-in through the Telegram bot. The raw token and browser secret are never stored, only SHA-256 hashes.
@@ -314,4 +315,32 @@ model Banner {
   updatedAt      DateTime  @updatedAt
 
   @@index([active, sortOrder])
+}
+
+/// Shop -> customer message (one-way), shown in the website account (Messages) and sent by the Telegram bot.
+/// A broadcast creates one row per recipient. `telegram`: pending | sent | failed | skipped (notifications off / no chat).
+model CustomerMessage {
+  id          Int               @id @default(autoincrement())
+  customerId  Int
+  customer    Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  text        String
+  broadcastId Int?
+  broadcast   MessageBroadcast? @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+  telegram    String            @default("pending")
+  readAt      DateTime?
+  createdBy   String
+  createdAt   DateTime          @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([broadcastId])
+}
+
+/// One "send to all customers" message from the admin; its per-customer copies are CustomerMessage rows.
+model MessageBroadcast {
+  id         Int               @id @default(autoincrement())
+  text       String
+  recipients Int
+  createdBy  String
+  createdAt  DateTime          @default(now())
+  messages   CustomerMessage[]
 }

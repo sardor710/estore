@@ -23,8 +23,8 @@ export type BotCopy = {
   phoneReceived: string
   confirmPrompt: string
   signedIn: string
+  /** Sign-in alert. No button on purpose: signing out everywhere is /logout (with a confirm step). */
   newSignIn: (time: string) => string
-  signOutAllButton: string
   wrongCode: string
   /** After a wrong pick: no new sign-in from this Telegram user for a minute. */
   tooManyAttempts: string
@@ -44,7 +44,31 @@ export type BotCopy = {
   newAddressButton: string
   locationSaved: string
   locationFailed: string
+  /** /help: the command list. */
+  help: string
+  /** /logout confirm step and its outcomes. */
+  logoutConfirm: string
+  logoutYes: string
+  logoutNo: string
+  logoutCancelled: string
+  /** /notifications */
+  notifyStatus: (on: boolean) => string
+  notifyTurnOn: string
+  notifyTurnOff: string
+  /** /language */
+  languagePrompt: string
+  languageSaved: string
+  /** /account */
+  accountInfo: (a: { name: string; phone: string; language: string; notify: boolean }) => string
+  profileButton: string
+  /** A message the shop sent from the admin (also stored in the website account, Messages page). */
+  shopMessage: (text: string) => string
+  messagesButton: string
 }
+
+/** Language names in their own language (language picker buttons and /account). */
+export const LANGUAGE_NAMES: Record<BotLocale, string> = { uz: 'Oʻzbekcha', ru: 'Русский', en: 'English' }
+export const LANGUAGE_FLAGS: Record<BotLocale, string> = { uz: '🇺🇿', ru: '🇷🇺', en: '🇬🇧' }
 
 const line = (url: string | null) => (url ? `\n${url}` : '')
 
@@ -66,8 +90,8 @@ const uz: BotCopy = {
     'Faqat hozir saytga OʻZINGIZ kirayotgan boʻlsangiz davom eting. Birov yuborgan havola orqali kirishni hech qachon tasdiqlamang.\n\n' +
     'Saytda koʻrinib turgan kodni tanlang:',
   signedIn: 'Tayyor, siz saytga kirdingiz — saytga qayting.',
-  newSignIn: (time) => `«Elektronika doʻkoni» saytiga yangi kirish: ${time} (Toshkent vaqti). Bu siz emasmisiz?`,
-  signOutAllButton: 'Barcha qurilmalardan chiqish',
+  newSignIn: (time) =>
+    `«Elektronika doʻkoni» saytiga yangi kirish: ${time} (Toshkent vaqti).\n\nBu siz emasmisiz? Barcha qurilmalardan chiqish uchun /logout buyrugʻini yuboring.`,
   wrongCode: 'Kodlar mos kelmadi — kirish bekor qilindi. Saytda qaytadan boshlang.',
   tooManyAttempts: 'Urinishlar juda koʻp. Bir daqiqadan keyin qaytadan urinib koʻring.',
   mismatch: 'Bu kirish soʻrovi sizga tegishli emas.',
@@ -86,6 +110,32 @@ const uz: BotCopy = {
   newAddressButton: '➕ Yangi manzil',
   locationSaved: 'Joylashuv saqlandi ✓',
   locationFailed: 'Joylashuvni saqlab boʻlmadi.',
+  help:
+    'Buyruqlar:\n' +
+    '/start — doʻkonni ochish\n' +
+    '/orders — soʻnggi buyurtmalarim\n' +
+    '/notifications — buyurtma xabarlarini yoqish/oʻchirish\n' +
+    '/language — bot tili\n' +
+    '/account — bogʻlangan akkaunt\n' +
+    '/logout — saytdan barcha qurilmalarda chiqish\n' +
+    '/help — yordam',
+  logoutConfirm: 'Saytdan barcha qurilmalarda (shu jumladan Telegram ichidagi doʻkonda) chiqilsinmi? Keyin qaytadan kirishingiz kerak boʻladi.',
+  logoutYes: 'Ha, chiqish',
+  logoutNo: 'Bekor qilish',
+  logoutCancelled: 'Bekor qilindi — siz tizimda qoldingiz.',
+  notifyStatus: (on) =>
+    on
+      ? 'Buyurtma xabarlari: yoqilgan ✅\nBuyurtma holati oʻzgarganda va doʻkon yangiliklari haqida shu yerga xabar yuboramiz.'
+      : 'Buyurtma xabarlari: oʻchirilgan 🔕\nBuyurtma holati va doʻkon yangiliklari haqida xabar yubormaymiz (ular saytdagi akkauntingizda qoladi, holatni /orders orqali koʻrishingiz mumkin).',
+  notifyTurnOn: '🔔 Yoqish',
+  notifyTurnOff: '🔕 Oʻchirish',
+  languagePrompt: 'Bot tilini tanlang:',
+  languageSaved: 'Bot tili: Oʻzbekcha ✓',
+  accountInfo: (a) =>
+    `Bogʻlangan akkaunt:\nIsm: ${a.name}\nTelefon: ${a.phone}\nBot tili: ${a.language}\nBuyurtma xabarlari: ${a.notify ? 'yoqilgan' : 'oʻchirilgan'}`,
+  profileButton: '👤 Profilni ochish',
+  shopMessage: (text) => `✉️ «Elektronika doʻkoni»dan xabar:\n\n${text}`,
+  messagesButton: 'Xabarlarni ochish',
 }
 
 const ru: BotCopy = {
@@ -106,8 +156,8 @@ const ru: BotCopy = {
     'Продолжайте, только если прямо сейчас на сайт входите ВЫ сами. Никогда не подтверждайте вход по ссылке, которую вам кто-то прислал.\n\n' +
     'Выберите код, который видите на сайте:',
   signedIn: 'Готово, вы вошли — возвращайтесь на сайт.',
-  newSignIn: (time) => `Новый вход в «Магазин электроники» в ${time} (по Ташкенту). Это были не вы?`,
-  signOutAllButton: 'Выйти на всех устройствах',
+  newSignIn: (time) =>
+    `Новый вход в «Магазин электроники» в ${time} (по Ташкенту).\n\nЭто были не вы? Отправьте /logout, чтобы выйти на всех устройствах.`,
   wrongCode: 'Коды не совпали — вход отменён. Начните заново на сайте.',
   tooManyAttempts: 'Слишком много попыток. Попробуйте снова через минуту.',
   mismatch: 'Этот запрос на вход не ваш.',
@@ -126,6 +176,32 @@ const ru: BotCopy = {
   newAddressButton: '➕ Новый адрес',
   locationSaved: 'Точка сохранена ✓',
   locationFailed: 'Не удалось сохранить точку.',
+  help:
+    'Команды:\n' +
+    '/start — открыть магазин\n' +
+    '/orders — мои последние заказы\n' +
+    '/notifications — включить/выключить уведомления о заказах\n' +
+    '/language — язык бота\n' +
+    '/account — привязанный аккаунт\n' +
+    '/logout — выйти с сайта на всех устройствах\n' +
+    '/help — помощь',
+  logoutConfirm: 'Выйти с сайта на всех устройствах (включая магазин внутри Telegram)? Потом нужно будет войти заново.',
+  logoutYes: 'Да, выйти',
+  logoutNo: 'Отмена',
+  logoutCancelled: 'Отменено — вы остались в аккаунте.',
+  notifyStatus: (on) =>
+    on
+      ? 'Уведомления о заказах: включены ✅\nМы напишем сюда, когда статус заказа изменится, и о новостях магазина.'
+      : 'Уведомления о заказах: выключены 🔕\nМы не будем писать о статусе заказов и новостях магазина (они остаются в аккаунте на сайте, статус можно посмотреть через /orders).',
+  notifyTurnOn: '🔔 Включить',
+  notifyTurnOff: '🔕 Выключить',
+  languagePrompt: 'Выберите язык бота:',
+  languageSaved: 'Язык бота: Русский ✓',
+  accountInfo: (a) =>
+    `Привязанный аккаунт:\nИмя: ${a.name}\nТелефон: ${a.phone}\nЯзык бота: ${a.language}\nУведомления о заказах: ${a.notify ? 'включены' : 'выключены'}`,
+  profileButton: '👤 Открыть профиль',
+  shopMessage: (text) => `✉️ Сообщение от «Магазина электроники»:\n\n${text}`,
+  messagesButton: 'Открыть сообщения',
 }
 
 const en: BotCopy = {
@@ -146,8 +222,7 @@ const en: BotCopy = {
     'Only continue if YOU are signing in on the website right now. Never confirm a link someone sent you.\n\n' +
     'Tap the code you see on the website:',
   signedIn: "You're signed in — go back to the website.",
-  newSignIn: (time) => `New sign-in to Electronics Store at ${time} (Tashkent). Not you?`,
-  signOutAllButton: 'Sign out everywhere',
+  newSignIn: (time) => `New sign-in to Electronics Store at ${time} (Tashkent).\n\nNot you? Send /logout to sign out on all devices.`,
   wrongCode: "The codes didn't match — sign-in cancelled. Start again on the website.",
   tooManyAttempts: 'Too many attempts. Please try again in a minute.',
   mismatch: "This sign-in request isn't yours.",
@@ -166,6 +241,32 @@ const en: BotCopy = {
   newAddressButton: '➕ New address',
   locationSaved: 'Location saved ✓',
   locationFailed: 'Could not save the location.',
+  help:
+    'Commands:\n' +
+    '/start — open the shop\n' +
+    '/orders — my latest orders\n' +
+    '/notifications — turn order updates on/off\n' +
+    '/language — bot language\n' +
+    '/account — linked account\n' +
+    '/logout — sign out of the website on all devices\n' +
+    '/help — help',
+  logoutConfirm: 'Sign out of the website on all devices (including the shop inside Telegram)? You will need to sign in again.',
+  logoutYes: 'Yes, sign out',
+  logoutNo: 'Cancel',
+  logoutCancelled: 'Cancelled — you are still signed in.',
+  notifyStatus: (on) =>
+    on
+      ? 'Order updates: on ✅\nWe message you here when your order status changes, and about shop news.'
+      : 'Order updates: off 🔕\nWe will not message you about order status or shop news (they stay in your website account; check orders with /orders).',
+  notifyTurnOn: '🔔 Turn on',
+  notifyTurnOff: '🔕 Turn off',
+  languagePrompt: 'Choose the bot language:',
+  languageSaved: 'Bot language: English ✓',
+  accountInfo: (a) =>
+    `Linked account:\nName: ${a.name}\nPhone: ${a.phone}\nBot language: ${a.language}\nOrder updates: ${a.notify ? 'on' : 'off'}`,
+  profileButton: '👤 Open profile',
+  shopMessage: (text) => `✉️ Message from Electronics Store:\n\n${text}`,
+  messagesButton: 'Open messages',
 }
 
 export const BOT_COPY: Record<BotLocale, BotCopy> = { uz, ru, en }

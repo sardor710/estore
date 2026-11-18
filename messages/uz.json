@@ -213,6 +213,7 @@
       "order": "№{number} buyurtma",
       "addresses": "Manzillarim",
       "favorites": "Sevimlilar",
+      "messages": "Xabarlar",
       "profile": "Profil"
     },
     "login": {
@@ -269,7 +270,13 @@
       "orders": "Buyurtmalar",
       "addresses": "Manzillar",
       "favorites": "Sevimlilar",
+      "messages": "Xabarlar",
       "profile": "Profil"
+    },
+    "messages": {
+      "title": "Xabarlar",
+      "empty": "Hozircha xabarlar yoʻq. Doʻkon sizga yozsa, xabar shu yerda va Telegram botda paydo boʻladi.",
+      "new": "Yangi"
     },
     "statuses": {
       "NEW": "Tasdiqlanishi kutilmoqda",
@@ -294,6 +301,7 @@
       "ordersHint": "Tarix va holat",
       "addressesHint": "Qayerga yetkazamiz",
       "favoritesHint": "Saqlangan mahsulotlar",
+      "messagesHint": "Doʻkondan kelgan xabarlar",
       "profileHint": "Ism, til, bildirishnomalar"
     },
     "orders": {

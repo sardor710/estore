@@ -213,6 +213,7 @@
       "order": "Order #{number}",
       "addresses": "My addresses",
       "favorites": "Favorites",
+      "messages": "Messages",
       "profile": "Profile"
     },
     "login": {
@@ -269,7 +270,13 @@
       "orders": "Orders",
       "addresses": "Addresses",
       "favorites": "Favorites",
+      "messages": "Messages",
       "profile": "Profile"
+    },
+    "messages": {
+      "title": "Messages",
+      "empty": "No messages yet. When the shop writes to you, the message appears here and in the Telegram bot.",
+      "new": "New"
     },
     "statuses": {
       "NEW": "Awaiting confirmation",
@@ -294,6 +301,7 @@
       "ordersHint": "History and status",
       "addressesHint": "Where we deliver",
       "favoritesHint": "Products you saved",
+      "messagesHint": "Messages from the shop",
       "profileHint": "Name, language, notifications"
     },
     "orders": {

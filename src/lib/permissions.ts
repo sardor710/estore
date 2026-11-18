@@ -45,6 +45,7 @@ export function can(role: Role, p: Permission): boolean {
 const SECTION: Record<string, Permission> = {
   orders: 'orders',
   clients: 'clients',
+  messages: 'clients',
   promotions: 'promotions',
   products: 'catalog',
   categories: 'catalog',

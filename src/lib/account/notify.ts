@@ -65,13 +65,17 @@ function orderButton(lang: Lang, number: number, deps: Deps): InlineButton[][] |
   return [[b]]
 }
 
-/** The order's customer chat, when its phone has a linked account with notifications on. */
-async function chatFor(phone: string): Promise<string | null> {
+/**
+ * The order's customer chat, when its phone has a linked account with notifications on, and the language to write
+ * in: the account's chosen language (bot /language or website profile), else the order's language.
+ */
+async function chatFor(phone: string, orderLocale: string | null | undefined): Promise<{ chatId: string; lang: Lang } | null> {
   const c = await prisma.customer.findUnique({
     where: { phone },
-    select: { telegramChatId: true, notifyTelegram: true, accountCreatedAt: true },
+    select: { telegramChatId: true, notifyTelegram: true, accountCreatedAt: true, accountLocale: true },
   })
-  return c && c.accountCreatedAt && c.telegramChatId && c.notifyTelegram ? c.telegramChatId : null
+  if (!c || !c.accountCreatedAt || !c.telegramChatId || !c.notifyTelegram) return null
+  return { chatId: c.telegramChatId, lang: toLang(c.accountLocale ?? orderLocale) }
 }
 
 async function send(chatId: string, text: string, buttons: InlineButton[][] | undefined, deps: Deps): Promise<NotifyOutcome> {
@@ -88,9 +92,9 @@ export async function notifyOrderStatus(orderId: number, to?: string, deps: Deps
     if (!Number.isSafeInteger(orderId) || orderId <= 0) return 'skipped'
     const order = await prisma.order.findUnique({ where: { id: orderId }, select: { number: true, status: true, phone: true, locale: true } })
     if (!order) return 'skipped'
-    const chatId = await chatFor(order.phone)
-    if (!chatId) return 'skipped'
-    const lang = toLang(order.locale)
+    const to_ = await chatFor(order.phone, order.locale)
+    if (!to_) return 'skipped'
+    const { chatId, lang } = to_
     const current = typeof to === 'string' && to ? to : order.status
     const text = TEXT[lang].line(order.number, STATUS[lang][current] ?? current)
     return await send(chatId, text, orderButton(lang, order.number, deps), deps)
@@ -108,9 +112,9 @@ export async function notifyOrderPlaced(orderNumber: number, deps: Deps = {}): P
       select: { number: true, phone: true, locale: true, totalUzs: true, lines: { select: { qty: true } } },
     })
     if (!order) return 'skipped'
-    const chatId = await chatFor(order.phone)
-    if (!chatId) return 'skipped'
-    const lang = toLang(order.locale)
+    const to_ = await chatFor(order.phone, order.locale)
+    if (!to_) return 'skipped'
+    const { chatId, lang } = to_
     const items = order.lines.reduce((n, l) => n + l.qty, 0)
     const text = TEXT[lang].placed(order.number, items, formatUzs(order.totalUzs, lang))
     return await send(chatId, text, orderButton(lang, order.number, deps), deps)

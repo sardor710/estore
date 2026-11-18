@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Heart, LayoutGrid, MapPin, Package, UserRound } from 'lucide-react'
+import { Heart, LayoutGrid, MapPin, MessageSquare, Package, UserRound } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
 import { path } from '@/lib/paths'
 
@@ -12,11 +12,13 @@ const SECTIONS = [
   { key: 'orders', href: '/orders', Icon: Package },
   { key: 'addresses', href: '/addresses', Icon: MapPin },
   { key: 'favorites', href: '/favorites', Icon: Heart },
+  { key: 'messages', href: '/messages', Icon: MessageSquare },
   { key: 'profile', href: '/profile', Icon: UserRound },
 ] as const
 
 /** Side nav on desktop, horizontally scrollable pill bar on mobile (scrolls inside itself, never the page). */
-export default function AccountNav({ locale }: { locale: Locale }) {
+/** `unread`: shop messages not yet seen, shown as a count on Messages. */
+export default function AccountNav({ locale, unread = 0 }: { locale: Locale; unread?: number }) {
   const t = useTranslations('account.nav')
   const pathname = usePathname() ?? ''
   const base = path(locale, '/account')
@@ -38,6 +40,9 @@ export default function AccountNav({ locale }: { locale: Locale }) {
               >
                 <Icon size={16} aria-hidden className={active ? 'text-white' : 'text-neutral-400'} />
                 {t(key)}
+                {key === 'messages' && unread > 0 && !active ? (
+                  <span className="ml-auto rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">{unread > 99 ? '99+' : unread}</span>
+                ) : null}
               </Link>
             </li>
           )

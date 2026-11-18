@@ -7,7 +7,10 @@
 //   pick:<loginId>:<code> -> the user taps the code shown on THEIR website screen (1 real + 5 decoys in 2 rows of
 //                            3; a wrong pick cancels and blocks this Telegram user's sign-ins for a minute)
 //                            -> website signs in + "New sign-in ... Not you?" alert
-//   signout_all           -> bumps sessionVersion of the sender's account (every website session dies)
+//   /logout               -> confirm prompt; logout:yes bumps sessionVersion of the sender's account (every website
+//                            session dies). The sign-in alert has no button so it cannot be pressed by accident.
+//   /notifications, /language, /account, /help -> bot-only settings (notifyTelegram, accountLocale) and info.
+// The bot answers in the account's saved language (accountLocale), else the Telegram app language.
 // Only private chats are handled. The real check code never appears in message text, only as one of 6 buttons.
 
 import { prisma } from '@/lib/db'
@@ -26,7 +29,7 @@ import {
   sendBotMessage,
   type ReplyMarkup,
 } from './api'
-import { botCopy, botLocale, tashkentTime, type BotCopy, type BotLocale } from './messages'
+import { botCopy, botLocale, LANGUAGE_FLAGS, LANGUAGE_NAMES, tashkentTime, type BotCopy, type BotLocale } from './messages'
 
 export type BotDeps = { fetchImpl?: typeof fetch; now?: Date }
 
@@ -67,6 +70,15 @@ function contextOf(from: unknown, chat: unknown, f: typeof fetch, now: Date): Ct
   return { f, now, locale, copy: botCopy(locale), userId, chatId }
 }
 
+const isBotLocale = (v: unknown): v is BotLocale => v === 'uz' || v === 'ru' || v === 'en'
+
+/** Switches the context to the linked account's saved language, when it has one. */
+async function withAccountLocale(ctx: Ctx): Promise<Ctx> {
+  const c = await prisma.customer.findUnique({ where: { telegramUserId: ctx.userId }, select: { accountLocale: true, accountCreatedAt: true } })
+  const l = c?.accountCreatedAt ? c.accountLocale : null
+  return isBotLocale(l) && l !== ctx.locale ? { ...ctx, locale: l, copy: botCopy(l) } : ctx
+}
+
 const say = (ctx: Ctx, text: string, markup?: ReplyMarkup) => sendBotMessage(ctx.chatId, text, markup, ctx.f)
 
 /** One button that opens `path` in the Mini App (web_app, needs https), else in the browser; null without SITE_URL. */
@@ -85,16 +97,25 @@ const openShopMarkup = (ctx: Ctx, path = `/${ctx.locale}`): ReplyMarkup | undefi
 
 const START_LOGIN = /^\/start(?:@\w+)?\s+login_([A-Za-z0-9_-]{16,64})\s*$/
 
+const command = (text: string, name: string) => new RegExp(`^/${name}(?:@\\w+)?$`).test(text)
+
 async function onMessage(msg: Obj, f: typeof fetch, now: Date) {
-  const ctx = contextOf(msg.from, msg.chat, f, now)
-  if (!ctx) return
+  const base = contextOf(msg.from, msg.chat, f, now)
+  if (!base) return
+  const ctx = await withAccountLocale(base)
   if (isObj(msg.contact)) return onContact(ctx, msg.contact, msg.from as Obj)
   if (isObj(msg.location)) return onLocation(ctx, msg.location)
   if (typeof msg.text !== 'string') return
   const m = START_LOGIN.exec(msg.text.trim())
   if (m) return onStartLogin(ctx, m[1])
   if (/^\/start(?:@\w+)?\s+login_/.test(msg.text.trim())) return say(ctx, ctx.copy.linkExpired(siteLogin(ctx.locale)))
-  if (/^\/orders(?:@\w+)?$/.test(msg.text.trim())) return onOrders(ctx)
+  const text = msg.text.trim()
+  if (command(text, 'orders')) return onOrders(ctx)
+  if (command(text, 'logout')) return say(ctx, ctx.copy.logoutConfirm, logoutMarkup(ctx))
+  if (command(text, 'notifications')) return onNotifications(ctx)
+  if (command(text, 'language')) return say(ctx, ctx.copy.languagePrompt, languageMarkup())
+  if (command(text, 'account')) return onAccount(ctx)
+  if (command(text, 'help')) return say(ctx, ctx.copy.help, openShopMarkup(ctx))
   await say(ctx, ctx.copy.welcome(siteHome(ctx.locale)), openShopMarkup(ctx))
 }
 
@@ -118,6 +139,39 @@ async function onOrders(ctx: Ctx) {
   const lines = orders.map((o) => `#${o.number} · ${statusLabel(ctx.locale, o.status)} · ${formatUzs(o.totalUzs, ctx.locale)}`)
   const buttons = orders.map((o) => shopButton(`#${o.number}`, `/${ctx.locale}/account/orders/${o.number}`)).filter((b) => b !== null)
   await say(ctx, [ctx.copy.ordersHeader, ...lines].join('\n'), buttons.length ? inlineKeyboard(buttons.map((b) => [b])) : undefined)
+}
+
+// ---------- bot-only settings ----------
+
+const logoutMarkup = (ctx: Ctx) =>
+  inlineKeyboard([[{ text: ctx.copy.logoutYes, data: 'logout:yes' }, { text: ctx.copy.logoutNo, data: 'logout:no' }]])
+
+const notifyMarkup = (ctx: Ctx, on: boolean) =>
+  inlineKeyboard([[on ? { text: ctx.copy.notifyTurnOff, data: 'notify:off' } : { text: ctx.copy.notifyTurnOn, data: 'notify:on' }]])
+
+const languageMarkup = () =>
+  inlineKeyboard([(['uz', 'ru', 'en'] as const).map((l) => ({ text: `${LANGUAGE_FLAGS[l]} ${LANGUAGE_NAMES[l]}`, data: `lang:${l}` }))])
+
+/** /notifications: current state + one toggle button (order status messages, Customer.notifyTelegram). */
+async function onNotifications(ctx: Ctx) {
+  const c = await prisma.customer.findUnique({ where: { telegramUserId: ctx.userId }, select: { notifyTelegram: true, accountCreatedAt: true } })
+  if (!c?.accountCreatedAt) return say(ctx, ctx.copy.askPhoneInShop, openShopMarkup(ctx))
+  await say(ctx, ctx.copy.notifyStatus(c.notifyTelegram), notifyMarkup(ctx, c.notifyTelegram))
+}
+
+/** /account: which website account this Telegram is linked to, plus the bot settings. */
+async function onAccount(ctx: Ctx) {
+  const c = await prisma.customer.findUnique({
+    where: { telegramUserId: ctx.userId },
+    select: { name: true, phone: true, notifyTelegram: true, accountCreatedAt: true },
+  })
+  if (!c?.accountCreatedAt) return say(ctx, ctx.copy.askPhoneInShop, openShopMarkup(ctx))
+  const profile = shopButton(ctx.copy.profileButton, `/${ctx.locale}/account`)
+  await say(
+    ctx,
+    ctx.copy.accountInfo({ name: c.name, phone: c.phone, language: LANGUAGE_NAMES[ctx.locale], notify: c.notifyTelegram }),
+    profile ? inlineKeyboard([[profile]]) : undefined,
+  )
 }
 
 const short = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
@@ -221,14 +275,54 @@ async function onCallback(cq: Obj, f: typeof fetch, now: Date) {
   const id = typeof cq.id === 'string' ? cq.id : null
   const message = isObj(cq.message) ? cq.message : null
   if (!id || !message) return
-  const ctx = contextOf(cq.from, message.chat, f, now)
-  if (!ctx) return
+  const base = contextOf(cq.from, message.chat, f, now)
+  if (!base) return
+  let ctx = await withAccountLocale(base)
   const data = typeof cq.data === 'string' ? cq.data : ''
   const messageId = typeof message.message_id === 'number' ? message.message_id : null
+  const edit = async (text: string, markup?: ReplyMarkup) => {
+    if (messageId === null || !(await editBotMessage(ctx.chatId, messageId, text, f, markup))) await say(ctx, text, markup)
+  }
 
+  // Old sign-in alerts still carry a "Sign out everywhere" button: it now only opens the confirm step.
   if (data === 'signout_all') {
+    await answerCallbackQuery(id, undefined, {}, f)
+    await say(ctx, ctx.copy.logoutConfirm, logoutMarkup(ctx))
+    return
+  }
+  if (data === 'logout:yes') {
     const r = await signOutEverywhereByTelegram(ctx.userId)
-    await answerCallbackQuery(id, r ? ctx.copy.signedOutAll : ctx.copy.noAccount, { alert: true }, f)
+    await answerCallbackQuery(id, undefined, {}, f)
+    await edit(r ? ctx.copy.signedOutAll : ctx.copy.noAccount)
+    return
+  }
+  if (data === 'logout:no') {
+    await answerCallbackQuery(id, undefined, {}, f)
+    await edit(ctx.copy.logoutCancelled)
+    return
+  }
+  if (data === 'notify:on' || data === 'notify:off') {
+    const on = data === 'notify:on'
+    const r = await prisma.customer.updateMany({ where: { telegramUserId: ctx.userId, accountCreatedAt: { not: null } }, data: { notifyTelegram: on } })
+    if (!r.count) {
+      await answerCallbackQuery(id, ctx.copy.noAccount, { alert: true }, f)
+      return
+    }
+    await answerCallbackQuery(id, undefined, {}, f)
+    await edit(ctx.copy.notifyStatus(on), notifyMarkup(ctx, on))
+    return
+  }
+  const lg = /^lang:(uz|ru|en)$/.exec(data)
+  if (lg) {
+    const l = lg[1] as BotLocale
+    const r = await prisma.customer.updateMany({ where: { telegramUserId: ctx.userId, accountCreatedAt: { not: null } }, data: { accountLocale: l } })
+    if (!r.count) {
+      await answerCallbackQuery(id, ctx.copy.noAccount, { alert: true }, f)
+      return
+    }
+    ctx = { ...ctx, locale: l, copy: botCopy(l) }
+    await answerCallbackQuery(id, undefined, {}, f)
+    await edit(ctx.copy.languageSaved)
     return
   }
 
@@ -258,12 +352,10 @@ async function onCallback(cq: Obj, f: typeof fetch, now: Date) {
   }
   await answerCallbackQuery(id, undefined, {}, f)
   // Replace the prompt (drops its buttons); fall back to a new message if it can't be edited.
-  const replace = async (text: string) => {
-    if (messageId === null || !(await editBotMessage(ctx.chatId, messageId, text, f))) await say(ctx, text)
-  }
+  const replace = (text: string) => edit(text)
   if (r === 'ok') {
     await replace(ctx.copy.signedIn)
-    await say(ctx, ctx.copy.newSignIn(tashkentTime(ctx.now)), inlineKeyboard([[{ text: ctx.copy.signOutAllButton, data: 'signout_all' }]]))
+    await say(ctx, ctx.copy.newSignIn(tashkentTime(ctx.now)))
   } else if (r === 'wrong_code') {
     await replace(ctx.copy.wrongCode)
   } else {
@@ -271,7 +363,7 @@ async function onCallback(cq: Obj, f: typeof fetch, now: Date) {
   }
 }
 
-/** "Not me": revokes every website session of the account linked to this Telegram user. False if none. */
+/** /logout confirmed: revokes every website session of the account linked to this Telegram user. False if none. */
 export async function signOutEverywhereByTelegram(telegramUserId: string): Promise<boolean> {
   if (!telegramUserId) return false
   const r = await prisma.customer.updateMany({

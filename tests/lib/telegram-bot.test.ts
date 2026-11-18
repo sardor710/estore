@@ -232,7 +232,7 @@ describe('handleUpdate: first sign-in', () => {
 })
 
 describe('handleUpdate: confirm by picking the code', () => {
-  it('correct pick -> website collects the customer once; "signed in" + "New sign-in ... Not you?" with signout_all', async () => {
+  it('correct pick -> website collects the customer once; "signed in" + "New sign-in ... Not you? /logout" without a button', async () => {
     const tg = fakeTelegram()
     const { login, buttons } = await signInUpToPrompt(tg)
     const real = buttons.find((b) => b.text === login.checkCode)!
@@ -245,7 +245,8 @@ describe('handleUpdate: confirm by picking the code', () => {
     const alert = tg.sent().find((m) => String(m.body.text).includes('New sign-in'))!
     expect(alert.body.text).toContain('15:05')
     expect(alert.body.text).toContain('Not you?')
-    expect(alert.body.reply_markup.inline_keyboard.flat()).toEqual([{ text: 'Sign out everywhere', callback_data: 'signout_all' }])
+    expect(alert.body.text).toContain('/logout')
+    expect(alert.body.reply_markup).toBeUndefined()
   })
 
   it('wrong pick -> sign-in cancelled, website gets expired', async () => {
@@ -327,8 +328,40 @@ describe('handleUpdate: confirm by picking the code', () => {
   })
 })
 
-describe('handleUpdate: sign out everywhere', () => {
-  it('signout_all bumps sessionVersion of the account linked to the sender only', async () => {
+describe('handleUpdate: /logout (sign out everywhere)', () => {
+  it('/logout only asks to confirm; nothing is signed out yet', async () => {
+    const mine = await prisma.customer.create({
+      data: { phone: '+998901111111', name: 'Me', region: '', tags: [], telegramUserId: String(ME), telegramChatId: String(ME), accountCreatedAt: NOW },
+    })
+    const tg = fakeTelegram()
+    await handleUpdate(textUpdate('/logout'), { fetchImpl: tg.fetchImpl, now: NOW })
+    const { text, buttons } = promptOf(tg)
+    expect(text).toContain('Sign out of the website on all devices')
+    expect(buttons.map((b) => b.callback_data)).toEqual(['logout:yes', 'logout:no'])
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: mine.id } })).sessionVersion).toBe(0)
+  })
+
+  it('an old alert\'s signout_all button only opens the confirm step', async () => {
+    const mine = await prisma.customer.create({
+      data: { phone: '+998901111111', name: 'Me', region: '', tags: [], telegramUserId: String(ME), telegramChatId: String(ME), accountCreatedAt: NOW },
+    })
+    const tg = fakeTelegram()
+    await handleUpdate(callbackUpdate('signout_all'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect(promptOf(tg).buttons.map((b) => b.callback_data)).toEqual(['logout:yes', 'logout:no'])
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: mine.id } })).sessionVersion).toBe(0)
+  })
+
+  it('logout:no keeps the sessions', async () => {
+    const mine = await prisma.customer.create({
+      data: { phone: '+998901111111', name: 'Me', region: '', tags: [], telegramUserId: String(ME), telegramChatId: String(ME), accountCreatedAt: NOW },
+    })
+    const tg = fakeTelegram()
+    await handleUpdate(callbackUpdate('logout:no'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: mine.id } })).sessionVersion).toBe(0)
+    expect(tg.texts().some((t) => t.includes('still signed in'))).toBe(true)
+  })
+
+  it('logout:yes bumps sessionVersion of the account linked to the sender only', async () => {
     const mine = await prisma.customer.create({
       data: { phone: '+998901111111', name: 'Me', region: '', tags: [], telegramUserId: String(ME), telegramChatId: String(ME), accountCreatedAt: NOW },
     })
@@ -336,11 +369,75 @@ describe('handleUpdate: sign out everywhere', () => {
       data: { phone: '+998902222222', name: 'Them', region: '', tags: [], telegramUserId: String(OTHER), telegramChatId: String(OTHER), accountCreatedAt: NOW },
     })
     const tg = fakeTelegram()
-    await handleUpdate(callbackUpdate('signout_all'), { fetchImpl: tg.fetchImpl, now: NOW })
+    await handleUpdate(callbackUpdate('logout:yes'), { fetchImpl: tg.fetchImpl, now: NOW })
     expect((await prisma.customer.findUniqueOrThrow({ where: { id: mine.id } })).sessionVersion).toBe(1)
     expect((await prisma.customer.findUniqueOrThrow({ where: { id: theirs.id } })).sessionVersion).toBe(0)
-    const ans = tg.calls.find((c) => c.method === 'answerCallbackQuery')!
-    expect(ans.body.text).toContain('Signed out on all devices')
+    expect(tg.texts().some((t) => t.includes('Signed out on all devices'))).toBe(true)
+  })
+})
+
+describe('handleUpdate: bot settings (/notifications, /language, /account)', () => {
+  async function linked(extra: Record<string, unknown> = {}) {
+    return prisma.customer.create({
+      data: { phone: '+998901234567', name: 'Ali', region: '', tags: [], telegramUserId: String(ME), telegramChatId: String(ME), accountCreatedAt: NOW, ...extra },
+    })
+  }
+
+  it('/notifications shows the state with one toggle; notify:off / notify:on store it and update the message', async () => {
+    const c = await linked()
+    const tg = fakeTelegram()
+    await handleUpdate(textUpdate('/notifications'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect(promptOf(tg).text).toContain('Order updates: on')
+    expect(promptOf(tg).buttons.map((b) => b.callback_data)).toEqual(['notify:off'])
+
+    await handleUpdate(callbackUpdate('notify:off'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: c.id } })).notifyTelegram).toBe(false)
+    const edited = tg.calls.filter((x) => x.method === 'editMessageText').at(-1)!
+    expect(edited.body.text).toContain('Order updates: off')
+    expect(edited.body.reply_markup.inline_keyboard.flat()[0].callback_data).toBe('notify:on')
+
+    await handleUpdate(callbackUpdate('notify:on'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: c.id } })).notifyTelegram).toBe(true)
+  })
+
+  it('/notifications without a linked account asks to share the phone in the shop', async () => {
+    const tg = fakeTelegram()
+    await handleUpdate(textUpdate('/notifications'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect(tg.texts()[0]).toContain('share your phone number')
+  })
+
+  it('/language offers uz/ru/en; lang:ru saves accountLocale and the bot then answers in Russian', async () => {
+    const c = await linked({ accountLocale: 'en' })
+    const tg = fakeTelegram()
+    await handleUpdate(textUpdate('/language'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect(promptOf(tg).buttons.map((b) => b.callback_data)).toEqual(['lang:uz', 'lang:ru', 'lang:en'])
+    await handleUpdate(callbackUpdate('lang:ru'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect((await prisma.customer.findUniqueOrThrow({ where: { id: c.id } })).accountLocale).toBe('ru')
+    expect(tg.texts().at(-1)).toContain('Русский')
+    await handleUpdate(textUpdate('/help', ME, 'en'), { fetchImpl: tg.fetchImpl, now: NOW })
+    expect(tg.texts().at(-1)).toContain('Команды')
+  })
+
+  it('a lang: or notify: press without a linked account changes nothing', async () => {
+    const tg = fakeTelegram()
+    await handleUpdate(callbackUpdate('lang:ru'), { fetchImpl: tg.fetchImpl, now: NOW })
+    await handleUpdate(callbackUpdate('notify:off'), { fetchImpl: tg.fetchImpl, now: NOW })
+    const answers = tg.calls.filter((c) => c.method === 'answerCallbackQuery')
+    expect(answers.map((a) => a.body.text)).toEqual(['No account is linked to this Telegram', 'No account is linked to this Telegram'])
+  })
+
+  it('/account shows the linked name, phone, language and notification state with a profile button', async () => {
+    await linked({ accountLocale: 'en', notifyTelegram: false })
+    const tg = fakeTelegram()
+    await handleUpdate(textUpdate('/account'), { fetchImpl: tg.fetchImpl, now: NOW })
+    const m = tg.sent()[0]
+    expect(m.body.text).toContain('Ali')
+    expect(m.body.text).toContain('+998901234567')
+    expect(m.body.text).toContain('Order updates: off')
+    expect(m.body.reply_markup.inline_keyboard.flat()[0]).toEqual({
+      text: '👤 Open profile',
+      web_app: { url: 'https://shop.example.uz/tg?next=%2Fen%2Faccount' },
+    })
   })
 })
 
@@ -604,7 +701,7 @@ describe('connectBotWebhook: Mini App menu button + commands (T10)', () => {
     })
     const cmds = tg.calls.filter((c) => c.method === 'setMyCommands')
     expect(cmds.map((c) => c.body.language_code ?? 'default')).toEqual(['default', 'ru', 'en'])
-    expect(cmds[2].body.commands.map((c: { command: string }) => c.command)).toEqual(['start', 'orders', 'help'])
+    expect(cmds[2].body.commands.map((c: { command: string }) => c.command)).toEqual(['start', 'orders', 'notifications', 'language', 'account', 'logout', 'help'])
   })
   it('a menu/commands failure is reported as a warning but the webhook connect still succeeds', async () => {
     const { connectBotWebhook } = await import('@/lib/telegram-bot/webhook')

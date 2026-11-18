@@ -7,7 +7,7 @@ import { t as l10n } from '@/lib/localized'
 
 // Server-only helpers shared by the login and account pages.
 
-export type AccountMetaKey = 'login' | 'overview' | 'orders' | 'order' | 'addresses' | 'favorites' | 'profile'
+export type AccountMetaKey = 'login' | 'overview' | 'orders' | 'order' | 'addresses' | 'favorites' | 'messages' | 'profile'
 
 /** Localized title; account pages and the login page are never indexed. */
 export async function accountMetadata(rawLocale: string, key: AccountMetaKey, values?: Record<string, string | number>): Promise<Metadata> {

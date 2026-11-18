@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquare,
   GalleryHorizontal,
   Newspaper,
   Package,
@@ -39,6 +40,7 @@ const GROUPS: Group[] = [
     items: [
       { href: '/admin/orders', label: 'Orders', icon: ClipboardList },
       { href: '/admin/clients', label: 'Clients', icon: Users },
+      { href: '/admin/messages', label: 'Messages', icon: MessageSquare },
       { href: '/admin/promotions', label: 'Promotions', icon: BadgePercent },
     ],
   },

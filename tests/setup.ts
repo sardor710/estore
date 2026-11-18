@@ -16,6 +16,8 @@ beforeEach(async () => {
   await prisma.customerAddress.deleteMany()
   await prisma.customerLogin.deleteMany()
   await prisma.customerLoginCode.deleteMany()
+  await prisma.customerMessage.deleteMany()
+  await prisma.messageBroadcast.deleteMany()
   await prisma.customer.deleteMany()
   await prisma.promotion.deleteMany()
   await prisma.adminUser.deleteMany()

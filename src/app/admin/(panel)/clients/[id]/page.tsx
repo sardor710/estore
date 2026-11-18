@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ShoppingBag } from 'lucide-react'
+import { MessageSquare, ShoppingBag } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/admin/session'
 import { getCustomer, type Segment } from '@/lib/customers'
@@ -9,6 +9,9 @@ import { tashkentDay } from '@/lib/analytics/visitor'
 import { Badge, EmptyState, PageHeader, card } from '@/components/admin/ui'
 import BackLink from '@/components/admin/BackLink'
 import ClientEditor from '@/components/admin/ClientEditor'
+import MessageComposer from '@/components/admin/MessageComposer'
+import { listClientMessages } from '@/lib/customer-messages'
+import { TELEGRAM_TONE } from '@/components/admin/message-status'
 
 export const metadata = { title: 'Client' }
 
@@ -22,6 +25,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const c = await getCustomer(id)
   if (!c) notFound()
   const region = getRegion(c.region)
+  const messages = c.accountCreatedAt ? await listClientMessages(c.id) : []
 
   return (
     <>
@@ -79,7 +83,39 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               </ul>
             )}
           </div>
+        <div className={card} id="messages">
+          <h2 className="mb-1 text-base font-semibold text-neutral-900">Messages</h2>
+          {c.accountCreatedAt ? (
+            <>
+              <p className="mb-3 text-sm text-neutral-500">Shown in the customer’s account (Messages) and sent by the Telegram bot. Customers cannot reply here.</p>
+              <MessageComposer mode="client" customerId={c.id} />
+              {messages.length === 0 ? (
+                <div className="mt-4">
+                  <EmptyState icon={MessageSquare} title="No messages yet." />
+                </div>
+              ) : (
+                <ul className="mt-4 divide-y divide-neutral-100">
+                  {messages.map((m) => (
+                    <li key={m.id} className="py-3">
+                      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                        <span>{m.createdAt.toLocaleString('en-GB', { timeZone: 'Asia/Tashkent', dateStyle: 'medium', timeStyle: 'short' })}</span>
+                        <span>· {m.createdBy}</span>
+                        {m.broadcastId ? <Badge tone="violet">Broadcast</Badge> : null}
+                        <Badge tone={TELEGRAM_TONE[m.telegram] ?? 'neutral'}>Telegram: {m.telegram}</Badge>
+                        <Badge tone={m.readAt ? 'green' : 'neutral'}>{m.readAt ? 'Read on site' : 'Unread on site'}</Badge>
+                      </div>
+                      <p className="whitespace-pre-line break-words text-sm text-neutral-900">{m.text}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-neutral-500">This client has no account yet. Messages can be sent once they sign in with Telegram on the website or in the bot.</p>
+          )}
         </div>
+        </div>
+
 
         <ClientEditor key={c.id} id={c.id} notes={c.notes} tags={c.tags} blocked={c.blocked} />
       </div>

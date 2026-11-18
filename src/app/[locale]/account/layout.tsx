@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server'
 import type { Locale } from '@/i18n/routing'
 import { getAccountCustomer } from '@/lib/account/session'
 import AccountNav from '@/components/account/AccountNav'
+import { unreadMessageCount } from '@/lib/customer-messages'
 import ProfileCard from '@/components/account/ProfileCard'
 import { path } from '@/lib/paths'
 
@@ -20,7 +21,11 @@ export default async function AccountLayout({ children, params }: { children: Re
   const locale = raw as Locale
   const customer = await getAccountCustomer()
   if (!customer) return <>{children}</>
-  const [t, tAcc] = await Promise.all([getTranslations({ locale, namespace: 'nav' }), getTranslations({ locale, namespace: 'account' })])
+  const [t, tAcc, unread] = await Promise.all([
+    getTranslations({ locale, namespace: 'nav' }),
+    getTranslations({ locale, namespace: 'account' }),
+    unreadMessageCount(customer.id),
+  ])
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
@@ -28,7 +33,7 @@ export default async function AccountLayout({ children, params }: { children: Re
         <aside className="min-w-0 space-y-4">
           <ProfileCard name={customer.name} phone={customer.phone} editHref={path(locale, '/account/profile')} editLabel={tAcc('card.edit')} />
           <p className="hidden px-4 pt-2 text-xs font-bold uppercase tracking-widest text-neutral-500 lg:block">{t('myAccount')}</p>
-          <AccountNav locale={locale} />
+          <AccountNav locale={locale} unread={unread} />
         </aside>
         <div className="min-w-0">{children}</div>
       </div>

@@ -27,7 +27,7 @@ export async function signOutEverywhere(cid: number): Promise<boolean> {
 }
 
 /**
- * Deletes the account: Telegram link, account fields, addresses, favorites and sign-in rows (the customer's and
+ * Deletes the account: Telegram link, account fields, addresses, favorites, shop messages and sign-in rows (the customer's and
  * those bound to its Telegram user) go, open codes are burnt; sessions are revoked. A customer with orders keeps
  * the Customer row (shop accounting, admin notes; signing in again later creates a fresh account on it); one
  * without orders is removed entirely (privacy).
@@ -38,6 +38,7 @@ export async function deleteAccount(cid: number): Promise<boolean> {
     if (!c) return false
     await tx.customerAddress.deleteMany({ where: { customerId: cid } })
     await tx.favorite.deleteMany({ where: { customerId: cid } })
+    await tx.customerMessage.deleteMany({ where: { customerId: cid } })
     await tx.customerLogin.deleteMany({
       where: { OR: [{ customerId: cid }, ...(c.telegramUserId ? [{ pendingTelegramUserId: c.telegramUserId }] : [])] },
     })
