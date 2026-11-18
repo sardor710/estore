@@ -17,6 +17,7 @@ import {
   Newspaper,
   Package,
   Settings,
+  SearchCheck,
   ShieldCheck,
   Store,
   Tags,
@@ -51,6 +52,7 @@ const GROUPS: Group[] = [
       { href: '/admin/categories', label: 'Categories', icon: FolderTree },
       { href: '/admin/brands', label: 'Brands', icon: Tags },
       { href: '/admin/import', label: 'Import', icon: Download },
+      { href: '/admin/seo', label: 'SEO', icon: SearchCheck },
     ],
   },
   {

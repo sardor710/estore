@@ -12,6 +12,11 @@ import ListControls, { move } from './ListControls'
 const toInt = (s: string): number => (s.trim() === '' ? 0 : Number(s))
 const toIntOrNull = (s: string): number | null => (s.trim() === '' ? null : Number(s))
 
+/** True when every variant has the same price and compare-at price. */
+export function allSamePrice(variants: Pick<VariantInput, 'priceUzs' | 'compareAtUzs'>[]): boolean {
+  return variants.every((v) => v.priceUzs === variants[0].priceUzs && v.compareAtUzs === variants[0].compareAtUzs)
+}
+
 /** Display name for a variant in the editor: en, then uz, then ru; null when it has none. */
 function variantName(v: VariantInput): string | null {
   for (const l of ['en', 'uz', 'ru'] as const) {
@@ -110,8 +115,31 @@ export default function VariantEditor({
 }) {
   const set = (i: number, patch: Partial<VariantInput>) => onChange(variants.map((v, j) => (j === i ? { ...v, ...patch } : v)))
   const several = variants.length > 1
+  // "Same price for all variants": on by default while every variant has the same price (e.g. all still 0 after an
+  // import), so typing one price fills the rest. Turn it off to give a variant (a bundle, a bigger size) its own price.
+  const [samePrice, setSamePrice] = useState(() => allSamePrice(variants))
+  const linked = several && samePrice
+  const setPrice = (i: number, patch: Pick<Partial<VariantInput>, 'priceUzs' | 'compareAtUzs'>) =>
+    linked ? onChange(variants.map((v) => ({ ...v, ...patch }))) : set(i, patch)
+  const toggleSamePrice = (on: boolean) => {
+    if (on && !allSamePrice(variants)) {
+      const first = variants[0]
+      if (!window.confirm(`Give every variant the price of the first one (${first.priceUzs} UZS)?`)) return
+      onChange(variants.map((v) => ({ ...v, priceUzs: first.priceUzs, compareAtUzs: first.compareAtUzs })))
+    }
+    setSamePrice(on)
+  }
   return (
     <div className="space-y-3">
+      {several ? (
+        <label className="flex items-start gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800">
+          <input type="checkbox" className="mt-0.5" checked={samePrice} onChange={(e) => toggleSamePrice(e.target.checked)} />
+          <span>
+            <span className="font-medium">Same price for all variants</span>
+            <span className="block text-xs text-neutral-500">Setting the price (or compare-at price) of one variant sets it for all. Turn off to price variants separately. Stock is always per variant and can be 0.</span>
+          </span>
+        </label>
+      ) : null}
       {variants.length === 0 ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">No variants yet. A product needs at least one variant (with a price) to be published.</p> : null}
       {variants.map((v, i) => {
         const name = variantName(v)
@@ -158,11 +186,11 @@ export default function VariantEditor({
                 </label>
                 <label>
                   <Label hint="UZS">Price</Label>
-                  <input className={input} inputMode="numeric" value={String(v.priceUzs)} onChange={(e) => set(i, { priceUzs: toInt(e.target.value) })} />
+                  <input className={input} inputMode="numeric" value={String(v.priceUzs)} onChange={(e) => setPrice(i, { priceUzs: toInt(e.target.value) })} />
                 </label>
                 <label>
                   <Label hint="UZS, optional">Compare-at</Label>
-                  <input className={input} inputMode="numeric" value={v.compareAtUzs === null ? '' : String(v.compareAtUzs)} onChange={(e) => set(i, { compareAtUzs: toIntOrNull(e.target.value) })} />
+                  <input className={input} inputMode="numeric" value={v.compareAtUzs === null ? '' : String(v.compareAtUzs)} onChange={(e) => setPrice(i, { compareAtUzs: toIntOrNull(e.target.value) })} />
                 </label>
                 <label>
                   <Label>Stock</Label>
@@ -201,7 +229,13 @@ export default function VariantEditor({
       <button
         type="button"
         className={`${btnGhost} ${btnSm}`}
-        onClick={() => onChange([...variants, { sku: '', name: {}, priceUzs: 0, compareAtUzs: null, stock: 0, colorHex: null, imageIndex: null }])}
+        onClick={() =>
+          onChange([
+            ...variants,
+            // A new variant starts at the shared price (when prices are shared) and 0 stock.
+            { sku: '', name: {}, priceUzs: linked || variants.length === 1 ? (variants[0]?.priceUzs ?? 0) : 0, compareAtUzs: linked || variants.length === 1 ? (variants[0]?.compareAtUzs ?? null) : null, stock: 0, colorHex: null, imageIndex: null },
+          ])
+        }
       >
         <Plus size={14} /> Add variant
       </button>

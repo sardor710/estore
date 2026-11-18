@@ -51,6 +51,7 @@ const SECTION: Record<string, Permission> = {
   categories: 'catalog',
   brands: 'catalog',
   import: 'catalog',
+  seo: 'catalog',
   blog: 'blog',
   translations: 'translations',
   users: 'users',

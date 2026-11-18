@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { sanitizeHtml } from '@/lib/sanitize'
 import type { Prisma } from '@/generated/prisma/client'
 import { logActivity } from './activity'
+import { autoFillProductSeo } from './seo'
 import { loadPromotionInput, savePromotion, type PromotionInput } from './promotions'
 import type { Staff } from './session'
 import type { L10n } from '@/lib/localized'
@@ -22,6 +23,8 @@ export async function publishProduct(id: number): Promise<ActionResult> {
   const t = (p.title ?? {}) as L10n
   if (!Object.values(t).some((v) => typeof v === 'string' && v.trim())) return { ok: false, error: 'The product needs a title before publishing.' }
   await prisma.product.update({ where: { id }, data: { status: 'PUBLISHED' } })
+  // Going live with blank SEO texts: generate them (texts staff wrote are kept).
+  await autoFillProductSeo(id)
   return { ok: true }
 }
 

@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Copy, ExternalLink, Eye, Languages, X } from 'lucide-react'
+import { Check, Copy, ExternalLink, Eye, Languages, Sparkles, X } from 'lucide-react'
 import { duplicateProductAction, publishAction, saveProductAction, translateProductAction } from '@/app/admin/actions/products'
+import { suggestSeoAction } from '@/app/admin/actions/seo'
 import {
   COMPLETENESS_CHECKS,
   SEO_DESCRIPTION_MAX,
@@ -222,6 +223,19 @@ export default function ProductEditor({
   const storefront = status === 'PUBLISHED' ? `/uz/p/${data.slug}` : null
   const tabHasError = (id: TabId) => Object.keys(errors).some((k) => ERROR_TAB[k] === id)
   const setSeo = (field: 'seoTitle' | 'seoDescription', l: string, v: string) => patch({ [field]: { ...data[field], [l]: v } })
+  const seoEmpty = locales.some((l) => !data.seoTitle[l]?.trim() || !data.seoDescription[l]?.trim())
+
+  /** Auto SEO: generated texts go into the form; staff review and save as usual. */
+  function generateSeo(onlyEmpty: boolean) {
+    if (!onlyEmpty && !window.confirm('Replace all SEO titles and descriptions with generated ones?')) return
+    setMsg(null)
+    start(async () => {
+      const { title, shortSpec, descriptionHtml, brandId, categoryId, seoTitle, seoDescription } = data
+      const r = await suggestSeoAction({ title, shortSpec, descriptionHtml, brandId, categoryId, seoTitle, seoDescription }, onlyEmpty)
+      patch({ seoTitle: r.seoTitle, seoDescription: r.seoDescription })
+      setMsg({ kind: 'info', text: 'SEO texts generated. Check them, then Save.' })
+    })
+  }
 
   const panels: Record<TabId, ReactNode> = {
     general: (
@@ -352,8 +366,18 @@ export default function ProductEditor({
     seo: (
       <Section id="seo-h" title="Search engines (SEO)" error={errors.seo}>
         <p className="text-sm text-neutral-600">
-          Optional. Shown by search engines and link previews. Keep titles within {SEO_TITLE_MAX} and descriptions within {SEO_DESCRIPTION_MAX} characters.
+          Shown by search engines and link previews. Keep titles within {SEO_TITLE_MAX} and descriptions within {SEO_DESCRIPTION_MAX} characters. Blank ones are generated automatically when you publish.
         </p>
+        <div className="flex flex-wrap gap-2">
+          {seoEmpty ? (
+            <button type="button" className={btn} disabled={pending} onClick={() => generateSeo(true)}>
+              <Sparkles size={16} aria-hidden /> Auto SEO: fill blank fields
+            </button>
+          ) : null}
+          <button type="button" className={btnGhost} disabled={pending} onClick={() => generateSeo(false)}>
+            <Sparkles size={16} aria-hidden /> {seoEmpty ? 'Regenerate all' : 'Auto SEO: regenerate all'}
+          </button>
+        </div>
         {locales.map((l) => (
           <fieldset key={l} className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50/60 p-3 sm:p-4">
             <legend className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-neutral-700">{l}</legend>
