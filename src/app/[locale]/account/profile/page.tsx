@@ -5,6 +5,8 @@ import { requireAccountCustomer } from '@/lib/account/session'
 import { path } from '@/lib/paths'
 import { accountMetadata } from '@/components/account/server'
 import ProfileForm from '@/components/account/ProfileForm'
+import { Avatar } from '@/components/account/ProfileCard'
+import { formatPhone } from '@/components/account/format'
 import { isTelegramMode } from '@/lib/tg/mode'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +25,13 @@ export default async function AccountProfilePage({ params }: { params: Promise<{
 
   return (
     <div>
-      <h1 className="font-[family-name:var(--font-heading)] text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">{t('title')}</h1>
+      <div className="flex items-center gap-4">
+        <Avatar name={c.name} size="lg" />
+        <div className="min-w-0">
+          <h1 className="font-[family-name:var(--font-heading)] text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">{t('title')}</h1>
+          <p className="mt-1 truncate text-sm text-neutral-500">{c.name.trim() ? `${c.name} · ${formatPhone(c.phone)}` : formatPhone(c.phone)}</p>
+        </div>
+      </div>
       <ProfileForm
         locale={locale}
         profile={{ name: c.name, phone: c.phone, locale: c.locale, notifyTelegram: c.notifyTelegram }}

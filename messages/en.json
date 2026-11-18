@@ -17,7 +17,8 @@
     "myAccount": "My account",
     "orders": "My orders",
     "favorites": "Favorites",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "more": "More"
   },
   "home": {
     "categoriesTitle": "Shop by category",
@@ -83,7 +84,14 @@
     "resultsFor": "Results for \"{q}\"",
     "none": "Nothing found for \"{q}\".",
     "prompt": "Type a product name or SKU to search.",
-    "label": "Search the store"
+    "label": "Search the store",
+    "suggest": {
+      "products": "Products",
+      "categories": "Categories",
+      "seeAll": "See all results for “{q}”",
+      "none": "No matches for “{q}”",
+      "loading": "Searching…"
+    }
   },
   "sale": {
     "title": "Sale",
@@ -361,6 +369,7 @@
       "empty": "No favorites yet. Tap the heart on a product to save it here.",
       "shop": "Browse products"
     },
+    "card": { "edit": "Edit profile" },
     "profile": {
       "title": "Profile",
       "details": "Personal details",

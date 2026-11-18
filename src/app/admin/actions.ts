@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { resetSearchCache } from '@/lib/search/service'
 import { requirePermission } from '@/lib/admin/session'
 import { logActivity } from '@/lib/admin/activity'
 import { saveSpecLabels, saveUiStrings, type SpecLabelRow } from '@/lib/admin/translations'
@@ -24,6 +25,7 @@ import type { L10n } from '@/lib/localized'
 /** Storefront pages (and their UI strings) must reflect admin edits. */
 function refreshStorefront() {
   revalidatePath('/', 'layout')
+  resetSearchCache() // live search must not show unpublished/renamed items for its cache lifetime
 }
 
 // ---------- import ----------

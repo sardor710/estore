@@ -7,10 +7,11 @@ import { useTranslations } from 'next-intl'
 import { Heart, LogOut, Package, UserRound } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
 import { path } from '@/lib/paths'
-import { initialOf } from './format'
+import { formatPhone } from './format'
 import { loginHref, signOut } from './signOut'
+import { Avatar } from './ProfileCard'
 
-export type NavAccount = { name: string } | null
+export type NavAccount = { name: string; phone: string } | null
 
 /** Header account control: "Sign in" icon link when signed out, initial avatar + menu when signed in. */
 export default function AccountMenu({ locale, account }: { locale: Locale; account: NavAccount }) {
@@ -47,9 +48,12 @@ export default function AccountMenu({ locale, account }: { locale: Locale; accou
         href={onLogin ? path(locale, '/login') : loginHref(locale, pathname)}
         aria-label={t('signIn')}
         title={t('signIn')}
-        className="rounded-full p-2 text-neutral-800 hover:bg-neutral-100"
+        className="flex items-center gap-2 rounded-full p-2 text-neutral-800 hover:bg-neutral-100 lg:border lg:border-neutral-200 lg:py-1.5 lg:pl-2 lg:pr-3.5 lg:hover:border-neutral-400"
       >
         <UserRound size={20} aria-hidden />
+        <span className="hidden whitespace-nowrap text-sm font-semibold lg:inline" aria-hidden>
+          {t('signIn')}
+        </span>
       </Link>
     )
   }
@@ -79,7 +83,7 @@ export default function AccountMenu({ locale, account }: { locale: Locale; accou
     }
   }
 
-  const initial = initialOf(account.name)
+  const firstName = account.name.trim().split(/\s+/)[0] ?? ''
   const item = 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-neutral-700 outline-none hover:bg-neutral-50 hover:text-neutral-900 focus-visible:bg-neutral-100 focus-visible:text-neutral-900'
 
   return (
@@ -98,11 +102,14 @@ export default function AccountMenu({ locale, account }: { locale: Locale; accou
             setOpen(true)
           }
         }}
-        className="flex rounded-full p-1 hover:bg-neutral-100"
+        className={`flex items-center gap-2 rounded-full p-1 hover:bg-neutral-100 ${firstName ? 'lg:border lg:border-neutral-200 lg:pr-3 lg:hover:border-neutral-400' : ''}`}
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-xs font-bold text-white" aria-hidden>
-          {initial ?? <UserRound size={15} />}
-        </span>
+        <Avatar name={account.name} size="sm" />
+        {firstName && (
+          <span className="hidden max-w-24 truncate text-sm font-semibold text-neutral-800 lg:inline" aria-hidden>
+            {firstName}
+          </span>
+        )}
       </button>
       {open && (
         <div
@@ -113,7 +120,13 @@ export default function AccountMenu({ locale, account }: { locale: Locale; accou
           onKeyDown={onMenuKey}
           className="absolute right-0 top-full z-50 mt-2 w-60 rounded-xl border border-neutral-100 bg-white p-2 shadow-lg"
         >
-          <p className="truncate px-3 pb-2 pt-1 text-xs text-neutral-500">{account.name}</p>
+          <div className="mb-1 flex items-center gap-3 rounded-lg bg-neutral-50 px-3 py-3" role="none">
+            <Avatar name={account.name} size="md" />
+            <div className="min-w-0">
+              {account.name.trim() && <p className="truncate text-sm font-bold text-neutral-900">{account.name}</p>}
+              <p className="truncate text-xs text-neutral-500">{formatPhone(account.phone)}</p>
+            </div>
+          </div>
           <Link role="menuitem" tabIndex={-1} href={path(locale, '/account')} onClick={() => setOpen(false)} className={item}>
             <UserRound size={16} aria-hidden className="text-neutral-400" />
             {t('myAccount')}

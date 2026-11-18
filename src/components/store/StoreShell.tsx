@@ -30,7 +30,7 @@ export default async function StoreShell({ locale, children }: { locale: Locale;
   }
   return (
     <FavoritesProvider ids={favorites} signedIn={customer !== null}>
-      <Navbar locale={locale} categories={categories} account={customer ? { name: customer.name } : null} />
+      <Navbar locale={locale} categories={categories} account={customer ? { name: customer.name, phone: customer.phone } : null} />
       <main>{children}</main>
       <Footer locale={locale} categories={categories} />
       <CartDrawer locale={locale} />

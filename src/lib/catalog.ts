@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/db'
 import { isSellable, storefrontWhere } from '@/lib/visibility'
 import type { Locale } from '@/i18n/routing'
-import { locales } from '@/i18n/routing'
 import type { L10n } from '@/lib/localized'
 import { loadPricer, type Pricer } from '@/lib/promotions'
 
@@ -268,33 +267,7 @@ export async function getProductBySlug(
   }
 }
 
-export async function searchProducts(q: string, locale: Locale): Promise<CardProduct[]> {
-  const needle = q.trim().toLowerCase()
-  if (!needle) return []
-  const [rows, price] = await Promise.all([
-    prisma.product.findMany({
-      where: storefrontWhere(),
-      include: cardInclude,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    }),
-    loadPricer(),
-  ])
-  const has = (field: unknown, l?: Locale) => {
-    const f = asL10n(field)
-    const vals = l ? [f[l]] : locales.map((x) => f[x])
-    return vals.some((v) => typeof v === 'string' && v.toLowerCase().includes(needle))
-  }
-  const scored: { row: (typeof rows)[number]; score: number }[] = []
-  for (const row of rows) {
-    let score = 0
-    if (has(row.title, locale) || has(row.shortSpec, locale)) score = 3
-    else if (has(row.title) || has(row.shortSpec)) score = 2
-    else if (row.variants.some((v) => v.sku.toLowerCase().includes(needle))) score = 1
-    if (score) scored.push({ row, score })
-  }
-  scored.sort((a, b) => b.score - a.score)
-  return scored.map((s) => toCard(s.row, price))
-}
+export { searchProducts } from './search/service'
 
 /** Products with a real compare-at discount or an active promotion on any variant. */
 export async function getSaleProducts(): Promise<CardProduct[]> {

@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { resetSearchCache } from '@/lib/search/service'
 import { requirePermission } from '@/lib/admin/session'
 import { deleteBrand, saveBrand, type BrandInput, type BrandResult } from '@/lib/admin/brands'
 
@@ -8,6 +9,7 @@ import { deleteBrand, saveBrand, type BrandInput, type BrandResult } from '@/lib
 
 function refreshStorefront() {
   revalidatePath('/', 'layout')
+  resetSearchCache() // live search must not show unpublished/renamed items for its cache lifetime
 }
 
 export async function saveBrandAction(input: BrandInput): Promise<BrandResult> {

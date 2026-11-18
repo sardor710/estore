@@ -17,7 +17,8 @@
     "myAccount": "Mening hisobim",
     "orders": "Buyurtmalarim",
     "favorites": "Sevimlilar",
-    "signOut": "Chiqish"
+    "signOut": "Chiqish",
+    "more": "Yana"
   },
   "home": {
     "categoriesTitle": "Kategoriyalar boʻyicha xarid qiling",
@@ -83,7 +84,14 @@
     "resultsFor": "\"{q}\" boʻyicha natijalar",
     "none": "\"{q}\" boʻyicha hech narsa topilmadi.",
     "prompt": "Qidirish uchun mahsulot nomi yoki SKU kiriting.",
-    "label": "Doʻkondan qidirish"
+    "label": "Doʻkondan qidirish",
+    "suggest": {
+      "products": "Mahsulotlar",
+      "categories": "Kategoriyalar",
+      "seeAll": "“{q}” boʻyicha barcha natijalar",
+      "none": "“{q}” boʻyicha hech narsa topilmadi",
+      "loading": "Qidirilmoqda…"
+    }
   },
   "sale": {
     "title": "Chegirmalar",
@@ -361,6 +369,7 @@
       "empty": "Sevimlilar hozircha boʻsh. Mahsulotni bu yerga saqlash uchun yurakchani bosing.",
       "shop": "Mahsulotlarni koʻrish"
     },
+    "card": { "edit": "Profilni tahrirlash" },
     "profile": {
       "title": "Profil",
       "details": "Shaxsiy maʼlumotlar",

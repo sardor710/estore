@@ -128,7 +128,7 @@ describe('searchProducts', () => {
     const c = await mkCat('chargers')
     await mkProduct({ slug: 'z', categoryId: c.id, title: { en: 'Charger', uz: 'Zaryad qurilmasi' } })
     await mkProduct({ slug: 's', categoryId: c.id, title: { en: 'Other' }, shortSpec: { ru: 'Быстрая зарядка' } })
-    expect((await searchProducts('zaryad', 'uz')).map((p) => p.slug)).toEqual(['z'])
+    expect((await searchProducts('zaryad', 'uz')).map((p) => p.slug)).toEqual(['z', 's'])
     expect((await searchProducts('быстрая', 'en')).map((p) => p.slug)).toEqual(['s'])
   })
   it('hides drafts and returns [] for blank query', async () => {
