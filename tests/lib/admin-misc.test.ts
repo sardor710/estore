@@ -57,7 +57,7 @@ describe('settings', () => {
     const token = '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     await saveSettings({ minOrderUzs: 1, telegramBotToken: token, telegramChatId: '-100123' }, { integrations: true })
     const view = await getSettingsView({ integrations: false })
-    expect(view).toEqual({ minOrderUzs: 1, vipThresholdUzs: 10_000_000, lowStockThreshold: 3, integrations: false })
+    expect(view).toEqual({ minOrderUzs: 1, vipThresholdUzs: 10_000_000, lowStockThreshold: 3, shop: expect.objectContaining({ shopLegalName: '' }), integrations: false })
     for (const sneaky of [{ telegramChatId: '-1' }, { telegramBotToken: '999:ZZZZZZZZZZZZZZZZZZZZZZZZ' }, { clearTelegramToken: true }]) {
       expect(await saveSettings({ minOrderUzs: 2, ...sneaky }, { integrations: false })).toMatchObject({ ok: false, errors: { _: expect.any(String) } })
     }

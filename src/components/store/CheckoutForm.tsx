@@ -400,6 +400,13 @@ export default function CheckoutForm({
           {submitting ? t('submitting') : t('submit')}
         </button>
         <p className="mt-3 text-xs text-neutral-500">{t('note')}</p>
+        <p className="mt-2 text-xs text-neutral-500">
+          {t.rich('legal', {
+            offer: (c) => <Link href={`/${locale}/legal/offer`} target="_blank" className="underline">{c}</Link>,
+            warranty: (c) => <Link href={`/${locale}/legal/warranty`} target="_blank" className="underline">{c}</Link>,
+            privacy: (c) => <Link href={`/${locale}/legal/privacy`} target="_blank" className="underline">{c}</Link>,
+          })}
+        </p>
         <button type="button" onClick={() => setCartOpen(true)} className="mt-3 inline-block text-xs font-semibold text-neutral-700 underline">
           {t('editCart')}
         </button>

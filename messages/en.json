@@ -155,6 +155,7 @@
     "submit": "Place order request",
     "submitting": "Sending...",
     "note": "This is an order request. We will call you to confirm the order. You pay on delivery.",
+    "legal": "By placing an order, you accept the <offer>public offer</offer>, the <warranty>warranty and return terms</warranty> and the <privacy>privacy policy</privacy>.",
     "empty": "Your cart is empty.",
     "backToShop": "Back to shop",
     "editCart": "Edit cart",

@@ -155,6 +155,7 @@
     "submit": "Buyurtma soʻrovini yuborish",
     "submitting": "Yuborilmoqda...",
     "note": "Bu buyurtma soʻrovi. Tasdiqlash uchun sizga qoʻngʻiroq qilamiz. Toʻlov yetkazib berilganda.",
+    "legal": "Buyurtma berish orqali siz <offer>ommaviy oferta</offer>, <warranty>kafolat va qaytarish</warranty> shartlarini hamda <privacy>maxfiylik siyosati</privacy>ni qabul qilasiz.",
     "empty": "Savatingiz boʻsh.",
     "backToShop": "Doʻkonga qaytish",
     "editCart": "Savatni tahrirlash",

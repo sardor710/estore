@@ -9,6 +9,13 @@ describe('settings', () => {
       telegramChatId: null,
       vipThresholdUzs: 10_000_000,
       lowStockThreshold: 3,
+      shopLegalName: null,
+      shopInn: null,
+      shopAddress: null,
+      shopPhone: null,
+      shopEmail: null,
+      shopTelegram: null,
+      shopHours: null,
     })
   })
   it('persists updates', async () => {

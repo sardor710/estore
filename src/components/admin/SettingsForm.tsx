@@ -8,6 +8,16 @@ import { Badge, btn, btnGhost, card, input, Label, Notice } from './ui'
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null
 
+const SHOP_FIELDS: [keyof SettingsView['shop'], string, string, string][] = [
+  ['shopLegalName', 'Legal name (seller)', 'company or individual entrepreneur', 'OOO "Zanko" / YaTT Familiya Ism'],
+  ['shopInn', 'INN (STIR)', '9 digits', '123456789'],
+  ['shopAddress', 'Legal address', 'also where warranty items are accepted', 'Tashkent, ... district, ... street, 1'],
+  ['shopPhone', 'Phone', 'customer support', '+998 90 123-45-67'],
+  ['shopEmail', 'Email', 'optional', 'support@zanko.uz'],
+  ['shopTelegram', 'Telegram support', 'optional', '@zanko_support'],
+  ['shopHours', 'Working hours', 'optional', 'Mon–Sat 10:00–19:00'],
+]
+
 const num = (s: string) => (s.trim() === '' ? NaN : Number(s))
 
 /** Integration sections (Telegram, translation key status) render only when `view.integrations` is true. */
@@ -16,6 +26,7 @@ export default function SettingsForm({ view, translationConfigured }: { view: Se
   const [min, setMin] = useState(String(view.minOrderUzs))
   const [vip, setVip] = useState(String(view.vipThresholdUzs))
   const [low, setLow] = useState(String(view.lowStockThreshold))
+  const [shop, setShop] = useState(view.shop)
   const [token, setToken] = useState('')
   const [clear, setClear] = useState(false)
   const [chat, setChat] = useState(view.integrations ? view.telegramChatId : '')
@@ -30,6 +41,7 @@ export default function SettingsForm({ view, translationConfigured }: { view: Se
       minOrderUzs: num(min),
       vipThresholdUzs: num(vip),
       lowStockThreshold: num(low),
+      shop,
       // Integration fields are only sent by staff who can see them; the server re-checks anyway.
       ...(view.integrations ? { telegramBotToken: token, clearTelegramToken: clear, telegramChatId: chat } : {}),
     }
@@ -97,6 +109,25 @@ export default function SettingsForm({ view, translationConfigured }: { view: Se
             <input className={input} inputMode="numeric" value={low} onChange={(e) => setLow(e.target.value)} />
             {err('lowStockThreshold')}
           </label>
+        </div>
+      </section>
+
+      <section className={`${card} space-y-4`} aria-labelledby="shop">
+        <div>
+          <h2 id="shop" className="text-base font-semibold text-neutral-900">Shop details</h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Shown in the site footer and in the Public offer, Privacy policy and Warranty pages. Fill in the legal name and INN (STIR) before launch: the public offer
+            needs them to be a valid contract.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {SHOP_FIELDS.map(([k, label, hint, placeholder]) => (
+            <label key={k} className={`block ${k === 'shopAddress' ? 'sm:col-span-2' : ''}`}>
+              <Label hint={hint}>{label}</Label>
+              <input className={input} value={shop[k]} placeholder={placeholder} onChange={(e) => setShop({ ...shop, [k]: e.target.value })} />
+              {err(k)}
+            </label>
+          ))}
         </div>
       </section>
 
