@@ -61,9 +61,6 @@ export type BotCopy = {
   /** /account */
   accountInfo: (a: { name: string; phone: string; language: string; notify: boolean }) => string
   profileButton: string
-  /** A message the shop sent from the admin (also stored in the website account, Messages page). */
-  shopMessage: (text: string) => string
-  messagesButton: string
 }
 
 /** Language names in their own language (language picker buttons and /account). */
@@ -134,8 +131,6 @@ const uz: BotCopy = {
   accountInfo: (a) =>
     `Bogʻlangan akkaunt:\nIsm: ${a.name}\nTelefon: ${a.phone}\nBot tili: ${a.language}\nBuyurtma xabarlari: ${a.notify ? 'yoqilgan' : 'oʻchirilgan'}`,
   profileButton: '👤 Profilni ochish',
-  shopMessage: (text) => `✉️ «Elektronika doʻkoni»dan xabar:\n\n${text}`,
-  messagesButton: 'Xabarlarni ochish',
 }
 
 const ru: BotCopy = {
@@ -200,8 +195,6 @@ const ru: BotCopy = {
   accountInfo: (a) =>
     `Привязанный аккаунт:\nИмя: ${a.name}\nТелефон: ${a.phone}\nЯзык бота: ${a.language}\nУведомления о заказах: ${a.notify ? 'включены' : 'выключены'}`,
   profileButton: '👤 Открыть профиль',
-  shopMessage: (text) => `✉️ Сообщение от «Магазина электроники»:\n\n${text}`,
-  messagesButton: 'Открыть сообщения',
 }
 
 const en: BotCopy = {
@@ -265,8 +258,6 @@ const en: BotCopy = {
   accountInfo: (a) =>
     `Linked account:\nName: ${a.name}\nPhone: ${a.phone}\nBot language: ${a.language}\nOrder updates: ${a.notify ? 'on' : 'off'}`,
   profileButton: '👤 Open profile',
-  shopMessage: (text) => `✉️ Message from Electronics Store:\n\n${text}`,
-  messagesButton: 'Open messages',
 }
 
 export const BOT_COPY: Record<BotLocale, BotCopy> = { uz, ru, en }

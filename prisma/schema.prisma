@@ -326,6 +326,9 @@ model CustomerMessage {
   text        String
   broadcastId Int?
   broadcast   MessageBroadcast? @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+  /// Optional attachment: /uploads/... URL and its kind (photo | animation | video).
+  mediaUrl    String?
+  mediaKind   String?
   telegram    String            @default("pending")
   readAt      DateTime?
   createdBy   String
@@ -339,6 +342,8 @@ model CustomerMessage {
 model MessageBroadcast {
   id         Int               @id @default(autoincrement())
   text       String
+  mediaUrl   String?
+  mediaKind  String?
   recipients Int
   createdBy  String
   createdAt  DateTime          @default(now())

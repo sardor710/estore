@@ -123,3 +123,56 @@ export async function answerCallbackQuery(
   const r = await botCall('answerCallbackQuery', { callback_query_id: id, ...(text ? { text, show_alert: !!opts.alert } : {}) }, fetchImpl)
   return r !== null
 }
+
+// ---------- media (admin -> customer posts) ----------
+
+export type BotMediaKind = 'photo' | 'animation' | 'video'
+/** A local file to upload, or a file_id Telegram returned for an earlier upload (re-sending costs no upload). */
+export type BotMediaSource = { fileId: string } | { data: Uint8Array; filename: string; contentType: string }
+
+const MEDIA_METHOD: Record<BotMediaKind, string> = { photo: 'sendPhoto', animation: 'sendAnimation', video: 'sendVideo' }
+
+/**
+ * sendPhoto / sendAnimation / sendVideo with an optional plain-text caption (max 1024 chars). Never throws.
+ * Returns the file_id to reuse for the next recipient, or null on failure.
+ */
+export async function sendBotMedia(
+  chatId: string | number,
+  kind: BotMediaKind,
+  source: BotMediaSource,
+  caption: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ fileId: string | null } | null> {
+  try {
+    const { telegramBotToken } = await getSettings()
+    if (!telegramBotToken) return null
+    const form = new FormData()
+    form.set('chat_id', String(chatId))
+    if (caption) form.set('caption', caption)
+    if (kind === 'video') form.set('supports_streaming', 'true')
+    if ('fileId' in source) form.set(kind, source.fileId)
+    else form.set(kind, new Blob([source.data as Uint8Array<ArrayBuffer>], { type: source.contentType }), source.filename)
+    const res = await fetchImpl(`https://api.telegram.org/bot${telegramBotToken}/${MEDIA_METHOD[kind]}`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout('fileId' in source ? 15_000 : 180_000),
+    })
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; result?: Record<string, unknown> } | null
+    if (!res.ok || !json?.ok) return null
+    return { fileId: mediaFileId(kind, json.result) }
+  } catch {
+    return null
+  }
+}
+
+/** file_id of the sent media in a Message (largest photo size; a GIF may come back as animation or document). */
+function mediaFileId(kind: BotMediaKind, msg: Record<string, unknown> | undefined): string | null {
+  if (!msg) return null
+  const id = (v: unknown) => (v && typeof v === 'object' && typeof (v as { file_id?: unknown }).file_id === 'string' ? (v as { file_id: string }).file_id : null)
+  if (kind === 'photo') {
+    const sizes = Array.isArray(msg.photo) ? msg.photo : []
+    return id(sizes[sizes.length - 1])
+  }
+  if (kind === 'video') return id(msg.video) ?? id(msg.document)
+  return id(msg.animation) ?? id(msg.document)
+}

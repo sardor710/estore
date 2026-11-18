@@ -1,66 +1,92 @@
-// Shop -> customer messages (one-way). Each message is stored for the customer's website account (Messages page)
-// and delivered by the shop's Telegram bot. Admin side: one customer (client page) or a broadcast to every
-// customer with an account. Plain text only: the bot sends no parse_mode and the website renders it as text.
+// Shop -> customer messages (one-way posts). Each message is stored for the customer's website account (Messages
+// page) and delivered by the shop's Telegram bot exactly as written: the text, optionally with one photo, GIF or MP4
+// video (sent as the media caption). Admin side: one customer (client page) or a broadcast to every customer with an
+// account. Plain text only: the bot sends no parse_mode and the website renders it as text.
 
+import { readFile } from 'node:fs/promises'
+import { basename } from 'node:path'
 import { prisma } from '@/lib/db'
 import { logActivity } from '@/lib/admin/activity'
 import type { Staff } from '@/lib/admin/session'
-import { inlineKeyboard, sendBotMessage } from '@/lib/telegram-bot/api'
-import { botCopy, type BotLocale } from '@/lib/telegram-bot/messages'
-import { shopButton } from '@/lib/telegram-bot/handler'
+import { sendBotMedia, sendBotMessage, type BotMediaSource } from '@/lib/telegram-bot/api'
+import { CONTENT_TYPES, mediaFile, mediaKindOf, type MediaExt, type MediaKind } from '@/lib/uploads'
 import { runAfterResponse } from '@/lib/after-response'
 
+/** Text-only message limit (Telegram allows 4096). */
 export const MESSAGE_MAX = 2000
+/** With an attachment the text is the media caption: Telegram allows 1024 characters. */
+export const CAPTION_MAX = 1024
 /** Telegram allows ~30 messages/s per bot; stay well below it for broadcasts. */
 const BROADCAST_DELAY_MS = 60
 
 export type TelegramStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'skipped'
+export type MessageInput = { text?: unknown; mediaUrl?: unknown }
 export type SendResult = { ok: true; id: number; telegram: TelegramStatus } | { ok: false; error: string }
 export type BroadcastResult = { ok: true; id: number; recipients: number } | { ok: false; error: string }
 type Deps = { fetchImpl?: typeof fetch; delayMs?: number }
+type Clean = { text: string; mediaUrl: string | null; mediaKind: MediaKind | null }
 
-/** Trimmed text, or an error message for the admin. */
-export function cleanMessageText(raw: unknown): { ok: true; text: string } | { ok: false; error: string } {
-  const text = typeof raw === 'string' ? raw.replace(/\r\n/g, '\n').trim() : ''
-  if (!text) return { ok: false, error: 'Write a message first.' }
-  if (text.length > MESSAGE_MAX) return { ok: false, error: `The message is too long (max ${MESSAGE_MAX} characters).` }
-  return { ok: true, text }
+/** Validated message: trimmed text and an optional attachment previously stored by saveMessageMedia. */
+export function cleanMessage(input: MessageInput): { ok: true; value: Clean } | { ok: false; error: string } {
+  const text = typeof input.text === 'string' ? input.text.replace(/\r\n/g, '\n').trim() : ''
+  const rawUrl = typeof input.mediaUrl === 'string' && input.mediaUrl ? input.mediaUrl : null
+  const mediaKind = rawUrl ? mediaKindOf(rawUrl) : null
+  if (rawUrl && !mediaKind) return { ok: false, error: 'The attachment is not valid. Upload it again.' }
+  if (!text && !rawUrl) return { ok: false, error: 'Write a message or attach a photo or video.' }
+  const max = rawUrl ? CAPTION_MAX : MESSAGE_MAX
+  if (text.length > max) {
+    return { ok: false, error: rawUrl ? `With a photo or video the text can be at most ${CAPTION_MAX} characters.` : `The message is too long (max ${MESSAGE_MAX} characters).` }
+  }
+  return { ok: true, value: { text, mediaUrl: rawUrl, mediaKind } }
 }
 
-const toLocale = (v: string | null | undefined): BotLocale => (v === 'ru' || v === 'en' ? v : 'uz')
+/** The attachment as a fresh upload (first recipient) or Telegram's file_id (every later one). */
+async function mediaSource(url: string, fileId: string | null): Promise<BotMediaSource | null> {
+  if (fileId) return { fileId }
+  const file = mediaFile(url)
+  if (!file) return null
+  const data = new Uint8Array(await readFile(file))
+  return { data, filename: basename(file), contentType: CONTENT_TYPES[basename(file).split('.').pop() as MediaExt] }
+}
+
+/** Per-send state: the attachment's file_id once Telegram has it (broadcasts upload the file only once). */
+type Media = { url: string; kind: MediaKind; fileId: string | null } | null
 
 /** Sends one stored message through the bot and records the outcome on the row. */
-async function deliver(
-  messageId: number,
-  to: { chatId: string | null; locale: string | null },
-  text: string,
-  deps: Deps,
-): Promise<TelegramStatus> {
+async function deliver(messageId: number, chatId: string | null, text: string, media: Media, deps: Deps): Promise<TelegramStatus> {
   let status: TelegramStatus = 'skipped'
-  if (to.chatId) {
-    const locale = toLocale(to.locale)
-    const copy = botCopy(locale)
-    const button = shopButton(copy.messagesButton, `/${locale}/account/messages`)
-    const ok = await sendBotMessage(to.chatId, copy.shopMessage(text), button ? inlineKeyboard([[button]]) : undefined, deps.fetchImpl)
-    status = ok ? 'sent' : 'failed'
+  if (chatId) {
+    if (media) {
+      const source = await mediaSource(media.url, media.fileId).catch(() => null)
+      const r = source ? await sendBotMedia(chatId, media.kind, source, text, deps.fetchImpl) : null
+      if (r?.fileId) media.fileId = r.fileId
+      status = r ? 'sent' : 'failed'
+    } else {
+      status = (await sendBotMessage(chatId, text, undefined, deps.fetchImpl)) ? 'sent' : 'failed'
+    }
   }
   await prisma.customerMessage.update({ where: { id: messageId }, data: { telegram: status } })
   return status
 }
 
+const mediaOf = (v: Clean): Media => (v.mediaUrl && v.mediaKind ? { url: v.mediaUrl, kind: v.mediaKind, fileId: null } : null)
+
 /** Admin -> one customer. Needs a website account (that is where the message lives); always sent to Telegram. */
-export async function sendCustomerMessage(customerId: number, rawText: unknown, staff: Staff, deps: Deps = {}): Promise<SendResult> {
-  const t = cleanMessageText(rawText)
-  if (!t.ok) return t
+export async function sendCustomerMessage(customerId: number, input: MessageInput, staff: Staff, deps: Deps = {}): Promise<SendResult> {
+  const c0 = cleanMessage(input)
+  if (!c0.ok) return c0
+  const v = c0.value
   const c = await prisma.customer.findUnique({
     where: { id: customerId },
-    select: { id: true, name: true, accountCreatedAt: true, telegramChatId: true, accountLocale: true },
+    select: { id: true, name: true, accountCreatedAt: true, telegramChatId: true },
   })
   if (!c) return { ok: false, error: 'Client not found.' }
   if (!c.accountCreatedAt) return { ok: false, error: 'This client has no account yet (they have not signed in with Telegram).' }
-  const m = await prisma.customerMessage.create({ data: { customerId: c.id, text: t.text, createdBy: staff.email } })
-  const telegram = await deliver(m.id, { chatId: c.telegramChatId, locale: c.accountLocale }, t.text, deps)
-  await logActivity(staff, 'create', 'message', m.id, `Sent a message to client #${c.id} ${c.name} (Telegram: ${telegram})`)
+  const m = await prisma.customerMessage.create({
+    data: { customerId: c.id, text: v.text, mediaUrl: v.mediaUrl, mediaKind: v.mediaKind, createdBy: staff.email },
+  })
+  const telegram = await deliver(m.id, c.telegramChatId, v.text, mediaOf(v), deps)
+  await logActivity(staff, 'create', 'message', m.id, `Sent a message${v.mediaKind ? ` (${v.mediaKind})` : ''} to client #${c.id} ${c.name} (Telegram: ${telegram})`)
   return { ok: true, id: m.id, telegram }
 }
 
@@ -80,32 +106,42 @@ export async function broadcastAudience(): Promise<{ accounts: number; telegram:
  * Admin -> every customer with an account. Stored for all of them right away; Telegram copies go out in the
  * background (throttled) and only to customers with notifications on.
  */
-export async function broadcastMessage(rawText: unknown, staff: Staff, deps: Deps = {}): Promise<BroadcastResult> {
-  const t = cleanMessageText(rawText)
-  if (!t.ok) return t
-  const customers = await prisma.customer.findMany({
-    where: broadcastWhere,
-    select: { id: true, telegramChatId: true, accountLocale: true, notifyTelegram: true },
-    orderBy: { id: 'asc' },
-  })
+export async function broadcastMessage(input: MessageInput, staff: Staff, deps: Deps = {}): Promise<BroadcastResult> {
+  const c0 = cleanMessage(input)
+  if (!c0.ok) return c0
+  const v = c0.value
+  const customers = await prisma.customer.findMany({ where: broadcastWhere, select: { id: true }, orderBy: { id: 'asc' } })
   if (!customers.length) return { ok: false, error: 'No customers with an account yet.' }
   const b = await prisma.$transaction(async (tx) => {
-    const b = await tx.messageBroadcast.create({ data: { text: t.text, recipients: customers.length, createdBy: staff.email } })
+    const b = await tx.messageBroadcast.create({
+      data: { text: v.text, mediaUrl: v.mediaUrl, mediaKind: v.mediaKind, recipients: customers.length, createdBy: staff.email },
+    })
     await tx.customerMessage.createMany({
-      data: customers.map((c) => ({ customerId: c.id, text: t.text, broadcastId: b.id, createdBy: staff.email })),
+      data: customers.map((c) => ({
+        customerId: c.id,
+        text: v.text,
+        mediaUrl: v.mediaUrl,
+        mediaKind: v.mediaKind,
+        broadcastId: b.id,
+        createdBy: staff.email,
+      })),
     })
     return b
   })
-  await logActivity(staff, 'create', 'message', `broadcast-${b.id}`, `Broadcast a message to ${customers.length} customers`)
-  runAfterResponse(() => deliverBroadcast(b.id, t.text, deps))
+  await logActivity(staff, 'create', 'message', `broadcast-${b.id}`, `Broadcast a message${v.mediaKind ? ` (${v.mediaKind})` : ''} to ${customers.length} customers`)
+  runAfterResponse(() => deliverBroadcast(b.id, deps))
   return { ok: true, id: b.id, recipients: customers.length }
 }
 
-/** Sends the pending copies of a broadcast one by one. Exported for tests. */
-export async function deliverBroadcast(broadcastId: number, text: string, deps: Deps = {}): Promise<void> {
+/** Sends the pending copies of a broadcast one by one (the attachment is uploaded once). Exported for tests. */
+export async function deliverBroadcast(broadcastId: number, deps: Deps = {}): Promise<void> {
+  const b = await prisma.messageBroadcast.findUnique({ where: { id: broadcastId } })
+  if (!b) return
+  const kind = b.mediaUrl ? mediaKindOf(b.mediaUrl) : null
+  const media: Media = b.mediaUrl && kind ? { url: b.mediaUrl, kind, fileId: null } : null
   const rows = await prisma.customerMessage.findMany({
     where: { broadcastId, telegram: 'pending' },
-    select: { id: true, customer: { select: { telegramChatId: true, accountLocale: true, notifyTelegram: true } } },
+    select: { id: true, customer: { select: { telegramChatId: true, notifyTelegram: true } } },
     orderBy: { id: 'asc' },
   })
   const delay = deps.delayMs ?? BROADCAST_DELAY_MS
@@ -115,7 +151,7 @@ export async function deliverBroadcast(broadcastId: number, text: string, deps: 
     if (claimed.count !== 1) continue
     const chatId = r.customer.notifyTelegram ? r.customer.telegramChatId : null
     try {
-      await deliver(r.id, { chatId, locale: r.customer.accountLocale }, text, deps)
+      await deliver(r.id, chatId, b.text, media, deps)
     } catch {
       await prisma.customerMessage.updateMany({ where: { id: r.id }, data: { telegram: 'failed' } }).catch(() => {})
     }
@@ -129,7 +165,7 @@ export function listClientMessages(customerId: number, take = 50) {
     where: { customerId },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take,
-    select: { id: true, text: true, telegram: true, readAt: true, createdAt: true, createdBy: true, broadcastId: true },
+    select: { id: true, text: true, mediaUrl: true, mediaKind: true, telegram: true, readAt: true, createdAt: true, createdBy: true, broadcastId: true },
   })
 }
 
@@ -155,7 +191,7 @@ export function listAccountMessages(customerId: number, take = 100) {
     where: { customerId },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take,
-    select: { id: true, text: true, readAt: true, createdAt: true },
+    select: { id: true, text: true, mediaUrl: true, mediaKind: true, readAt: true, createdAt: true },
   })
 }
 

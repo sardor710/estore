@@ -10,6 +10,7 @@ import { Badge, EmptyState, PageHeader, card } from '@/components/admin/ui'
 import BackLink from '@/components/admin/BackLink'
 import ClientEditor from '@/components/admin/ClientEditor'
 import MessageComposer from '@/components/admin/MessageComposer'
+import MessageMedia from '@/components/MessageMedia'
 import { listClientMessages } from '@/lib/customer-messages'
 import { TELEGRAM_TONE } from '@/components/admin/message-status'
 
@@ -87,7 +88,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           <h2 className="mb-1 text-base font-semibold text-neutral-900">Messages</h2>
           {c.accountCreatedAt ? (
             <>
-              <p className="mb-3 text-sm text-neutral-500">Shown in the customer’s account (Messages) and sent by the Telegram bot. Customers cannot reply here.</p>
+              <p className="mb-3 text-sm text-neutral-500">Customers get exactly this post (text and/or photo/video) in the Telegram bot and in their account (Messages). They cannot reply here.</p>
               <MessageComposer mode="client" customerId={c.id} />
               {messages.length === 0 ? (
                 <div className="mt-4">
@@ -104,7 +105,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                         <Badge tone={TELEGRAM_TONE[m.telegram] ?? 'neutral'}>Telegram: {m.telegram}</Badge>
                         <Badge tone={m.readAt ? 'green' : 'neutral'}>{m.readAt ? 'Read on site' : 'Unread on site'}</Badge>
                       </div>
-                      <p className="whitespace-pre-line break-words text-sm text-neutral-900">{m.text}</p>
+                      <MessageMedia url={m.mediaUrl} kind={m.mediaKind} className="mb-2 max-h-48" />
+                      {m.text ? <p className="whitespace-pre-line break-words text-sm text-neutral-900">{m.text}</p> : null}
                     </li>
                   ))}
                 </ul>

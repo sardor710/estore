@@ -7,6 +7,7 @@ import { listAccountMessages, markMessagesRead } from '@/lib/customer-messages'
 import { path } from '@/lib/paths'
 import { accountMetadata } from '@/components/account/server'
 import { formatDateTime } from '@/components/account/format'
+import MessageMedia from '@/components/MessageMedia'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,8 @@ export default async function AccountMessagesPage({ params }: { params: Promise<
                 <time dateTime={m.createdAt.toISOString()}>{formatDateTime(m.createdAt, locale)}</time>
                 {!m.readAt ? <span className="rounded-full bg-neutral-900 px-2 py-0.5 font-semibold text-white">{t('new')}</span> : null}
               </div>
-              <p className="whitespace-pre-line break-words text-neutral-900">{m.text}</p>
+              <MessageMedia url={m.mediaUrl} kind={m.mediaKind} className="mb-3" />
+              {m.text ? <p className="whitespace-pre-line break-words text-neutral-900">{m.text}</p> : null}
             </li>
           ))}
         </ul>
