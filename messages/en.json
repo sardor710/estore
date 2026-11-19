@@ -441,6 +441,7 @@
     "mapHint": "Move the map so the pin points at your door",
     "mapLoading": "Loading map…",
     "mapError": "The map could not load. Please just type the address.",
-    "myLocation": "My location"
+    "myLocation": "My location",
+    "mapSyncHint": "Type the address above or move the map: each fills in the other"
   }
 }

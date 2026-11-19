@@ -49,7 +49,20 @@ function locate(): Promise<LatLng | Err> {
 }
 
 /** Optional delivery pin: the Yandex map when a key is configured, else "Share my location" -> attached (view / remove). */
-export default function LocationButton({ value, onChange }: { value: LatLng | null; onChange(v: LatLng | null): void }) {
+export default function LocationButton({
+  value,
+  onChange,
+  address,
+  region,
+  onAddress,
+}: {
+  value: LatLng | null
+  onChange(v: LatLng | null): void
+  /** Address-field text and region name: with `onAddress` the map and the address field follow each other. */
+  address?: string
+  region?: string
+  onAddress?(text: string, regionCode: string | null): void
+}) {
   const t = useTranslations('location')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<Err | null>(null)
@@ -58,7 +71,7 @@ export default function LocationButton({ value, onChange }: { value: LatLng | nu
   if (YANDEX_MAPS_KEY) {
     return (
       <div>
-        <MapPicker value={value} onChange={onChange} locate={locate} />
+        <MapPicker value={value} onChange={onChange} locate={locate} address={address} region={region} onAddress={onAddress} />
         <p className="mt-1 text-xs text-neutral-500">{t('hint')}</p>
       </div>
     )

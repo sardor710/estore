@@ -315,7 +315,16 @@ export default function CheckoutForm({
             )}
           </div>
         )}
-        <LocationButton value={pin} onChange={setPin} />
+        <LocationButton
+          value={pin}
+          onChange={setPin}
+          address={values.address}
+          region={regions.find((r) => r.code === values.region)?.name}
+          onAddress={(address, region) => {
+            setValues((v) => ({ ...v, address, region: region && regions.some((r) => r.code === region) ? region : v.region }))
+            setErrors((e) => ({ ...e, address: undefined, region: region ? undefined : e.region }))
+          }}
+        />
         {field(
           'comment',
           t('comment'),

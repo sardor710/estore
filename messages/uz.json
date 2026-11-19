@@ -441,6 +441,7 @@
     "mapHint": "Belgi uyingizni koʻrsatishi uchun xaritani suring",
     "mapLoading": "Xarita yuklanmoqda…",
     "mapError": "Xaritani yuklab boʻlmadi. Manzilni yozing.",
-    "myLocation": "Mening joylashuvim"
+    "myLocation": "Mening joylashuvim",
+    "mapSyncHint": "Manzilni yuqorida yozing yoki xaritani suring — biri ikkinchisini toʻldiradi"
   }
 }
