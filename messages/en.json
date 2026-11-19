@@ -437,14 +437,10 @@
     "remove": "Remove",
     "denied": "Location access was denied. Allow it in your phone settings or just type the address.",
     "unavailable": "Could not get your location. Please type the address.",
-    "pickOnMap": "Choose on map",
     "pickTitle": "Choose delivery location",
     "mapHint": "Move the map so the pin points at your door",
     "mapLoading": "Loading map…",
-    "mapError": "The map could not load. Use “Share my location” or just type the address.",
-    "myLocation": "My location",
-    "confirm": "Deliver here",
-    "cancel": "Cancel",
-    "change": "Change"
+    "mapError": "The map could not load. Please just type the address.",
+    "myLocation": "My location"
   }
 }

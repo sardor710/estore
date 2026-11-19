@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Loader2, Map as MapIcon, MapPin, X } from 'lucide-react'
+import { Loader2, MapPin, X } from 'lucide-react'
 import { mapLinks, type LatLng } from '@/lib/geo'
 import { getWebApp } from '@/components/tg/webapp'
 import MapPicker, { YANDEX_MAPS_KEY } from './MapPicker'
@@ -48,27 +48,21 @@ function locate(): Promise<LatLng | Err> {
   })
 }
 
-/** Optional delivery pin: "Share my location" -> attached (view on map / remove). */
+/** Optional delivery pin: the Yandex map when a key is configured, else "Share my location" -> attached (view / remove). */
 export default function LocationButton({ value, onChange }: { value: LatLng | null; onChange(v: LatLng | null): void }) {
   const t = useTranslations('location')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<Err | null>(null)
-  const [picking, setPicking] = useState(false)
-  const [address, setAddress] = useState<string | null>(null)
-  const canPick = YANDEX_MAPS_KEY !== ''
-  const picker = picking && (
-    <MapPicker
-      initial={value}
-      locate={locate}
-      onClose={() => setPicking(false)}
-      onPick={(p, a) => {
-        setPicking(false)
-        setError(null)
-        setAddress(a)
-        onChange(p)
-      }}
-    />
-  )
+
+  // With a Yandex key the map is always on the page; it handles "my location" itself.
+  if (YANDEX_MAPS_KEY) {
+    return (
+      <div>
+        <MapPicker value={value} onChange={onChange} locate={locate} />
+        <p className="mt-1 text-xs text-neutral-500">{t('hint')}</p>
+      </div>
+    )
+  }
 
   const share = async () => {
     setBusy(true)
@@ -76,10 +70,7 @@ export default function LocationButton({ value, onChange }: { value: LatLng | nu
     const r = await locate()
     setBusy(false)
     if (typeof r === 'string') setError(r)
-    else {
-      setAddress(null)
-      onChange(r)
-    }
+    else onChange(r)
   }
 
   if (value) {
@@ -87,19 +78,12 @@ export default function LocationButton({ value, onChange }: { value: LatLng | nu
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
         <MapPin size={16} className="text-emerald-700" aria-hidden />
         <span className="font-semibold text-emerald-800">{t('attached')}</span>
-        {address && <span className="basis-full text-emerald-900 sm:basis-auto">{address}</span>}
-        {canPick && (
-          <button type="button" onClick={() => setPicking(true)} className="text-emerald-800 underline">
-            {t('change')}
-          </button>
-        )}
         <a href={mapLinks(value.lat, value.lng).google} target="_blank" rel="noopener noreferrer" className="text-emerald-800 underline">
           {t('view')}
         </a>
         <button type="button" onClick={() => onChange(null)} className="ml-auto inline-flex items-center gap-1 text-neutral-600 hover:text-neutral-900">
           <X size={14} aria-hidden /> {t('remove')}
         </button>
-        {picker}
       </div>
     )
   }
@@ -114,16 +98,6 @@ export default function LocationButton({ value, onChange }: { value: LatLng | nu
         {busy && <Loader2 size={15} className="animate-spin" aria-hidden />}
         {busy ? t('locating') : t('share')}
       </button>
-      {canPick && (
-        <button
-          type="button"
-          onClick={() => setPicking(true)}
-          className="ml-2 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:border-neutral-400"
-        >
-          <MapIcon size={15} aria-hidden /> {t('pickOnMap')}
-        </button>
-      )}
-      {picker}
       <p className="mt-1 text-xs text-neutral-500">{t('hint')}</p>
       {error && (
         <p role="alert" className="mt-1 text-xs font-medium text-red-600">

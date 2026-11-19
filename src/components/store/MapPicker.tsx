@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useLocale, useTranslations } from 'next-intl'
 import { Crosshair, Loader2, MapPin, X } from 'lucide-react'
 import type { LatLng } from '@/lib/geo'
@@ -72,46 +71,47 @@ async function reverseGeocode(p: LatLng, lang: string, signal: AbortSignal): Pro
 }
 
 /**
- * Full-screen map dialog: the shopper drags the map under a fixed centre pin (or taps a spot), sees the street
- * address and confirms. `locate` is the device-location lookup shared with LocationButton.
+ * Always-visible delivery map: the shopper drags the map under a fixed centre pin (or taps a spot, or uses
+ * "my location"), and the point is attached as soon as the map settles. The street address shows underneath.
+ * `locate` is the device-location lookup shared with LocationButton.
  */
 export default function MapPicker({
-  initial,
-  onPick,
-  onClose,
+  value,
+  onChange,
   locate,
 }: {
-  initial: LatLng | null
-  onPick(p: LatLng, address: string | null): void
-  onClose(): void
+  value: LatLng | null
+  onChange(p: LatLng | null): void
   locate(): Promise<LatLng | string>
 }) {
   const t = useTranslations('location')
   const lang = LANG[useLocale()] ?? 'ru_RU'
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<YMapInstance | null>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [center, setCenter] = useState<LatLng>(initial ?? TASHKENT)
   const [moving, setMoving] = useState(false)
   const [address, setAddress] = useState<string | null>(null)
   const [geoBusy, setGeoBusy] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    const start = initial ?? TASHKENT
+    const start = value ?? TASHKENT
     loadYmaps(lang)
       .then((y) => {
         if (cancelled || !el.current) return
         const m = new y.Map(
           el.current,
-          { center: [start.lat, start.lng], zoom: initial ? 17 : 12, controls: ['zoomControl'] },
+          { center: [start.lat, start.lng], zoom: value ? 17 : 12, controls: ['zoomControl'] },
           { suppressMapOpenBlock: true, yandexMapDisablePoiInteractivity: true },
         )
         m.events.add('actionbegin', () => setMoving(true))
         m.events.add('actionend', () => {
           const [lat, lng] = m.getCenter()
           setMoving(false)
-          setCenter({ lat: round6(lat), lng: round6(lng) })
+          onChangeRef.current({ lat: round6(lat), lng: round6(lng) })
         })
         m.events.add('click', (e) => m.setCenter(e.get('coords'), undefined, { duration: 300 }))
         map.current = m
@@ -123,104 +123,93 @@ export default function MapPicker({
       map.current?.destroy()
       map.current = null
     }
-    // the map is created once per opening; later `initial` changes are irrelevant while it is open
+    // the map is created once; later value changes move it (below) instead of rebuilding it
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang])
 
-  // Address under the pin, after the map settles.
+  // A pin set from outside (a saved address, "Share my location") moves the map there.
   useEffect(() => {
-    if (state !== 'ready' || moving) return
+    const m = map.current
+    if (!m || !value) return
+    const [lat, lng] = m.getCenter()
+    if (Math.abs(lat - value.lat) > 1e-5 || Math.abs(lng - value.lng) > 1e-5) m.setCenter([value.lat, value.lng], 17)
+  }, [value, state])
+
+  // Street address of the attached point, after the map settles.
+  useEffect(() => {
+    setAddress(null)
+    if (!value || moving) return
     const ac = new AbortController()
-    const timer = setTimeout(() => {
-      setAddress(null)
-      reverseGeocode(center, lang, ac.signal).then((a) => !ac.signal.aborted && setAddress(a))
-    }, 350)
+    const timer = setTimeout(() => reverseGeocode(value, lang, ac.signal).then((a) => !ac.signal.aborted && setAddress(a)), 300)
     return () => {
       clearTimeout(timer)
       ac.abort()
     }
-  }, [center, moving, state, lang])
-
-  // Esc closes; the page behind does not scroll.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-    }
-  }, [onClose])
+  }, [value, moving, lang])
 
   const goToMe = async () => {
     setGeoBusy(true)
+    setGeoError(null)
     const r = await locate()
     setGeoBusy(false)
-    if (typeof r !== 'string') map.current?.setCenter([r.lat, r.lng], 17, { duration: 400 })
+    if (typeof r === 'string') return setGeoError(r)
+    map.current?.setCenter([r.lat, r.lng], 17)
+    onChange(r)
   }
 
-  // Portalled to <body> so no sticky header or stacking context of the form can sit above the dialog.
-  return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={t('pickTitle')} className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
-      <div className="flex h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white sm:h-[80vh] sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
-          <h2 className="text-base font-semibold text-neutral-900">{t('pickTitle')}</h2>
-          <button type="button" onClick={onClose} aria-label={t('cancel')} className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900">
-            <X size={20} aria-hidden />
-          </button>
-        </div>
-
-        <div className="relative flex-1 bg-neutral-100">
-          <div ref={el} className="absolute inset-0" />
-          {state === 'loading' && (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-neutral-500">
-              <Loader2 size={18} className="mr-2 animate-spin" aria-hidden /> {t('mapLoading')}
+  return (
+    <div>
+      <div className="relative h-72 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 sm:h-80">
+        <div ref={el} className="absolute inset-0" aria-label={t('pickTitle')} />
+        {state === 'loading' && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-neutral-500">
+            <Loader2 size={18} className="mr-2 animate-spin" aria-hidden /> {t('mapLoading')}
+          </div>
+        )}
+        {state === 'error' && (
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-red-600">{t('mapError')}</div>
+        )}
+        {state === 'ready' && (
+          <>
+            {/* Fixed centre pin: its tip marks the chosen point. */}
+            <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full" aria-hidden>
+              <MapPin
+                size={40}
+                strokeWidth={2.2}
+                className={`drop-shadow transition-transform ${value ? 'fill-red-500 text-red-700' : 'fill-neutral-300 text-neutral-500'} ${moving ? '-translate-y-2' : ''}`}
+              />
             </div>
-          )}
-          {state === 'error' && (
-            <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-red-600">{t('mapError')}</div>
-          )}
-          {state === 'ready' && (
-            <>
-              {/* Fixed centre pin: its tip marks the chosen point. */}
-              <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full" aria-hidden>
-                <MapPin size={40} strokeWidth={2.2} className={`fill-red-500 text-red-700 drop-shadow transition-transform ${moving ? '-translate-y-2' : ''}`} />
-              </div>
-              <button
-                type="button"
-                onClick={goToMe}
-                disabled={geoBusy}
-                aria-label={t('myLocation')}
-                title={t('myLocation')}
-                className="absolute bottom-4 right-4 rounded-full bg-white p-3 text-neutral-800 shadow-md hover:bg-neutral-50 disabled:opacity-70"
-              >
-                {geoBusy ? <Loader2 size={20} className="animate-spin" aria-hidden /> : <Crosshair size={20} aria-hidden />}
-              </button>
-            </>
-          )}
-        </div>
-
-        <div className="space-y-3 border-t border-neutral-100 px-4 py-3">
-          <p className="min-h-[1.25rem] text-sm text-neutral-700" aria-live="polite">
-            {state === 'ready' ? (moving ? t('mapHint') : address ?? `${center.lat}, ${center.lng}`) : ''}
-          </p>
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="flex-1 rounded-full border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-800 hover:border-neutral-400">
-              {t('cancel')}
-            </button>
             <button
               type="button"
-              disabled={state !== 'ready' || moving}
-              onClick={() => onPick(center, address)}
-              className="flex-[2] rounded-full bg-neutral-900 px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-700 disabled:opacity-50"
+              onClick={goToMe}
+              disabled={geoBusy}
+              aria-label={t('myLocation')}
+              title={t('myLocation')}
+              className="absolute bottom-10 right-3 rounded-full bg-white p-3 text-neutral-800 shadow-md hover:bg-neutral-50 disabled:opacity-70"
             >
-              {t('confirm')}
+              {geoBusy ? <Loader2 size={20} className="animate-spin" aria-hidden /> : <Crosshair size={20} aria-hidden />}
             </button>
-          </div>
-        </div>
+          </>
+        )}
       </div>
-    </div>,
-    document.body,
+      <div className="mt-2 flex items-start gap-3 text-sm" aria-live="polite">
+        {value ? (
+          <>
+            <MapPin size={16} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden />
+            <span className="text-neutral-800">{moving ? t('mapHint') : address ?? `${value.lat}, ${value.lng}`}</span>
+            <button type="button" onClick={() => onChange(null)} className="ml-auto inline-flex shrink-0 items-center gap-1 text-neutral-600 hover:text-neutral-900">
+              <X size={14} aria-hidden /> {t('remove')}
+            </button>
+          </>
+        ) : (
+          <span className="text-neutral-500">{t('mapHint')}</span>
+        )}
+      </div>
+      {geoError && (
+        <p role="alert" className="mt-1 text-xs font-medium text-red-600">
+          {t(geoError)}
+        </p>
+      )}
+    </div>
   )
 }
