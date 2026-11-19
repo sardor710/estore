@@ -436,6 +436,15 @@
     "view": "Xaritada koʻrish",
     "remove": "Olib tashlash",
     "denied": "Joylashuvga ruxsat berilmadi. Telefon sozlamalarida ruxsat bering yoki manzilni yozing.",
-    "unavailable": "Joylashuvni aniqlab boʻlmadi. Manzilni yozing."
+    "unavailable": "Joylashuvni aniqlab boʻlmadi. Manzilni yozing.",
+    "pickOnMap": "Xaritadan tanlash",
+    "pickTitle": "Yetkazib berish joyini tanlang",
+    "mapHint": "Belgi uyingizni koʻrsatishi uchun xaritani suring",
+    "mapLoading": "Xarita yuklanmoqda…",
+    "mapError": "Xaritani yuklab boʻlmadi. Joylashuvni yuboring yoki manzilni yozing.",
+    "myLocation": "Mening joylashuvim",
+    "confirm": "Shu yerga yetkazish",
+    "cancel": "Bekor qilish",
+    "change": "Oʻzgartirish"
   }
 }
