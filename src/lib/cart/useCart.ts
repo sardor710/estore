@@ -74,6 +74,25 @@ function subscribeDrawer(cb: () => void) {
   }
 }
 
+export const isCartDrawerOpen = () => drawerOpen
+export const getCartLines = (): CartLine[] => getCartSnapshot()
+
+/**
+ * Adds to the cart without opening the drawer (the shopper opens it from the cart icon or the toast).
+ * Returns whether the variant's quantity actually changed (false when `max` stock is already in the cart).
+ */
+export function addToCart(variantId: number, qty: number, max?: number): boolean {
+  ensureLoaded()
+  const before = lines.find((l) => l.variantId === variantId)?.qty ?? 0
+  const next = addItem(lines, variantId, qty, max)
+  const after = next.find((l) => l.variantId === variantId)?.qty ?? 0
+  if (after === before) return false
+  emit(next)
+  return true
+}
+
+export const clearCart = () => emit(EMPTY)
+
 /** Shared open/close state of the cart drawer. */
 export function useCartDrawer(): { open: boolean; setOpen(open: boolean): void } {
   const open = useSyncExternalStore(subscribeDrawer, () => drawerOpen, () => false)
@@ -82,23 +101,18 @@ export function useCartDrawer(): { open: boolean; setOpen(open: boolean): void }
 
 export function useCart(): {
   lines: CartLine[]
-  add(variantId: number, qty: number, max?: number): void
+  /** True when the cart changed; never opens the drawer. */
+  add(variantId: number, qty: number, max?: number): boolean
   setQty(variantId: number, qty: number): void
   remove(variantId: number): void
   clear(): void
   count: number
 } {
   const current = useSyncExternalStore(subscribeCart, getCartSnapshot, getServerCart)
-  const add = useCallback((variantId: number, qty: number, max?: number) => {
-    ensureLoaded()
-    const next = addItem(lines, variantId, qty, max)
-    if (next === lines) return
-    emit(next)
-    setDrawer(true)
-  }, [])
+  const add = useCallback((variantId: number, qty: number, max?: number) => addToCart(variantId, qty, max), [])
   const setQty = useCallback((variantId: number, qty: number) => emit(setLineQty(getCartSnapshot(), variantId, qty)), [])
   const remove = useCallback((variantId: number) => emit(removeItem(getCartSnapshot(), variantId)), [])
-  const clear = useCallback(() => emit(EMPTY), [])
+  const clear = useCallback(() => clearCart(), [])
   const count = useMemo(() => countLines(current), [current])
   return { lines: current, add, setQty, remove, clear, count }
 }

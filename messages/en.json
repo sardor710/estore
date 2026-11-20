@@ -44,6 +44,13 @@
     "empty": "No products in this category yet.",
     "subcategories": "Subcategories"
   },
+  "cartToast": {
+    "added": "Added to cart",
+    "addedMany": "{count, plural, one {# item} other {# items}} added to cart",
+    "max": "The maximum available quantity is already in your cart",
+    "view": "View cart",
+    "close": "Close"
+  },
   "product": {
     "from": "from {price}",
     "add": "Add to cart",
@@ -445,6 +452,12 @@
     "view": "View on map",
     "remove": "Remove",
     "denied": "Location access was denied. Allow it in your phone settings or just type the address.",
-    "unavailable": "Could not get your location. Please type the address."
+    "unavailable": "Could not get your location. Please type the address.",
+    "pickTitle": "Choose delivery location",
+    "mapHint": "Move the map so the pin points at your door",
+    "mapLoading": "Loading map…",
+    "mapError": "The map could not load. Please just type the address.",
+    "myLocation": "My location",
+    "mapSyncHint": "Type the address above or move the map: each fills in the other"
   }
 }

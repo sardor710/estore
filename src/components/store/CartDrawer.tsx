@@ -24,6 +24,9 @@ export default function CartDrawer({ locale, telegram = false }: { locale: Local
   useEffect(() => {
     if (!open) return
     const prev = document.body.style.overflow
+    // Return focus to whatever opened the drawer (cart icon, toast button) when it closes.
+    const active = document.activeElement
+    const opener = active instanceof HTMLElement && active !== document.body ? active : null
     document.body.style.overflow = 'hidden'
     closeRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
@@ -33,6 +36,9 @@ export default function CartDrawer({ locale, telegram = false }: { locale: Local
     return () => {
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
+      // the toast's "View cart" button is gone by now: fall back to the cart icon
+      const back = opener?.isConnected ? opener : document.querySelector<HTMLElement>('button[data-cart-target], [data-cart-target]')?.closest('button')
+      back?.focus({ preventScroll: true })
     }
   }, [open, setOpen])
 

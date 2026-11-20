@@ -329,7 +329,16 @@ function AddressForm({
         </div>
       </div>
       <div className="mt-4">
-        <LocationButton value={pin} onChange={(p) => setV((s) => ({ ...s, lat: p?.lat ?? null, lng: p?.lng ?? null }))} />
+        <LocationButton
+          value={pin}
+          onChange={(p) => setV((s) => ({ ...s, lat: p?.lat ?? null, lng: p?.lng ?? null }))}
+          address={v.address}
+          region={regions.find((r) => r.code === v.region)?.name}
+          onAddress={(address, region) => {
+            setV((s) => ({ ...s, address, region: region && regions.some((r) => r.code === region) ? region : s.region }))
+            setErrors((e) => ({ ...e, address: undefined, region: region ? undefined : e.region }))
+          }}
+        />
       </div>
       <label className="mt-4 flex items-center gap-2.5 text-sm text-neutral-800">
         <input type="checkbox" checked={v.isDefault} onChange={set('isDefault')} className="h-4 w-4 accent-neutral-900" />

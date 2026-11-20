@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { addItem, setQty, removeItem, countLines, type CartLine } from '@/lib/cart/cart'
+import { addToCart, clearCart, getCartLines, isCartDrawerOpen } from '@/lib/cart/useCart'
 
 describe('cart ops', () => {
   it('adds new line and merges existing', () => {
@@ -32,5 +33,23 @@ describe('cart ops', () => {
     const l: CartLine[] = [{ variantId: 1, qty: 2 }, { variantId: 2, qty: 3 }]
     expect(removeItem(l, 1)).toEqual([{ variantId: 2, qty: 3 }])
     expect(countLines(l)).toBe(5)
+  })
+})
+
+describe('cart store', () => {
+  beforeEach(() => clearCart())
+  it('adding reports a change and never opens the drawer', () => {
+    expect(addToCart(7, 1, 5)).toBe(true)
+    expect(isCartDrawerOpen()).toBe(false)
+    expect(getCartLines()).toEqual([{ variantId: 7, qty: 1 }])
+  })
+  it('reports no change when the stock cap is already reached', () => {
+    expect(addToCart(7, 5, 5)).toBe(true)
+    expect(addToCart(7, 1, 5)).toBe(false)
+    expect(getCartLines()).toEqual([{ variantId: 7, qty: 5 }])
+  })
+  it('reports no change for a non-positive qty', () => {
+    expect(addToCart(7, 0)).toBe(false)
+    expect(getCartLines()).toEqual([])
   })
 })

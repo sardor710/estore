@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Loader2, MapPin, X } from 'lucide-react'
 import { mapLinks, type LatLng } from '@/lib/geo'
 import { getWebApp } from '@/components/tg/webapp'
+import MapPicker, { YANDEX_MAPS_KEY } from './MapPicker'
 
 type Err = 'denied' | 'unavailable'
 const TIMEOUT_MS = 10_000
@@ -47,11 +48,34 @@ function locate(): Promise<LatLng | Err> {
   })
 }
 
-/** Optional delivery pin: "Share my location" -> attached (view on map / remove). */
-export default function LocationButton({ value, onChange }: { value: LatLng | null; onChange(v: LatLng | null): void }) {
+/** Optional delivery pin: the Yandex map when a key is configured, else "Share my location" -> attached (view / remove). */
+export default function LocationButton({
+  value,
+  onChange,
+  address,
+  region,
+  onAddress,
+}: {
+  value: LatLng | null
+  onChange(v: LatLng | null): void
+  /** Address-field text and region name: with `onAddress` the map and the address field follow each other. */
+  address?: string
+  region?: string
+  onAddress?(text: string, regionCode: string | null): void
+}) {
   const t = useTranslations('location')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<Err | null>(null)
+
+  // With a Yandex key the map is always on the page; it handles "my location" itself.
+  if (YANDEX_MAPS_KEY) {
+    return (
+      <div>
+        <MapPicker value={value} onChange={onChange} locate={locate} address={address} region={region} onAddress={onAddress} />
+        <p className="mt-1 text-xs text-neutral-500">{t('hint')}</p>
+      </div>
+    )
+  }
 
   const share = async () => {
     setBusy(true)

@@ -52,6 +52,16 @@ const reload = (id: number) =>
   prisma.product.findUniqueOrThrow({ where: { id }, include: { variants: true } })
 
 describe('translateProduct', () => {
+  it('translates imported banners and FAQ, skips an empty banner heading, keeps the import fields', async () => {
+    const banner = { heading: { en: '' }, body: { en: 'Body' }, image: 'https://cdn.example/d.png', imageMobile: 'https://cdn.example/m.png', layout: 'banner', sourceKey: 'k' }
+    const faq = { q: { en: 'Q?' }, a: { en: 'A.' }, sourceKey: 'q', hidden: true }
+    const p = await mkProduct({ sections: [banner], faq: [faq] })
+    expect((await translateProduct(p.id, { translator: fake })).status).toBe('done')
+    const q = await reload(p.id)
+    expect((q.sections as any)[0]).toEqual({ ...banner, body: { en: 'Body', uz: '[uz] Body', ru: '[ru] Body' } })
+    expect((q.faq as any)[0]).toEqual({ ...faq, q: { en: 'Q?', uz: '[uz] Q?', ru: '[ru] Q?' }, a: { en: 'A.', uz: '[uz] A.', ru: '[ru] A.' } })
+  })
+
   it('fills uz and ru for every translatable field and leaves en', async () => {
     const p = await mkProduct()
     await prisma.specLabel.createMany({

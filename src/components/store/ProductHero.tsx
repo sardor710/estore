@@ -9,6 +9,8 @@ import type { Locale } from '@/i18n/routing'
 import { t as l10n } from '@/lib/localized'
 import { formatUzs } from '@/lib/money'
 import { useCart } from '@/lib/cart/useCart'
+import { flyToCart } from '@/lib/cart/flyToCart'
+import { showCartToast } from '@/lib/cart/cartToast'
 import { stepIndex, visibleIndex } from '@/lib/gallery'
 import FavoriteButton from '@/components/account/FavoriteButton'
 
@@ -68,9 +70,14 @@ export default function ProductHero({ locale, productId, template, title, subtit
     if (idx != null && images[idx]) setImageIdx(idx)
   }
 
-  const addToCart = () => {
+  const addToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!variant || !inStock) return
-    add(variant.id, qty, variant.stock)
+    if (!add(variant.id, qty, variant.stock)) {
+      showCartToast({ kind: 'max' })
+      return
+    }
+    void flyToCart({ from: e.currentTarget, imageSrc: current })
+    showCartToast({ kind: 'added' })
     setAdded(true)
     setTimeout(() => setAdded(false), 1800)
   }

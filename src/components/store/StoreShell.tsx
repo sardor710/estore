@@ -7,6 +7,7 @@ import FavoritesProvider from '@/components/account/FavoritesProvider'
 import Navbar from './Navbar'
 import Footer from './Footer'
 import CartDrawer from './CartDrawer'
+import CartToast from './CartToast'
 import { isTelegramMode } from '@/lib/tg/mode'
 import TabBar from '@/components/tg/TabBar'
 import TgTopBar from '@/components/tg/TgTopBar'
@@ -24,6 +25,7 @@ export default async function StoreShell({ locale, children }: { locale: Locale;
         <main className="pb-[calc(4.5rem+env(safe-area-inset-bottom))]">{children}</main>
         <TabBar locale={locale} />
         <CartDrawer locale={locale} telegram />
+        <CartToast telegram />
         <TgBridge locale={locale} />
       </FavoritesProvider>
     )
@@ -34,6 +36,7 @@ export default async function StoreShell({ locale, children }: { locale: Locale;
       <main>{children}</main>
       <Footer locale={locale} categories={categories} />
       <CartDrawer locale={locale} />
+      <CartToast />
     </FavoritesProvider>
   )
 }

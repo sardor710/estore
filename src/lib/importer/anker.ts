@@ -66,6 +66,36 @@ function buildSections(p: ImportedProduct) {
   return p.highlights.filter((h) => h.body).map((h) => ({ heading: { en: h.title }, body: { en: h.body } }))
 }
 
+type Banner = { heading: L10nObj; body: L10nObj; image: string; imageMobile?: string; layout: 'banner'; sourceKey: string }
+type ImportedFaq = { q: L10nObj; a: L10nObj; sourceKey: string }
+
+/** Overview blocks as full-width banner sections (shown after the key-feature sections). */
+function buildBanners(p: ImportedProduct): Banner[] {
+  return p.banners.map((b) => ({
+    heading: { en: b.heading },
+    body: { en: b.body },
+    image: b.image,
+    ...(b.imageMobile ? { imageMobile: b.imageMobile } : {}),
+    layout: 'banner',
+    sourceKey: b.sourceKey,
+  }))
+}
+
+function buildFaq(p: ImportedProduct): ImportedFaq[] {
+  return p.faq.map((f) => ({ q: { en: f.q }, a: { en: f.a }, sourceKey: f.sourceKey }))
+}
+
+/**
+ * "Keep admin edits": existing items stay exactly as they are (text, images, order, hidden flag, translations);
+ * only source items whose sourceKey isn't on the product yet are appended. Items without a sourceKey (hand-made)
+ * are never touched.
+ */
+function appendNewBySourceKey<T extends { sourceKey?: string }>(old: unknown, fresh: T[]): unknown[] {
+  const oldArr = Array.isArray(old) ? old : []
+  const have = new Set(oldArr.map((o) => (isRec(o) && typeof o.sourceKey === 'string' ? o.sourceKey : undefined)).filter(Boolean))
+  return [...oldArr, ...fresh.filter((f) => f.sourceKey && !have.has(f.sourceKey))]
+}
+
 const SHORT_SPEC_PRIORITY = [
   /^(total|max(imum)?) output|^output power|^power output/i,
   /^capacity/i,
@@ -190,10 +220,10 @@ export async function importAnkerProduct(
       subtitle: { en: '' },
       shortSpec: { en: buildShortSpec(p.specGroups) },
       descriptionHtml: { en: sanitizeHtml(p.descriptionHtml) },
-      sections: buildSections(p),
+      sections: [...buildSections(p), ...buildBanners(p)],
       highlights: buildHighlights(p),
       inTheBox: p.inTheBox.map((en) => ({ en })),
-      faq: [],
+      faq: buildFaq(p),
       specs,
       images: p.images,
       reviewed: { uz: false, ru: false },
@@ -249,6 +279,8 @@ function mergeItems<T extends AnyObj>(fresh: T[], old: unknown, keyOf: (i: AnyOb
     return merged as T
   })
 }
+/** Kept as-is on refresh: imported overview items (by sourceKey, whatever the admin made of them) and every banner. */
+const isImported = (s: AnyObj) => (typeof s.sourceKey === 'string' && s.sourceKey !== '') || s.layout === 'banner'
 const enOf = (field: string) => (i: AnyObj) => (isRec(i[field]) ? (i[field] as { en?: string }).en : undefined)
 
 /** Re-fetch the source page and refresh images/specs/highlights/EN text. Never touches price, stock or uz/ru text. */
@@ -262,6 +294,7 @@ export async function refreshAnkerProduct(
   const { parsed: p } = await load(prod.sourceUrl, opts.fetchHtml)
 
   const en = (cur: unknown, v: string) => ({ ...((cur ?? {}) as L10nObj), en: v })
+  const oldSections: AnyObj[] = (Array.isArray(prod.sections) ? (prod.sections as unknown[]) : []).filter(isRec)
   await upsertSpecLabels(p.specGroups)
 
   await prisma.product.update({
@@ -271,7 +304,12 @@ export async function refreshAnkerProduct(
       shortSpec: en(prod.shortSpec, buildShortSpec(p.specGroups)),
       descriptionHtml: en(prod.descriptionHtml, sanitizeHtml(p.descriptionHtml)),
       highlights: mergeItems(buildHighlights(p), prod.highlights, enOf('title')),
-      sections: mergeItems(buildSections(p), prod.sections, enOf('heading')),
+      sections: [
+        // imported overview items are owned by the admin once on the product (even if turned into a text row)
+        ...mergeItems(buildSections(p), oldSections.filter((s) => !isImported(s)), enOf('heading')),
+        ...appendNewBySourceKey(oldSections.filter(isImported), buildBanners(p)),
+      ] as never,
+      faq: appendNewBySourceKey(prod.faq, buildFaq(p)) as never,
       inTheBox: mergeItems(p.inTheBox.map((en) => ({ en })), prod.inTheBox, (i) => i.en as string | undefined),
       specs: buildSpecs(p.specGroups, prod.specs as SpecGroup[]),
       images: p.images,

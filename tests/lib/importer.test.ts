@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { prisma } from '@/lib/db'
-import { parseAnkerHtml, normalizeAnkerUrl, ImportError } from '@/lib/importer/anker-parse'
+import { parseAnkerHtml, normalizeAnkerUrl, ImportError, MAX_BANNERS } from '@/lib/importer/anker-parse'
 import { importAnkerProduct, refreshAnkerProduct, fetchAnkerHtml } from '@/lib/importer/anker'
 
 const fixture = readFileSync(join(__dirname, '..', 'fixtures', 'anker-a120f.html'), 'utf8')
@@ -147,6 +147,114 @@ describe('parseAnkerHtml (A120F fixture)', () => {
   })
   it('throws PARSE_FAILED on empty page', () => {
     expect(codeOf(() => parseAnkerHtml('<html></html>', URL_A120F))).toBe('PARSE_FAILED')
+  })
+})
+
+const liveFixture = readFileSync(join(__dirname, '..', 'fixtures', 'anker-a120f-live.html'), 'utf8')
+/** Rewrite the live fixture's metafields.components (synthetic overview cases). */
+function withComponents(edit: (components: Record<string, unknown> | undefined, pageProps: Record<string, unknown>) => void): string {
+  const m = liveFixture.match(NEXT_RE)!
+  const next = JSON.parse(m[2])
+  const pp = next.props.pageProps
+  edit(pp.metafields?.components, pp)
+  return liveFixture.replace(m[0], () => m[1] + JSON.stringify(next).split('<').join(String.fromCharCode(92) + 'u003c') + m[3])
+}
+const imgBlock = (title: string, n: number) => ({ type: 'image', src: `https://cdn.example/b/${n}.png?v=1`, srcMb: `https://cdn.example/b/${n}-m.png`, topContent: { title, desc: 'd' } })
+
+describe('parseAnkerHtml overview banners (live fixture)', () => {
+  const p = parseAnkerHtml(liveFixture, URL_A120F)
+  const pp = nextData(liveFixture).props.pageProps
+  it('reads the overview blocks in page order with desktop + mobile images', () => {
+    expect(p.banners.length).toBeGreaterThanOrEqual(10)
+    expect(urlKey(p.banners[0].image).endsWith('A210C011_A__landing_page_01_US_V1_jpg.png')).toBe(true)
+    expect(urlKey(p.banners[0].imageMobile).endsWith('Frame_2147239181.png')).toBe(true)
+    expect(p.banners.some((b) => b.heading === 'Charging Power Guide')).toBe(true)
+  })
+  it('banner text has no HTML and every image is an https picture, not a video', () => {
+    for (const b of p.banners) {
+      expect(b.heading).not.toMatch(/</)
+      expect(b.body).not.toMatch(/</)
+      for (const u of [b.image, b.imageMobile].filter(Boolean) as string[]) {
+        expect(u).toMatch(/^https:\/\//)
+        expect(urlKey(u)).not.toMatch(/\.(mp4|webm|mov)$/i)
+      }
+    }
+  })
+  it('site chrome images never become banners', () => {
+    const chrome = new Set<string>()
+    const re = /(?:https?:)?\/\/[^"'\s\\]+?\.(?:jpg|jpeg|png|webp|gif)/gi
+    for (const k of ['menuCharger', 'footerCountry', 'memberSetting', 'copywriting']) {
+      for (const u of JSON.stringify(pp.metafields?.[k] ?? {}).match(re) ?? []) chrome.add(urlKey(u))
+    }
+    for (const b of p.banners) expect(chrome.has(urlKey(b.image)), b.image).toBe(false)
+  })
+  it('sourceKeys are unique', () => {
+    expect(new Set(p.banners.map((b) => b.sourceKey)).size).toBe(p.banners.length)
+  })
+  it('FAQ comes from the faq component as plain text', () => {
+    expect(p.faq.length).toBeGreaterThanOrEqual(3)
+    expect(p.faq[0].q).toBe('How does the Laptop Charger Pro recognize my laptop?')
+    for (const f of p.faq) {
+      expect(f.a).not.toMatch(/</)
+      expect(f.a.length).toBeGreaterThan(0)
+      expect(f.sourceKey).toBeTruthy()
+    }
+  })
+  it('a page without components still imports, with no banners or FAQ', () => {
+    const q = parseAnkerHtml(withComponents((_c, pp) => { delete (pp.metafields as Record<string, unknown>).components }), URL_A120F)
+    expect(q.banners).toEqual([])
+    expect(q.faq).toEqual([])
+    expect(q.title).toBe(p.title)
+    expect(q.images).toEqual(p.images)
+  })
+  it('video-only blocks are skipped', () => {
+    const q = parseAnkerHtml(withComponents((c) => {
+      for (const k of Object.keys(c!)) delete c![k]
+      c!.videoEle = { type: 'video', src: 'https://cdn.example/a.mp4', srcMb: 'https://cdn.example/a-m.mp4' }
+      c!.videoEle_1 = imgBlock('Keep me', 1)
+    }), URL_A120F)
+    expect(q.banners.map((b) => b.heading)).toEqual(['Keep me'])
+  })
+  it('a video block with a poster uses the poster', () => {
+    const q = parseAnkerHtml(withComponents((c) => {
+      for (const k of Object.keys(c!)) delete c![k]
+      c!.videoEle = { type: 'video', src: 'https://cdn.example/a.mp4', poster: 'https://cdn.example/poster.jpg', topContent: { title: 'Vid' } }
+    }), URL_A120F)
+    expect(q.banners).toHaveLength(1)
+    expect(q.banners[0].image).toBe('https://cdn.example/poster.jpg')
+  })
+  it('related-product carousels are skipped', () => {
+    const q = parseAnkerHtml(withComponents((c) => {
+      for (const k of Object.keys(c!)) delete c![k]
+      c!.recommend = { title: 'You may also like', list: [{ title: 'Other', img: 'https://cdn.example/o.png', handle: 'other-product' }] }
+      c!.videoEle = imgBlock('Mine', 2)
+    }), URL_A120F)
+    expect(q.banners.map((b) => b.heading)).toEqual(['Mine'])
+  })
+  it('a block whose images live under a Shopify CDN /products/ path is still imported', () => {
+    const q = parseAnkerHtml(withComponents((c) => {
+      for (const k of Object.keys(c!)) delete c![k]
+      c!.videoEle = { type: 'image', src: 'https://cdn.shopify.com/s/files/1/0493/products/A120F_banner.jpg?v=1', topContent: { title: 'CDN' } }
+      c!.recommend = { list: [{ title: 'Other', img: 'https://cdn.example/o.png', link: 'https://www.anker.com/products/a2633' }] }
+      c!.recommend_1 = { list: [{ title: 'Rel', img: 'https://cdn.example/r.png', url: '/products/a1234-other' }] }
+    }), URL_A120F)
+    expect(q.banners.map((b) => b.heading)).toEqual(['CDN'])
+  })
+  it('repeated headings get distinct sourceKeys', () => {
+    const q = parseAnkerHtml(withComponents((c) => {
+      for (const k of Object.keys(c!)) delete c![k]
+      c!.videoEle = imgBlock('Same', 1)
+      c!.videoEle_1 = imgBlock('Same', 2)
+    }), URL_A120F)
+    expect(q.banners.map((b) => b.sourceKey)).toEqual(['same', 'same-2'])
+  })
+  it(`caps banners at MAX_BANNERS (${MAX_BANNERS})`, () => {
+    const q = parseAnkerHtml(withComponents((c) => {
+      for (const k of Object.keys(c!)) delete c![k]
+      for (let i = 0; i < 60; i++) c![`videoEle_${i}`] = imgBlock(`B${i}`, i)
+    }), URL_A120F)
+    expect(q.banners).toHaveLength(MAX_BANNERS)
+    expect(q.banners[0].heading).toBe('B0')
   })
 })
 
@@ -310,6 +418,87 @@ describe('importAnkerProduct', () => {
     await refreshAnkerProduct(r.productId, { fetchHtml: fetchFixture })
     const v = await prisma.variant.findUniqueOrThrow({ where: { sku: 'B120FJ41' } })
     expect(v.priceUzs).toBe(0)
+  })
+
+  type Sec = { heading: Record<string, string>; body: Record<string, string>; image?: string; imageMobile?: string; layout?: string; sourceKey?: string; hidden?: boolean }
+  type Faq = { q: Record<string, string>; a: Record<string, string>; sourceKey?: string; hidden?: boolean }
+  const fetchLive = async () => liveFixture
+
+  it('import stores overview banners after the key-feature sections, plus the FAQ', async () => {
+    const r = await importAnkerProduct(URL_A120F, { fetchHtml: fetchLive })
+    const prod = await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })
+    const sections = prod.sections as Sec[]
+    const firstBanner = sections.findIndex((s) => s.layout === 'banner')
+    expect(firstBanner).toBeGreaterThan(0)
+    expect(sections.slice(0, firstBanner).every((s) => !s.layout && !s.sourceKey)).toBe(true)
+    const banners = sections.slice(firstBanner)
+    expect(banners.length).toBeGreaterThanOrEqual(10)
+    for (const b of banners) {
+      expect(b.layout).toBe('banner')
+      expect(b.sourceKey).toBeTruthy()
+      expect(b.image).toMatch(/^https:\/\//)
+      expect(typeof b.heading.en).toBe('string')
+    }
+    expect(banners.some((b) => b.imageMobile)).toBe(true)
+    const faq = prod.faq as Faq[]
+    expect(faq.length).toBeGreaterThanOrEqual(3)
+    expect(faq[0].q.en).toBe('How does the Laptop Charger Pro recognize my laptop?')
+    expect(faq[0].sourceKey).toBeTruthy()
+  })
+
+  it('re-import keeps admin banner/FAQ edits, order, hidden and hand-made items; appends only new source items', async () => {
+    const r = await importAnkerProduct(URL_A120F, { fetchHtml: fetchLive })
+    const prod = await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })
+    const all = prod.sections as Sec[]
+    const text = all.filter((s) => s.layout !== 'banner')
+    const banners = all.filter((s) => s.layout === 'banner')
+    const deleted = banners[3]
+    banners[0].heading.uz = 'Sarlavha'
+    banners[1].heading.en = 'Edited by admin'
+    banners[2].hidden = true
+    const edited = [banners[banners.length - 1], ...banners.slice(0, banners.length - 1)].filter((b) => b !== deleted)
+    const handMade: Sec = { heading: { en: 'Our own banner' }, body: { en: '' }, image: 'https://cdn.example/own.png', layout: 'banner' }
+    const faq = prod.faq as Faq[]
+    faq[0].a.en = 'Admin answer'
+    faq[1].hidden = true
+    await prisma.product.update({ where: { id: r.productId }, data: { sections: [...text, ...edited, handMade], faq } })
+
+    await refreshAnkerProduct(r.productId, { fetchHtml: fetchLive })
+
+    const after = await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })
+    const afterBanners = (after.sections as Sec[]).filter((s) => s.layout === 'banner')
+    expect(afterBanners.slice(0, edited.length + 1)).toEqual([...edited, handMade])
+    // the banner deleted straight from the data has no tombstone, so it comes back once, at the end
+    expect(afterBanners.slice(edited.length + 1).map((b) => b.sourceKey)).toEqual([deleted.sourceKey])
+    const afterFaq = after.faq as Faq[]
+    expect(afterFaq).toEqual(faq)
+  })
+
+  it('re-import keeps an imported banner the admin turned into a text section (no duplicate, edits kept)', async () => {
+    const r = await importAnkerProduct(URL_A120F, { fetchHtml: fetchLive })
+    const prod = await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })
+    const all = (prod.sections as Sec[]).map((s) => ({ ...s }))
+    const i = all.findIndex((s) => s.layout === 'banner')
+    const { layout: _l, ...asText } = all[i]
+    all[i] = { ...asText, heading: { ...asText.heading, uz: 'Matn' } }
+    await prisma.product.update({ where: { id: r.productId }, data: { sections: all } })
+    await refreshAnkerProduct(r.productId, { fetchHtml: fetchLive })
+    const after = (await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })).sections as Sec[]
+    const same = after.filter((s) => s.sourceKey === all[i].sourceKey)
+    expect(same).toHaveLength(1)
+    expect(same[0].layout).toBeUndefined()
+    expect(same[0].heading.uz).toBe('Matn')
+  })
+
+  it('re-import of a product imported before banners existed appends the banners and FAQ', async () => {
+    const r = await importAnkerProduct(URL_A120F, { fetchHtml: fetchLive })
+    const prod = await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })
+    const text = (prod.sections as Sec[]).filter((s) => s.layout !== 'banner')
+    await prisma.product.update({ where: { id: r.productId }, data: { sections: text, faq: [] } })
+    await refreshAnkerProduct(r.productId, { fetchHtml: fetchLive })
+    const after = await prisma.product.findUniqueOrThrow({ where: { id: r.productId } })
+    expect(after.sections).toEqual(prod.sections)
+    expect(after.faq).toEqual(prod.faq)
   })
 })
 

@@ -44,6 +44,13 @@
     "empty": "Bu kategoriyada hozircha mahsulot yoʻq.",
     "subcategories": "Ichki kategoriyalar"
   },
+  "cartToast": {
+    "added": "Savatga qoʻshildi",
+    "addedMany": "{count} ta mahsulot savatga qoʻshildi",
+    "max": "Savatda mavjud boʻlgan maksimal miqdor allaqachon bor",
+    "view": "Savatni ochish",
+    "close": "Yopish"
+  },
   "product": {
     "from": "{price}dan",
     "add": "Savatga qoʻshish",
@@ -445,6 +452,12 @@
     "view": "Xaritada koʻrish",
     "remove": "Olib tashlash",
     "denied": "Joylashuvga ruxsat berilmadi. Telefon sozlamalarida ruxsat bering yoki manzilni yozing.",
-    "unavailable": "Joylashuvni aniqlab boʻlmadi. Manzilni yozing."
+    "unavailable": "Joylashuvni aniqlab boʻlmadi. Manzilni yozing.",
+    "pickTitle": "Yetkazib berish joyini tanlang",
+    "mapHint": "Belgi uyingizni koʻrsatishi uchun xaritani suring",
+    "mapLoading": "Xarita yuklanmoqda…",
+    "mapError": "Xaritani yuklab boʻlmadi. Manzilni yozing.",
+    "myLocation": "Mening joylashuvim",
+    "mapSyncHint": "Manzilni yuqorida yozing yoki xaritani suring — biri ikkinchisini toʻldiradi"
   }
 }

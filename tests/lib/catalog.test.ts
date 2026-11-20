@@ -177,6 +177,16 @@ describe('card shape', () => {
     expect(oos.inStock).toBe(false)
     expect(oos.quickAddVariantId).toBeNull()
   })
+
+  it('carries the quick-add variant stock so the card can cap its add', async () => {
+    const c = await mkCat('chargers')
+    await mkProduct({ slug: 'qa', categoryId: c.id, variants: [{ sku: 'Q1', priceUzs: 100, compareAtUzs: 130, stock: 2 }] })
+    const [card] = await getSaleProducts()
+    expect(card.quickAddStock).toBe(2)
+    await prisma.variant.updateMany({ data: { stock: 0 } })
+    const [oos] = await getSaleProducts()
+    expect(oos.quickAddStock).toBe(0)
+  })
 })
 
 describe('promotions in the catalog', () => {
