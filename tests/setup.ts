@@ -8,6 +8,7 @@ beforeEach(async () => {
   await track.housekeepingIdle() // a background rollup from the previous test must not write after the wipe
   track.resetTrackState()
   await prisma.activityLog.deleteMany()
+  await prisma.imageTranslation.deleteMany()
   await prisma.banner.deleteMany()
   await prisma.pageView.deleteMany()
   await prisma.dailyTraffic.deleteMany()

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { getProductBySlug, type ProductDetail } from '@/lib/catalog'
 import { defaultLocale, locales, type Locale } from '@/i18n/routing'
+import { localizeProductImages } from '@/lib/image-translate/service'
 
 /**
  * A product as the storefront template would render it, drafts included (staff-only preview). Prices go
@@ -13,5 +14,6 @@ export async function getProductForPreview(id: number, locale: string): Promise<
   if (!row) return null
   const product = await getProductBySlug(row.slug, { includeDraft: true })
   if (!product) return null
-  return { product, locale: (locales as readonly string[]).includes(locale) ? (locale as Locale) : defaultLocale }
+  const loc = (locales as readonly string[]).includes(locale) ? (locale as Locale) : defaultLocale
+  return { product: await localizeProductImages(product, loc), locale: loc }
 }

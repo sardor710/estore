@@ -5,6 +5,7 @@ import { jsonLdScript, pageMetadata, productJsonLd, productMeta } from '@/lib/se
 import { notFound } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { getProductBySlug, getRelated } from '@/lib/catalog'
+import { localizeProductImages } from '@/lib/image-translate/service'
 import type { Locale } from '@/i18n/routing'
 import { t as l10n } from '@/lib/localized'
 import { path } from '@/lib/paths'
@@ -35,8 +36,10 @@ export default async function ProductPage({ params }: { params: Promise<{ locale
   const { locale: raw, slug } = await params
   setRequestLocale(raw)
   const locale = raw as Locale
-  const product = await getProductBySlug(slug)
-  if (!product) notFound()
+  const found = await getProductBySlug(slug)
+  if (!found) notFound()
+  // uz/ru show copies of the images with their English text translated, where one is ready.
+  const product = await localizeProductImages(found, locale)
   const related = await getRelated(product.id, 4)
   const title = l10n(product.title, locale)
 

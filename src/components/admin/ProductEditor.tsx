@@ -25,6 +25,7 @@ import L10nRichField from './L10nRichField'
 import VariantEditor from './VariantEditor'
 import SpecEditor from './SpecEditor'
 import ImagesEditor from './ImagesEditor'
+import ImageTranslationsPanel from './ImageTranslationsPanel'
 import { remapImageIndex } from '@/lib/admin/variant-display'
 import { FaqEditor, HighlightsEditor, InTheBoxEditor, SectionsEditor } from './ContentEditor'
 
@@ -339,6 +340,7 @@ export default function ProductEditor({
       </Section>
     ),
     images: (
+      <>
       <Section id="img" title="Images" error={errors.images}>
         <ImagesEditor
           images={data.images}
@@ -349,6 +351,10 @@ export default function ProductEditor({
           }}
         />
       </Section>
+      <Section id="img-tr" title="Translated images (uz, ru)">
+        <ImageTranslationsPanel productId={product.id} dirty={dirty} />
+      </Section>
+      </>
     ),
     specs: (
       <Section id="spec" title="Specifications" error={errors.specs}>

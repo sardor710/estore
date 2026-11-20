@@ -21,6 +21,8 @@ import { loadEditorProduct, type EditorProduct } from '@/lib/admin/product-view'
 import { saveSpecLabels, type SpecLabelRow } from '@/lib/admin/translations'
 import { translateProduct, TranslationError } from '@/lib/translate'
 import type { L10n } from '@/lib/localized'
+import { runAfterResponse } from '@/lib/after-response'
+import { queueProductImages } from '@/lib/image-translate/service'
 
 // 'catalog' permission, re-checked against the DB on every call; every change is written to the activity log
 // (here, or by the lib function that takes the staff member).
@@ -55,6 +57,8 @@ export async function saveProductAction(
     }
     await logActivity(staff, 'update', 'translations', null, `Saved ${rows.length} spec label(s) from product #${id}`)
   }
+  // New or changed images get their English text translated in the background (uz, ru).
+  runAfterResponse(() => queueProductImages(id))
   refreshStorefront()
   // The editor continues from what is now in the DB (new updatedAt and stock baseline).
   const fresh = await loadEditorProduct(id)
@@ -79,6 +83,7 @@ export async function translateProductAction(id: number, force: boolean): Promis
   const staff = await requirePermission('catalog')
   try {
     const r = await translateProduct(id, { force })
+    runAfterResponse(() => queueProductImages(id))
     if (r.status === 'done') {
       if (r.translated > 0) await logActivity(staff, 'update', 'product', id, `Machine-translated ${r.translated} field(s) of product #${id}`)
       refreshStorefront()

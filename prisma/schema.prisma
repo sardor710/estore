@@ -349,3 +349,21 @@ model MessageBroadcast {
   createdAt  DateTime          @default(now())
   messages   CustomerMessage[]
 }
+
+/// A product image with its English text redrawn in another language by an AI image model.
+/// One row per (source image, locale); the storefront swaps in `url` when status is DONE.
+model ImageTranslation {
+  id        Int      @id @default(autoincrement())
+  sourceUrl String
+  locale    String // uz | ru
+  status    String   @default("PENDING") // PENDING | RUNNING | DONE | NO_TEXT | FAILED | ORIGINAL
+  url       String? // translated copy under /uploads when DONE
+  texts     Json? // text blocks read from the source image, with translations
+  error     String?
+  costUsd   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sourceUrl, locale])
+  @@index([status])
+}

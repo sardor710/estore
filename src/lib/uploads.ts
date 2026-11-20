@@ -55,6 +55,18 @@ export async function saveUpload(file: File, now: Date = new Date()): Promise<{ 
   return { ok: true, url: `/uploads/${yyyy}/${mm}/${name}` }
 }
 
+/** Stores bytes the server produced itself (e.g. a translated image) as a new upload; returns its URL. */
+export async function saveGeneratedImage(bytes: Uint8Array, ext: ImageExt, now: Date = new Date()): Promise<string> {
+  if (sniffImage(bytes) !== ext) throw new Error(`Generated file is not a ${ext} image`)
+  const yyyy = String(now.getUTCFullYear())
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0')
+  const name = `${randomBytes(16).toString('hex')}.${ext}`
+  const dir = join(uploadsDir(), yyyy, mm)
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, name), bytes)
+  return `/uploads/${yyyy}/${mm}/${name}`
+}
+
 const SEG = /^(\d{4})\/(0[1-9]|1[0-2])\/[A-Za-z0-9_-]{1,64}\.(jpg|png|webp|gif|mp4)$/
 
 /** Maps URL segments under /uploads/ to an absolute file path, or null unless strictly `YYYY/MM/<hex>.<ext>`. */

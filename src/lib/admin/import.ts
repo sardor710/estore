@@ -1,5 +1,7 @@
 import { importAnkerProduct, refreshAnkerProduct, ImportError, normalizeAnkerUrl } from '@/lib/importer/anker'
 import { translateProduct, TranslationError } from '@/lib/translate'
+import { runAfterResponse } from '@/lib/after-response'
+import { queueProductImages } from '@/lib/image-translate/service'
 
 const IMPORT_MESSAGES: Record<string, string> = {
   BAD_URL: 'That is not a valid Anker product URL. Use a link like https://www.anker.com/products/<name>.',
@@ -27,6 +29,7 @@ export async function runImport(url: string, categoryId: number | undefined, dep
   try {
     const { productId, created } = await deps.importProduct(url, { categoryId })
     if (!created) return { ok: true, productId, created: false }
+    runAfterResponse(() => queueProductImages(productId))
     try {
       const t = await deps.translate(productId)
       if (t.status === 'not_configured') {
@@ -57,6 +60,7 @@ export async function findImported(url: string): Promise<number | null> {
 export async function runRefresh(productId: number): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
     await refreshAnkerProduct(productId)
+    runAfterResponse(() => queueProductImages(productId))
     return { ok: true }
   } catch (e) {
     if (e instanceof ImportError) return { ok: false, message: importErrorMessage(e.code) }
