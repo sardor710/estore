@@ -7,6 +7,7 @@ import { sanitizeHtml } from '@/lib/sanitize'
 import ProductHero from './ProductHero'
 import SpecTable from './SpecTable'
 import ProductGrid from './ProductGrid'
+import OverviewBanner from './OverviewBanner'
 
 const ICONS: Record<string, LucideIcon> = {
   zap: Zap,
@@ -36,7 +37,12 @@ export default async function DetailedProduct({
   const t = await getTranslations({ locale, namespace: 'product' })
   const description = sanitizeHtml(l10n(product.descriptionHtml, locale))
   const inTheBox = product.inTheBox.map((i) => l10n(i, locale)).filter(Boolean)
-  const faq = product.faq.filter((f) => l10n(f.q, locale))
+  const faq = product.faq.filter((f) => !f.hidden && l10n(f.q, locale))
+  const visible = product.sections.filter((s) => !s.hidden)
+  const textSections = visible.filter((s) => s.layout !== 'banner')
+  const banners = visible.filter((s) => s.layout === 'banner' && s.image)
+  // Banners are the overview story; they no longer hide the description (only hand-written text sections do).
+  const showDescription = Boolean(description) && textSections.length === 0
 
   return (
     <article data-template="detailed">
@@ -82,8 +88,9 @@ export default async function DetailedProduct({
         </section>
       )}
 
-      <div className="mx-auto max-w-7xl space-y-16 px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
-        {description && product.sections.length === 0 && (
+      {(showDescription || textSections.length > 0) && (
+      <div className="mx-auto max-w-7xl space-y-16 px-4 pt-14 sm:px-6 lg:px-8 lg:pt-20">
+        {showDescription && (
           <section aria-labelledby="about-h" className="max-w-3xl">
             <h2 id="about-h" className="mb-4 text-2xl font-extrabold tracking-tight text-neutral-900">
               {t('about')}
@@ -92,9 +99,9 @@ export default async function DetailedProduct({
           </section>
         )}
 
-        {product.sections.length > 0 && (
+        {textSections.length > 0 && (
           <div className="space-y-14">
-            {product.sections.map((s, i) => (
+            {textSections.map((s, i) => (
               <section key={i} className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
                 {s.image && (
                   <div className={`overflow-hidden rounded-2xl bg-[#f5f5f7] ${i % 2 ? 'md:order-2' : ''}`}>
@@ -110,7 +117,18 @@ export default async function DetailedProduct({
             ))}
           </div>
         )}
+      </div>
+      )}
 
+      {banners.length > 0 && (
+        <div data-overview className="mt-14 lg:mt-20">
+          {banners.map((s, i) => (
+            <OverviewBanner key={s.sourceKey ?? i} heading={l10n(s.heading, locale)} body={l10n(s.body, locale)} image={s.image!} imageMobile={s.imageMobile} />
+          ))}
+        </div>
+      )}
+
+      <div className="mx-auto max-w-7xl space-y-16 px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
         {product.specs.some((g) => g.items?.length) && (
           <section aria-labelledby="specs-h" className="max-w-4xl">
             <h2 id="specs-h" className="mb-6 text-2xl font-extrabold tracking-tight text-neutral-900">

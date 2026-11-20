@@ -44,6 +44,13 @@
     "empty": "Bu kategoriyada hozircha mahsulot yoʻq.",
     "subcategories": "Ichki kategoriyalar"
   },
+  "cartToast": {
+    "added": "Savatga qoʻshildi",
+    "addedMany": "{count} ta mahsulot savatga qoʻshildi",
+    "max": "Savatda mavjud boʻlgan maksimal miqdor allaqachon bor",
+    "view": "Savatni ochish",
+    "close": "Yopish"
+  },
   "product": {
     "from": "{price}dan",
     "add": "Savatga qoʻshish",

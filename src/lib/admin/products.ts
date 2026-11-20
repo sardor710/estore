@@ -30,11 +30,21 @@ export async function unpublishProduct(id: number): Promise<ActionResult> {
   return r.count === 1 ? { ok: true } : { ok: false, error: 'Product not found.' }
 }
 
+/** Import identity + admin "hidden" flag, kept only when well-formed. */
+function cleanSourceFields(s: Record<string, unknown> | null | undefined): { sourceKey?: string; hidden?: true } {
+  return {
+    ...(typeof s?.sourceKey === 'string' && s.sourceKey && s.sourceKey.length <= 200 ? { sourceKey: s.sourceKey } : {}),
+    ...(s?.hidden === true ? { hidden: true as const } : {}),
+  }
+}
 function cleanSections(v: unknown): Section[] {
   return (Array.isArray(v) ? v : []).map((s) => ({
     heading: cleanL10n(s?.heading),
     body: cleanL10n(s?.body),
     ...(typeof s?.image === 'string' && s.image ? { image: s.image } : {}),
+    ...(typeof s?.imageMobile === 'string' && /^https?:\/\//i.test(s.imageMobile) ? { imageMobile: s.imageMobile } : {}),
+    ...(s?.layout === 'banner' ? { layout: 'banner' as const } : {}),
+    ...cleanSourceFields(s),
   }))
 }
 function cleanHighlights(v: unknown): Highlight[] {
@@ -179,7 +189,7 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
           sections: cleanSections(input.sections),
           highlights: cleanHighlights(input.highlights),
           inTheBox: (Array.isArray(input.inTheBox) ? input.inTheBox : []).map(cleanL10n).filter((x) => Object.keys(x).length),
-          faq: (Array.isArray(input.faq) ? input.faq : []).map((f) => ({ q: cleanL10n(f?.q), a: cleanL10n(f?.a) })),
+          faq: (Array.isArray(input.faq) ? input.faq : []).map((f) => ({ q: cleanL10n(f?.q), a: cleanL10n(f?.a), ...cleanSourceFields(f) })),
           specs: cleanSpecs(input.specs),
           images,
           reviewed: { uz: input.reviewed?.uz === true, ru: input.reviewed?.ru === true },

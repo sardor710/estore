@@ -42,7 +42,7 @@ export default function TabBar({ locale }: { locale: Locale }) {
           {t('catalog')}
         </Link>
         <button type="button" onClick={() => setCartOpen(true)} className={item(cartOpen)} aria-haspopup="dialog">
-          <span className="relative">
+          <span className="relative" data-cart-target>
             <ShoppingBag size={22} aria-hidden />
             {count > 0 && (
               <span className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-neutral-900 px-1 text-center text-[10px] font-bold leading-4 text-white">

@@ -10,6 +10,8 @@ import { t as l10n } from '@/lib/localized'
 import { formatUzs } from '@/lib/money'
 import { path } from '@/lib/paths'
 import { useCart } from '@/lib/cart/useCart'
+import { flyToCart } from '@/lib/cart/flyToCart'
+import { showCartToast } from '@/lib/cart/cartToast'
 import FavoriteButton from '@/components/account/FavoriteButton'
 
 export default function ProductCard({ product, locale }: { product: CardProduct; locale: Locale }) {
@@ -20,9 +22,14 @@ export default function ProductCard({ product, locale }: { product: CardProduct;
   const shortSpec = l10n(product.shortSpec, locale)
   const href = path(locale, `/p/${product.slug}`)
 
-  const quickAdd = () => {
+  const quickAdd = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!product.quickAddVariantId) return
-    add(product.quickAddVariantId, 1)
+    if (!add(product.quickAddVariantId, 1, product.quickAddStock || undefined)) {
+      showCartToast({ kind: 'max' })
+      return
+    }
+    void flyToCart({ from: e.currentTarget, imageSrc: product.image })
+    showCartToast({ kind: 'added' })
     setJustAdded(true)
     setTimeout(() => setJustAdded(false), 1200)
   }

@@ -19,12 +19,15 @@ export default function ListControls({
   onMove,
   onRemove,
   what,
+  removeLabel,
 }: {
   index: number
   length: number
   onMove: (dir: -1 | 1) => void
   onRemove: () => void
   what: string
+  /** Accessible name of the remove button; defaults to "Remove <what>". */
+  removeLabel?: string
 }) {
   return (
     <div className="flex shrink-0 items-center">
@@ -34,7 +37,7 @@ export default function ListControls({
       <button type="button" className={b} disabled={index === length - 1} onClick={() => onMove(1)} aria-label={`Move ${what} down`}>
         <ArrowDown size={16} />
       </button>
-      <button type="button" className={`${b} hover:!bg-red-50 hover:text-red-700`} onClick={onRemove} aria-label={`Remove ${what}`}>
+      <button type="button" className={`${b} hover:!bg-red-50 hover:text-red-700`} onClick={onRemove} aria-label={removeLabel ?? `Remove ${what}`} title={removeLabel}>
         <Trash2 size={16} />
       </button>
     </div>

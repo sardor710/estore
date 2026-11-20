@@ -44,6 +44,13 @@
     "empty": "No products in this category yet.",
     "subcategories": "Subcategories"
   },
+  "cartToast": {
+    "added": "Added to cart",
+    "addedMany": "{count, plural, one {# item} other {# items}} added to cart",
+    "max": "The maximum available quantity is already in your cart",
+    "view": "View cart",
+    "close": "Close"
+  },
   "product": {
     "from": "from {price}",
     "add": "Add to cart",

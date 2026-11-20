@@ -69,6 +69,7 @@ export default function Navbar({ locale, categories, account = null }: { locale:
             type="button"
             className="relative rounded-full p-2 text-neutral-800 hover:bg-neutral-100"
             aria-label={`${t('cart')} (${count})`}
+            data-cart-target
             onClick={() => setCartOpen(true)}
           >
             <ShoppingBag size={20} />

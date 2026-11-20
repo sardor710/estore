@@ -10,7 +10,12 @@ export type ImportedProduct = {
   inTheBox: string[]
   specGroups: { group: string; items: { label: string; value: string }[] }[]
   variants: { sku: string; name: string; priceUsd: number; imageUrl?: string; available: boolean }[]
+  /** Overview blocks (anker.com `metafields.components`), in page order. */
+  banners: ImportedBanner[]
+  faq: { q: string; a: string; sourceKey: string }[]
 }
+
+export type ImportedBanner = { heading: string; body: string; image: string; imageMobile?: string; sourceKey: string }
 
 export type ImportErrorCode = 'BAD_URL' | 'FETCH_FAILED' | 'NOT_FOUND' | 'PARSE_FAILED'
 
@@ -142,6 +147,101 @@ function parseSpecs($: cheerio.CheerioAPI): ImportedProduct['specGroups'] {
     }
   })
   return groups.filter((g) => g.items.length > 0)
+}
+
+export const MAX_BANNERS = 40
+
+/** Components that are not overview media (or are read elsewhere). */
+const NON_OVERVIEW = /^(reviews|faq|htmlContainer|productSpecs|variantsMetafields)(_\d+)?$/
+const VIDEO_RE = /\.(mp4|webm|mov|m3u8)$/i
+const DESKTOP_KEYS = ['src', 'img', 'image', 'pcImg']
+const MOBILE_KEYS = ['srcMb', 'mobImg', 'imageMob', 'mobileImg', 'mbImg']
+const POSTER_KEYS = ['poster', 'cover', 'posterImg']
+
+const plain = (v: unknown): string => {
+  const s = asStr(v)
+  return s ? textOf(s.replace(/<br\s*\/?>/gi, ' ')) : ''
+}
+const firstText = (...vals: unknown[]): string => {
+  for (const v of vals) {
+    const t = plain(v)
+    if (t) return t
+  }
+  return ''
+}
+/** First https picture under any of `keys` (videos rejected). */
+function pictureOf(o: Json, keys: string[]): string | undefined {
+  for (const k of keys) {
+    const u = absHttps(o[k])
+    if (u && !VIDEO_RE.test(u.split(/[?#]/)[0])) return u
+  }
+  return undefined
+}
+/** Blocks that link to other products (recommendation carousels) are not this product's story. */
+// Only links to an anker.com product page count (absolute, or a string value starting with /products/);
+// Shopify CDN image paths like cdn.shopify.com/.../products/x.jpg are pictures, not links.
+const linksOtherProducts = (block: unknown): boolean =>
+  /"(handle|productId)"\s*:|"(?:https?:)?(?:\/\/(?:www\.)?anker\.com)?\/products\/[A-Za-z0-9]/i.test(JSON.stringify(block))
+
+/** anker.com overview blocks -> banners (heading, body, desktop + mobile image) and the FAQ. */
+export function parseOverview(components: unknown): { banners: ImportedBanner[]; faq: ImportedProduct['faq'] } {
+  const raw: Omit<ImportedBanner, 'sourceKey'>[] = []
+  const faq: ImportedProduct['faq'] = []
+  if (!isObj(components)) return { banners: [], faq }
+
+  const push = (o: Json, heading: string, body: string) => {
+    const image = pictureOf(o, DESKTOP_KEYS) ?? pictureOf(o, POSTER_KEYS)
+    if (!image) return false
+    const imageMobile = pictureOf(o, MOBILE_KEYS)
+    raw.push({ heading, body, image, ...(imageMobile && imageMobile !== image ? { imageMobile } : {}) })
+    return true
+  }
+
+  for (const [key, block] of Object.entries(components)) {
+    if (NON_OVERVIEW.test(key) || !isObj(block) || linksOtherProducts(block)) continue
+    const top = isObj(block.topContent) ? block.topContent : isObj(block._topContent) ? block._topContent : {}
+    let blockTitle = firstText(block.title, top.title)
+    const blockBody = firstText(block.subTitle, block.desc, top.desc)
+    if (push(block, blockTitle, blockBody)) blockTitle = ''
+    for (const item of Array.isArray(block.list) ? block.list : []) {
+      if (!isObj(item)) continue
+      const heading = firstText(item.title, item.txt) || blockTitle
+      const body = firstText(item.subTitle, item.desc)
+      let used = push(item, heading, body)
+      for (const child of Array.isArray(item.child) ? item.child : []) {
+        if (isObj(child) && push(child, used ? '' : heading, used ? '' : body)) used = true
+      }
+      if (used && heading === blockTitle) blockTitle = ''
+    }
+  }
+
+  const faqBlock = components.faq
+  const items = isObj(faqBlock) && Array.isArray(faqBlock.items) ? faqBlock.items : []
+  const faqKeys = new Map<string, number>()
+  for (const it of items) {
+    if (!isObj(it)) continue
+    const q = plain(it.question)
+    const a = plain(it.answer)
+    if (q && a) faq.push({ q, a, sourceKey: uniqueKey(faqKeys, slugify(q)) })
+  }
+
+  const seen = new Set<string>()
+  const keys = new Map<string, number>()
+  const banners: ImportedBanner[] = []
+  for (const b of raw) {
+    const imgKey = b.image.split(/[?#]/)[0]
+    if (seen.has(imgKey)) continue
+    seen.add(imgKey)
+    banners.push({ ...b, sourceKey: uniqueKey(keys, slugify(b.heading) || imgKey) })
+    if (banners.length === MAX_BANNERS) break
+  }
+  return { banners, faq }
+}
+
+function uniqueKey(used: Map<string, number>, base: string): string {
+  const n = (used.get(base) ?? 0) + 1
+  used.set(base, n)
+  return n === 1 ? base : `${base}-${n}`
 }
 
 export function parseAnkerHtml(html: string, url: string): ImportedProduct {
@@ -279,5 +379,6 @@ export function parseAnkerHtml(html: string, url: string): ImportedProduct {
     inTheBox,
     specGroups: parseSpecs($),
     variants,
+    ...parseOverview(isObj(pageProps.metafields) ? pageProps.metafields.components : null),
   }
 }

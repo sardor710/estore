@@ -60,6 +60,24 @@ describe('publish validation', () => {
 })
 
 describe('updateProduct', () => {
+  it('keeps banner/import fields on sections and FAQ; drops unsafe values', async () => {
+    const p = await mk('bn', [{ sku: 'BN1', price: 100 }])
+    const sections = [
+      { heading: { en: 'Text' }, body: { en: 'b' } },
+      { heading: { en: 'Ban' }, body: { en: '' }, image: 'https://cdn.example/d.png', imageMobile: 'https://cdn.example/m.png', layout: 'banner', sourceKey: 'ban', hidden: true },
+      { heading: { en: 'Bad' }, body: {}, image: 'https://cdn.example/x.png', imageMobile: 'javascript:alert(1)', layout: 'weird', sourceKey: 'x'.repeat(201), hidden: 'yes' },
+    ]
+    const faq = [{ q: { en: 'Q' }, a: { en: 'A' }, sourceKey: 'q', hidden: true }]
+    expect(await updateProduct(p.id, inputOf(p, { sections: sections as never, faq: faq as never }))).toEqual({ ok: true })
+    const row = await prisma.product.findUniqueOrThrow({ where: { id: p.id } })
+    expect(row.sections).toEqual([
+      { heading: { en: 'Text' }, body: { en: 'b' } },
+      { heading: { en: 'Ban' }, body: {}, image: 'https://cdn.example/d.png', imageMobile: 'https://cdn.example/m.png', layout: 'banner', sourceKey: 'ban', hidden: true },
+      { heading: { en: 'Bad' }, body: {}, image: 'https://cdn.example/x.png' },
+    ])
+    expect(row.faq).toEqual([{ q: { en: 'Q' }, a: { en: 'A' }, sourceKey: 'q', hidden: true }])
+  })
+
   it('sets and clears the brand by id; rejects an unknown brand', async () => {
     const p = await mk('br', [{ sku: 'BR1', price: 100 }])
     const brand = await prisma.brand.create({ data: { name: 'Anker', slug: 'anker' } })

@@ -9,9 +9,15 @@ export type SortKey = 'new' | 'price-asc' | 'price-desc'
 
 export type SpecItem = { label: string; value: string; valueL10n?: L10n }
 export type SpecGroup = { group: string; items: SpecItem[] }
-export type Section = { heading: L10n; body: L10n; image?: string }
+/**
+ * Imported items carry `sourceKey` (their identity on the source page, used by re-import) and may be `hidden`
+ * by the admin (hidden instead of deleted, so re-import does not bring them back).
+ */
+type SourceFields = { sourceKey?: string; hidden?: boolean }
+/** `layout: 'banner'` = full-width overview image (imported from anker.com) instead of the image/text row. */
+export type Section = { heading: L10n; body: L10n; image?: string; imageMobile?: string; layout?: 'banner' } & SourceFields
 export type Highlight = { icon?: string; title: L10n; value?: string }
-export type FaqItem = { q: L10n; a: L10n }
+export type FaqItem = { q: L10n; a: L10n } & SourceFields
 
 export type CategoryNode = {
   id: number
@@ -37,6 +43,8 @@ export type CardProduct = {
   inStock: boolean
   /** Id of the first in-stock variant (cheapest first); null when sold out */
   quickAddVariantId: number | null
+  /** Stock of the quick-add variant (0 when sold out): caps the card's quick add like the product page does */
+  quickAddStock: number
   createdAt: Date
 }
 
@@ -124,6 +132,7 @@ export function toCard(p: ProductWithVariants, price: Pricer): CardProduct {
     hasMultiplePrices: vs.some((v) => v.priceUzs !== cheapest?.priceUzs),
     inStock: Boolean(firstInStock),
     quickAddVariantId: firstInStock ? firstInStock.id : null,
+    quickAddStock: firstInStock?.stock ?? 0,
     createdAt: p.createdAt,
   }
 }

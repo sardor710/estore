@@ -1,22 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Loader2, RotateCcw } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
-import { useCart, useCartDrawer } from '@/lib/cart/useCart'
+import { useCart } from '@/lib/cart/useCart'
+import { flyToCart } from '@/lib/cart/flyToCart'
+import { showCartToast } from '@/lib/cart/cartToast'
 import { buyAgainAction } from '@/app/[locale]/account/actions'
 import { loginHref } from './signOut'
 
 type Result = { kind: 'ok'; added: number; unavailable: string[] } | { kind: 'error' }
 
-/** Re-adds the order's still-available variants (stock-capped by the server) to the cart and opens the drawer. */
+/** Re-adds the order's still-available variants (stock-capped by the server) to the cart; flies to the cart icon and toasts. */
 export default function BuyAgainButton({ orderNumber, locale }: { orderNumber: number; locale: Locale }) {
   const t = useTranslations('account.order')
   const router = useRouter()
   const { add } = useCart()
-  const { setOpen } = useCartDrawer()
+  const button = useRef<HTMLButtonElement>(null)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
 
@@ -33,8 +35,12 @@ export default function BuyAgainButton({ orderNumber, locale }: { orderNumber: n
         setResult({ kind: 'error' })
       } else {
         // Capped by current stock: a line already in the cart (or a second click) can't exceed what's available.
-        for (const l of r.lines) add(l.variantId, l.qty, l.stock)
-        if (r.lines.length > 0) setOpen(true)
+        let changed = 0
+        for (const l of r.lines) if (add(l.variantId, l.qty, l.stock)) changed++
+        if (changed > 0) {
+          if (button.current) void flyToCart({ from: button.current })
+          showCartToast({ kind: 'addedMany', count: changed })
+        } else if (r.lines.length > 0) showCartToast({ kind: 'max' })
         setResult({ kind: 'ok', added: r.lines.length, unavailable: r.unavailable })
       }
     } catch {
@@ -46,6 +52,7 @@ export default function BuyAgainButton({ orderNumber, locale }: { orderNumber: n
   return (
     <div>
       <button
+        ref={button}
         type="button"
         onClick={run}
         disabled={busy}
