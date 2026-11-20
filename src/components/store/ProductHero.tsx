@@ -62,6 +62,17 @@ export default function ProductHero({ locale, productId, template, title, subtit
   const shownIdx = visibleIndex(images.length, broken, imageIdx)
   const current = shownIdx === null ? undefined : images[shownIdx]
   const working = images.length - broken.size
+  // 1-based position among the images that load, for the phone counter.
+  const position = shownIdx === null ? 0 : images.slice(0, shownIdx + 1).filter((_, i) => !broken.has(i)).length
+  const step = (dir: 1 | -1) => shownIdx !== null && setImageIdx(stepIndex(images.length, broken, shownIdx, dir) ?? shownIdx)
+  // Phones have no thumbnail strip: a horizontal swipe on the main image flips through the gallery.
+  const [touchX, setTouchX] = useState<number | null>(null)
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchX === null) return
+    const dx = e.changedTouches[0].clientX - touchX
+    setTouchX(null)
+    if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1)
+  }
 
   const pick = (i: number) => {
     setVariantIdx(i)
@@ -85,11 +96,11 @@ export default function ProductHero({ locale, productId, template, title, subtit
   const sticky = template === 'DETAILED'
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-14">
+    <div className="grid grid-cols-1 gap-4 sm:gap-8 lg:grid-cols-12 lg:gap-14">
       {/* Gallery */}
       <div className="flex flex-col-reverse gap-4 md:flex-row lg:col-span-7">
         {working > 1 && (
-          <div className="flex shrink-0 gap-3 overflow-x-auto pb-2 md:max-h-[580px] md:flex-col md:overflow-y-auto md:pb-0">
+          <div className="hidden shrink-0 gap-3 md:flex md:max-h-[580px] md:flex-col md:overflow-y-auto lg:max-h-[min(580px,calc(100svh-10rem))]">
             {images.map((img, idx) =>
               broken.has(idx) ? null : (
               <button
@@ -109,7 +120,13 @@ export default function ProductHero({ locale, productId, template, title, subtit
             )}
           </div>
         )}
-        <div className="group relative flex aspect-square flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#f5f5f7] p-6 sm:p-10">
+        {/* Square on tablets; capped by the screen height elsewhere so the title and price stay in view (phones) and
+            tall 4:5 imported infographics are not cropped by the fold (desktop). */}
+        <div
+          className="group relative flex aspect-square max-h-[46svh] w-full items-center justify-center overflow-hidden rounded-2xl bg-[#f5f5f7] p-2 sm:p-4 md:max-h-none md:flex-1 lg:max-h-[min(580px,calc(100svh-10rem))]"
+          onTouchStart={(e) => setTouchX(e.touches[0].clientX)}
+          onTouchEnd={onTouchEnd}
+        >
           {badge && (
             <span className="absolute left-4 top-4 z-10 rounded bg-black px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
               {badge}
@@ -132,7 +149,7 @@ export default function ProductHero({ locale, productId, template, title, subtit
             <>
               <button
                 type="button"
-                onClick={() => setImageIdx(stepIndex(images.length, broken, shownIdx, -1) ?? shownIdx)}
+                onClick={() => step(-1)}
                 className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-neutral-800 shadow-sm transition hover:bg-white md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                 aria-label={t('prevImage')}
               >
@@ -140,12 +157,15 @@ export default function ProductHero({ locale, productId, template, title, subtit
               </button>
               <button
                 type="button"
-                onClick={() => setImageIdx(stepIndex(images.length, broken, shownIdx, 1) ?? shownIdx)}
+                onClick={() => step(1)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-neutral-800 shadow-sm transition hover:bg-white md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                 aria-label={t('nextImage')}
               >
                 <ChevronRight size={16} />
               </button>
+              <span className="absolute bottom-3 right-3 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white md:hidden" aria-hidden>
+                {position}/{working}
+              </span>
             </>
           )}
         </div>
@@ -154,12 +174,12 @@ export default function ProductHero({ locale, productId, template, title, subtit
       {/* Buy box */}
       <div className="lg:col-span-5">
         <div className={sticky ? 'lg:sticky lg:top-24' : ''}>
-          <div className="space-y-5">
-            <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">{categoryName}</span>
+          <div className="space-y-4 sm:space-y-5">
+            <span className="hidden text-xs font-bold uppercase tracking-widest text-neutral-500 sm:inline">{categoryName}</span>
             <div>
-              <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-neutral-900 sm:text-3xl lg:text-4xl">{name}</h1>
+              <h1 className="text-xl font-extrabold leading-tight tracking-tight text-neutral-900 sm:text-3xl lg:text-4xl">{name}</h1>
               {(l10n(subtitle, locale) || l10n(shortSpec, locale)) && (
-                <p className="mt-2 text-sm font-medium text-neutral-600">{l10n(subtitle, locale) || l10n(shortSpec, locale)}</p>
+                <p className="mt-1 text-sm font-medium text-neutral-600 sm:mt-2">{l10n(subtitle, locale) || l10n(shortSpec, locale)}</p>
               )}
             </div>
 

@@ -46,7 +46,7 @@ export default async function DetailedProduct({
 
   return (
     <article data-template="detailed">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mx-auto max-w-7xl px-4 pb-8 pt-3 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
         <ProductHero
           locale={locale}
           productId={product.id}

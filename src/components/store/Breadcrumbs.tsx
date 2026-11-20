@@ -16,7 +16,8 @@ export default async function Breadcrumbs({ locale, items }: { locale: Locale; i
         {all.map((c, i) => {
           const last = i === all.length - 1
           return (
-            <li key={`${c.label}-${i}`} className="flex items-center gap-1.5">
+            // On phones the product name repeats the H1 just below, so the last crumb is dropped to keep one line.
+            <li key={`${c.label}-${i}`} className={`items-center gap-1.5 ${last && i > 0 ? 'hidden sm:flex' : 'flex'}`}>
               {c.href && !last ? (
                 <Link href={c.href} className="transition hover:text-black">
                   {c.label}
@@ -26,7 +27,7 @@ export default async function Breadcrumbs({ locale, items }: { locale: Locale; i
                   {c.label}
                 </span>
               )}
-              {!last && <ChevronRight size={12} aria-hidden />}
+              {!last && <ChevronRight size={12} aria-hidden className={i === all.length - 2 ? 'hidden sm:block' : ''} />}
             </li>
           )
         })}
