@@ -20,13 +20,13 @@ const quote = (s: string) => s.replace(/\s+/g, ' ').trim()
  */
 export function buildEditPrompt(blocks: TextBlock[], locale: ImageLocale): string {
   const lang = LANGUAGE_NAME[locale]
-  const lines = blocks.map((b, i) => `${i + 1}. ${quote(b.where)}: "${quote(b.text)}" -> «${quote(b[locale])}»`)
+  const lines = blocks.map((b, i) => `${i + 1}. ${quote(b.where)}\n   English: ${quote(b.text)}\n   ${lang}: ${quote(b[locale])}`)
   return [
     'TEXT-ONLY EDIT of the attached product image. Reproduce the image exactly: same product, same composition, framing, crop, camera angle, lighting, colors, background, icons, logos and layout. The only change: translate the English captions into ' +
       lang +
       '.',
     '',
-    `There are exactly ${blocks.length} English text block${blocks.length === 1 ? '' : 's'}. Replace EVERY one of them (all ${blocks.length}, do not skip any), keeping its position, font family, weight, color, alignment and approximate size. Spell the ${lang} text exactly as written, letter by letter:`,
+    `There are exactly ${blocks.length} English text block${blocks.length === 1 ? '' : 's'}. Replace EVERY one of them (all ${blocks.length}, do not skip any), keeping its position, font family, weight, color, alignment and approximate size. Spell the ${lang} text exactly as written, letter by letter. The list below only labels each text; draw the ${lang} words alone, without the labels and without adding quotation marks:`,
     '',
     ...lines,
     '',

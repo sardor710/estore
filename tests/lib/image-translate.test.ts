@@ -54,10 +54,11 @@ describe('prompt helpers', () => {
   it('lists every block with its translation and count', () => {
     const p = buildEditPrompt([BLOCK, { where: 'footnote', text: 'Note:  small\nprint', uz: 'Izoh', ru: 'Примечание' }], 'ru')
     expect(p).toContain('exactly 2 English text blocks')
-    expect(p).toContain('1. top headline: "Fast Charging" -> «Быстрая зарядка»')
-    expect(p).toContain('2. footnote: "Note: small print" -> «Примечание»')
+    expect(p).toContain('1. top headline\n   English: Fast Charging\n   Russian: Быстрая зарядка')
+    expect(p).toContain('2. footnote\n   English: Note: small print\n   Russian: Примечание')
+    expect(p).not.toContain('«')
     expect(p).toContain('Russian')
-    expect(buildEditPrompt([BLOCK], 'uz')).toContain('«Tez quvvatlash»')
+    expect(buildEditPrompt([BLOCK], 'uz')).toContain('Uzbek (Latin script): Tez quvvatlash')
   })
 
   it('picks the closest supported aspect ratio', () => {
@@ -108,8 +109,8 @@ describe('queue and worker', () => {
     await processPending(deps)
     expect(calls.read).toBe(1)
     expect(calls.edit.map((c) => c.aspectRatio)).toEqual(['4:5', '4:5'])
-    expect(calls.edit[0].prompt).toContain('«Tez quvvatlash»')
-    expect(calls.edit[1].prompt).toContain('«Быстрая зарядка»')
+    expect(calls.edit[0].prompt).toContain(': Tez quvvatlash')
+    expect(calls.edit[1].prompt).toContain('Russian: Быстрая зарядка')
     const rows = await prisma.imageTranslation.findMany({ orderBy: { locale: 'asc' } })
     expect(rows.map((r) => [r.locale, r.status])).toEqual([
       ['ru', 'DONE'],

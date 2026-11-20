@@ -18,6 +18,7 @@ const SYSTEM = [
   'Skip: text that is physically on the product or its screen (digits, UI labels, printed logos), brand names and logos on their own (Anker, soundcore, eufy, ...), model numbers, and text that is only numbers and units (100W, 25,000mAh). Inside a caption, keep those untranslated.',
   'A headline that wraps over several lines in the same style is ONE block; lines in different sizes or styles (e.g. small text above and below a big number in a badge) are SEPARATE blocks, each translated on its own. A multi-line headline is ONE block. Give each block a short location ("top headline", "left card title", "badge in top-left corner", "bottom footnote").',
   'Translate each block into Russian (natural shop Russian) and Uzbek in the Latin script. Uzbek rules: use the modifier letter ʻ (U+02BB) in oʻ and gʻ and ’ (U+2019) for the tutuq belgisi; never the ASCII apostrophe. Keep units (W, mAh, ft), numbers and technical terms (USB-C, GaN, PD, Qi2) unchanged. Keep translations about as short as the English.',
+  'Include small print and footnotes too, even when they are mostly numbers and units ("Note: Dimensions may vary: 4.76 × 2.86 in"): translate the words and keep the numbers.',
   'If the image has no such English text, return an empty list.',
   'Respond with JSON only.',
 ].join('\n')
