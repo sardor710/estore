@@ -144,7 +144,7 @@ async function linkPhoneTx(
   // longer an account either (nobody can sign in to it), so the admin badge / account state stay honest.
   await tx.customer.updateMany({
     where: { telegramUserId: a.tg, phone: { not: a.phone } },
-    data: { telegramUserId: null, telegramChatId: null, accountCreatedAt: null, sessionVersion: { increment: 1 } },
+    data: { telegramUserId: null, telegramChatId: null, accountCreatedAt: null, lastLoginAt: null, lastSeenAt: null, sessionVersion: { increment: 1 } },
   })
   const existing = await tx.customer.findUnique({ where: { phone: a.phone } })
   if (existing) {
@@ -156,7 +156,8 @@ async function linkPhoneTx(
         telegramChatId: a.chatId,
         accountLocale: a.locale ?? existing.accountLocale,
         accountCreatedAt: existing.accountCreatedAt ?? now,
-        ...(relinked ? { sessionVersion: { increment: 1 } } : {}),
+        // another Telegram user takes the number over: old sessions end and the previous holder's times go
+        ...(relinked ? { sessionVersion: { increment: 1 }, lastLoginAt: null, lastSeenAt: null } : {}),
       },
     })
     return { customerId: existing.id, oldChatId: relinked ? existing.telegramChatId : null }

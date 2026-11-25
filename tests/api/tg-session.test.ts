@@ -59,6 +59,8 @@ describe('POST /api/tg/session', () => {
     const token = decodeURIComponent(session.split(';')[0].split('=')[1])
     expect((await customerFromToken(token))?.id).toBe(c.id)
     expect(cookieValue(res, TG_MODE_COOKIE)).toMatch(/^tg_mode=1/)
+    // a Mini App launch signs in silently on every open: it is not a "sign-in" for the dashboard
+    expect((await prisma.customer.findUnique({ where: { id: c.id } }))?.lastLoginAt).toBeNull()
   })
 
   it('http SITE_URL -> SameSite=Lax; https SITE_URL -> SameSite=None; Secure; Partitioned', async () => {

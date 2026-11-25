@@ -3,13 +3,16 @@ import { redirect } from 'next/navigation'
 import { can, homeFor } from '@/lib/permissions'
 import { getStaff, requirePermission } from '@/lib/admin/session'
 import { getDashboard, isRangeKey, resolveRange, type RangeKey } from '@/lib/admin/dashboard'
+import { getTraffic } from '@/lib/admin/traffic'
 import { rollupAndPrune } from '@/lib/analytics/rollup'
 import { tashkentDay } from '@/lib/analytics/visitor'
 import { Badge, Notice, PageHeader, card } from '@/components/admin/ui'
 import KpiTiles, { fmtNum } from '@/components/admin/dashboard/KpiTiles'
 import RangePicker from '@/components/admin/dashboard/RangePicker'
 import RankList from '@/components/admin/dashboard/RankList'
-import TrendChart, { SERIES_COLOR } from '@/components/admin/dashboard/TrendChart'
+import TrafficSection from '@/components/admin/dashboard/TrafficSection'
+import TrendChart from '@/components/admin/dashboard/TrendChart'
+import { SERIES_COLOR } from '@/components/admin/dashboard/series-colors'
 
 export const metadata = { title: 'Dashboard' }
 export const dynamic = 'force-dynamic'
@@ -35,7 +38,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   } catch (e) {
     console.error('[dashboard] rollup failed', e) // housekeeping must never take the page down
   }
-  const d = await getDashboard(range, now)
+  const [d, traffic] = await Promise.all([getDashboard(range, now), getTraffic(range)])
   const first = range.days[0]
   const last = range.days[range.days.length - 1]
   const lowStockLabel = (v: { title: string; variant: string }) => (v.variant && v.variant !== v.title ? `${v.title} / ${v.variant}` : v.title)
@@ -54,7 +57,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
 
       {process.env.TRUST_PROXY !== '1' ? (
         <div className="mb-4">
-          <Notice kind="warn">Visitor counts are approximate: set TRUST_PROXY=1 behind your reverse proxy. Without it visitors are told apart by browser only, so Visitors is undercounted and Conversion overstated.</Notice>
+          <Notice kind="warn">Visitor counts are approximate: set TRUST_PROXY=1 behind your reverse proxy. Without it visitors are told apart by browser only, so Visitors is undercounted, Conversion overstated, and guests on the same kind of browser as a signed-in customer are counted as signed-in.</Notice>
         </div>
       ) : null}
       <KpiTiles kpis={d.kpis} />
@@ -66,10 +69,9 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         <div className={card}>
           <TrendChart title="Orders" kind="line" color={SERIES_COLOR.orders} data={d.series.map((s) => ({ day: s.day, value: s.orders }))} />
         </div>
-        <div className={`${card} lg:col-span-2`}>
-          <TrendChart title="Visitors" kind="line" color={SERIES_COLOR.visitors} data={d.series.map((s) => ({ day: s.day, value: s.visitors }))} />
-        </div>
       </div>
+
+      <TrafficSection traffic={traffic} kpis={d.kpis} topPages={d.topPages} sources={d.sources} devices={d.devices} firstDay={first} />
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section className={card}>
@@ -110,9 +112,6 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         <RankList title="Top products (revenue)" items={d.topProductsByRevenue.map((p) => ({ label: p.title, value: p.revenueUzs, display: som(p.revenueUzs), sub: `${fmtNum(p.units)} units` }))} />
         <RankList title="Top categories (revenue)" items={d.topCategories.map((c) => ({ label: c.name, value: c.revenueUzs, display: som(c.revenueUzs), sub: `${fmtNum(c.units)} units` }))} />
         <RankList title="Sales by region" items={d.salesByRegion.map((r) => ({ label: r.name, value: r.revenueUzs, display: som(r.revenueUzs), sub: `${r.orders} orders` }))} />
-        <RankList title="Top pages" items={d.topPages} />
-        <RankList title="Traffic sources" items={d.sources} />
-        <RankList title="Devices" items={d.devices} />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/admin/session'
 import { getCustomer, type Segment } from '@/lib/customers'
 import { getRegion } from '@/lib/regions'
 import { formatUzs } from '@/lib/money'
-import { tashkentDay } from '@/lib/analytics/visitor'
+import { tashkentDateTime, tashkentDay } from '@/lib/analytics/visitor'
 import { Badge, EmptyState, PageHeader, card } from '@/components/admin/ui'
 import BackLink from '@/components/admin/BackLink'
 import ClientEditor from '@/components/admin/ClientEditor'
@@ -53,6 +53,18 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                 <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Spent</dt>
                 <dd className="mt-0.5 font-semibold text-neutral-900">{formatUzs(c.spentUzs, 'en')}</dd>
               </div>
+              {c.accountCreatedAt ? (
+                <>
+                  <div className="col-span-2" title="Latest sign-in on the website (Telegram link or code), Tashkent time">
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Last sign-in</dt>
+                    <dd className="mt-0.5 font-semibold tabular-nums text-neutral-900">{c.lastLoginAt ? tashkentDateTime(c.lastLoginAt) : 'never'}</dd>
+                  </div>
+                  <div className="col-span-2" title="Latest visit while signed in, website or Telegram Mini App, Tashkent time">
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Last seen</dt>
+                    <dd className="mt-0.5 font-semibold tabular-nums text-neutral-900">{c.lastSeenAt ? tashkentDateTime(c.lastSeenAt) : 'never'}</dd>
+                  </div>
+                </>
+              ) : null}
             </dl>
             <p className="text-xs text-neutral-500">Orders and spent count confirmed and delivered orders only.</p>
           </div>

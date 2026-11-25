@@ -8,6 +8,12 @@ export function tashkentDay(d: Date): string {
   return new Date(d.getTime() + TASHKENT_OFFSET_MS).toISOString().slice(0, 10)
 }
 
+/** Wall clock in Asia/Tashkent, `YYYY-MM-DD HH:mm`. */
+export function tashkentDateTime(d: Date): string {
+  const iso = new Date(d.getTime() + TASHKENT_OFFSET_MS).toISOString()
+  return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`
+}
+
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|lighthouse/i
 
 /** Crawlers, link-preview fetchers and headless browsers. An empty user agent counts as a bot. */

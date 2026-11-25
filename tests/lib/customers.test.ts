@@ -191,4 +191,12 @@ describe('customer accounts in the admin list', () => {
     expect(rows.find((r) => r.id === b.id)?.accountCreatedAt).toBeNull()
     expect((await getCustomer(a.id))?.accountCreatedAt).toEqual(since)
   })
+  it('the detail carries last sign-in and last seen (null for a customer who never signed in)', async () => {
+    const login = new Date('2026-11-20T08:00:00Z')
+    const seen = new Date('2026-11-21T09:30:00Z')
+    const a = await prisma.customer.create({ data: { phone: '+998901112233', name: 'Aziz', region: 'tashkent-city', tags: [], accountCreatedAt: login, telegramUserId: '42', lastLoginAt: login, lastSeenAt: seen } })
+    const b = await prisma.customer.create({ data: { phone: '+998901112244', name: 'Bobur', region: '', tags: [] } })
+    expect(await getCustomer(a.id)).toMatchObject({ lastLoginAt: login, lastSeenAt: seen })
+    expect(await getCustomer(b.id)).toMatchObject({ lastLoginAt: null, lastSeenAt: null })
+  })
 })

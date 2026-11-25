@@ -153,6 +153,8 @@ model PageView {
   referrerHost String?
   device       String // mobile | tablet | desktop
   visitorHash  String
+  signedIn     Boolean? // null = unknown: recorded before the split existed, or the account lookup failed
+  region       String? // signed-in visitors only: the customer's profile region code. Never a customer id.
   createdAt    DateTime @default(now())
 
   @@index([day])
@@ -205,6 +207,8 @@ model Customer {
   notifyTelegram   Boolean           @default(true)
   sessionVersion   Int               @default(0)
   accountCreatedAt DateTime?
+  lastLoginAt      DateTime? // latest website sign-in (link or code); a Mini App launch does not count
+  lastSeenAt       DateTime? // latest signed-in page view, written at most once per 5 minutes
   addresses        CustomerAddress[]
   favorites        Favorite[]
   logins           CustomerLogin[]

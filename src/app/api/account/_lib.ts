@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { createLimiter, createSharedAwareLimiter } from '@/lib/rate-limit'
+import { markSignedIn } from '@/lib/account/activity'
 
 // Shared bits of the customer account API (not a route: only `route.ts` files are routed).
 
@@ -46,6 +47,15 @@ const NO_STORE = { 'cache-control': 'no-store' }
 export function json(body: unknown, status = 200, headers: Record<string, string> = {}): NextResponse {
   return NextResponse.json(body, { status, headers: { ...NO_STORE, ...headers } })
 }
+/** Records a successful website sign-in on the customer. Never throws: a failed stamp must not fail the sign-in. */
+export async function stampSignIn(customerId: number): Promise<void> {
+  try {
+    await markSignedIn(customerId, new Date())
+  } catch (e) {
+    console.error('[account] sign-in stamp failed', e)
+  }
+}
+
 export const forbidden = () => json({ error: 'FORBIDDEN' }, 403)
 export const rateLimited = (retryAfterSec: number) => json({ error: 'RATE_LIMITED' }, 429, { 'retry-after': String(retryAfterSec) })
 
