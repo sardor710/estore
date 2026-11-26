@@ -12,6 +12,8 @@ export type NotifyOrder = {
   lines: { productTitle: string; variantName: string; qty: number; priceUzs: number }[]
   /** Map link when the customer attached a delivery pin. */
   mapUrl?: string | null
+  /** CASH (default) = on delivery; CARD = online via Octo, payment confirmed separately (notifyOrderPaid). */
+  payMethod?: 'CASH' | 'CARD'
 }
 
 export type NotifyResult = 'sent' | 'skipped' | 'failed'
@@ -32,6 +34,7 @@ function summary(o: NotifyOrder): string {
     ...lines,
     '',
     `Total: ${formatUzs(o.totalUzs, 'uz')}`,
+    o.payMethod === 'CARD' ? 'Payment: card (Octo), awaiting payment' : 'Payment: cash on delivery',
   ].join('\n')
 }
 
@@ -55,4 +58,17 @@ export async function sendTelegramText(text: string, fetchImpl: typeof fetch = f
 /** Posts a plain-text order summary to Telegram. Never throws. 'skipped' when not configured. */
 export async function notifyNewOrder(order: NotifyOrder, fetchImpl: typeof fetch = fetch): Promise<NotifyResult> {
   return sendTelegramText(summary(order), fetchImpl)
+}
+
+/** "Order #N paid by card" to the shop's Telegram chat, once per paid order (called by the payment service). */
+export async function notifyOrderPaid(orderId: number, fetchImpl: typeof fetch = fetch): Promise<NotifyResult> {
+  const { prisma } = await import('@/lib/db')
+  const o = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { number: true, totalUzs: true, payments: { where: { status: 'succeeded' }, orderBy: { id: 'desc' }, take: 1 } },
+  })
+  if (!o) return 'skipped'
+  const p = o.payments[0]
+  const card = p ? [p.cardVendor, p.maskedPan].filter(Boolean).join(' ') : ''
+  return sendTelegramText(`Order #${o.number} paid by card: ${formatUzs(o.totalUzs, 'uz')}${card ? ` (${card})` : ''}`, fetchImpl)
 }

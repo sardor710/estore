@@ -9,6 +9,9 @@ import { orderLimiter } from '@/lib/order-throttle'
 import { runAfterResponse } from '@/lib/after-response'
 import { isJsonContentType, isSameOrigin } from '@/lib/admin/csrf'
 import { CUSTOMER_COOKIE, customerFromToken, readCookie } from '@/lib/account/session'
+import { octoConfig } from '@/lib/payments/octo'
+import { startCardPayment } from '@/lib/payments/service'
+import { notifyOrderPaid } from '@/lib/telegram'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +24,10 @@ export async function POST(req: Request) {
     if (!body.ok) return NextResponse.json({ error: body.status === 413 ? 'TOO_LARGE' : 'INVALID' }, { status: body.status })
     const b = body.value as Record<string, unknown> | null
     if (!b || typeof b !== 'object' || Array.isArray(b)) return NextResponse.json({ error: 'INVALID' }, { status: 400 })
+
+    const card = b.payment === 'card'
+    // Card chosen but Octo not configured: refuse before anything is created (the checkout hides the option then).
+    if (card && !octoConfig()) return NextResponse.json({ error: 'CARD_UNAVAILABLE' }, { status: 400 })
 
     const key = clientKey(req.headers)
     const slot = orderLimiter.reserve(key)
@@ -46,6 +53,7 @@ export async function POST(req: Request) {
           locale,
           location: b.location && typeof b.location === 'object' && !Array.isArray(b.location) ? (b.location as { lat?: unknown; lng?: unknown }) : null,
           ...(account ? { accountCustomerId: account.id, saveAddress } : {}),
+          payMethod: card ? 'CARD' : 'CASH',
         },
         // Telegram runs after the response (kept alive by the platform), never delaying or failing the order.
         { notify: (o) => runAfterResponse(() => notifyNewOrder(o)) },
@@ -60,6 +68,16 @@ export async function POST(req: Request) {
     }
     const placedNumber = result.number
     runAfterResponse(() => notifyOrderPlaced(placedNumber)) // customer's 'order received' in Telegram (linked accounts only)
+    if (card) {
+      // The order exists either way; if Octo fails the customer gets "Try again" on the order page.
+      try {
+        const { payUrl } = await startCardPayment(result.id, { notifyPaid: (id) => notifyOrderPaid(id) })
+        return NextResponse.json({ number: result.number, token: result.payToken, payUrl }, { status: 201 })
+      } catch (e) {
+        console.error('[orders] Octo payment start failed', e instanceof Error ? e.message : e)
+        return NextResponse.json({ number: result.number, token: result.payToken, payError: true }, { status: 201 })
+      }
+    }
     return NextResponse.json({ number: result.number }, { status: 201 })
   } catch (e) {
     console.error('[orders] create failed', e)
