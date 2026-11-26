@@ -37,6 +37,7 @@ export default function CheckoutForm({
   account = null,
   telegram = false,
   cardPayments = false,
+  octoTest = false,
 }: {
   locale: Locale
   regions: { code: string; name: string }[]
@@ -45,6 +46,8 @@ export default function CheckoutForm({
   telegram?: boolean
   /** Octo is configured: offer "Pay online by card" next to cash on delivery. */
   cardPayments?: boolean
+  /** Octo test-mode checkout (?octo_test=1): the server only accepts card orders in test mode with this flag. */
+  octoTest?: boolean
 }) {
   const t = useTranslations('checkout')
   const tc = useTranslations('cart')
@@ -148,7 +151,7 @@ export default function CheckoutForm({
           ...values,
           locale,
           location: pin,
-          ...(cardPayments && payment === 'card' ? { payment: 'card' } : {}),
+          ...(cardPayments && payment === 'card' ? { payment: 'card', ...(octoTest ? { octoTest: true } : {}) } : {}),
           // Signed in: the server uses the account phone anyway; optionally keep the new address.
           ...(account && choice === 'new' && canSaveAddress && saveNew ? { saveAddress: { label: newLabel.trim() } } : {}),
         }),

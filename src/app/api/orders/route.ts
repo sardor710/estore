@@ -11,7 +11,7 @@ import { isJsonContentType, isSameOrigin } from '@/lib/admin/csrf'
 import { CUSTOMER_COOKIE, customerFromToken, readCookie } from '@/lib/account/session'
 import { octoConfig } from '@/lib/payments/octo'
 import { startCardPayment } from '@/lib/payments/service'
-import { notifyOrderPaid } from '@/lib/telegram'
+import { livePaymentDeps } from '@/lib/payments/live'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +26,10 @@ export async function POST(req: Request) {
     if (!b || typeof b !== 'object' || Array.isArray(b)) return NextResponse.json({ error: 'INVALID' }, { status: 400 })
 
     const card = b.payment === 'card'
-    // Card chosen but Octo not configured: refuse before anything is created (the checkout hides the option then).
-    if (card && !octoConfig()) return NextResponse.json({ error: 'CARD_UNAVAILABLE' }, { status: 400 })
+    // Card chosen but Octo not configured -- or Octo in test mode and this is not an explicit test checkout
+    // (?octo_test=1): refuse before anything is created, so real customers never pay on the test page.
+    const octo = octoConfig()
+    if (card && (!octo || (octo.test && b.octoTest !== true))) return NextResponse.json({ error: 'CARD_UNAVAILABLE' }, { status: 400 })
 
     const key = clientKey(req.headers)
     const slot = orderLimiter.reserve(key)
@@ -71,7 +73,7 @@ export async function POST(req: Request) {
     if (card) {
       // The order exists either way; if Octo fails the customer gets "Try again" on the order page.
       try {
-        const { payUrl } = await startCardPayment(result.id, { notifyPaid: (id) => notifyOrderPaid(id) })
+        const { payUrl } = await startCardPayment(result.id, livePaymentDeps)
         return NextResponse.json({ number: result.number, token: result.payToken, payUrl }, { status: 201 })
       } catch (e) {
         console.error('[orders] Octo payment start failed', e instanceof Error ? e.message : e)

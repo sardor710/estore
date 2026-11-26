@@ -61,6 +61,7 @@ export default function OrderPaymentPanel({ view }: { view: OrderPaymentView }) 
       </div>
     )
   }
+  if (view.orderStatus === 'CANCELLED' || view.orderStatus === 'DELIVERED') return null
   const failed = view.status === 'FAILED'
   return (
     <div className={`${box} ${failed ? 'bg-red-50 text-red-900' : 'bg-amber-50 text-amber-900'}`} role="status">

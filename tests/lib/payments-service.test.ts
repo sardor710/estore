@@ -61,6 +61,7 @@ describe('startCardPayment', () => {
     const o = await mkOrder()
     const { f } = octo()
     await startCardPayment(o.id, { fetch: f })
+    await prisma.payment.updateMany({ where: { orderId: o.id }, data: { createdAt: new Date(Date.now() - 40 * 60_000) } })
     await startCardPayment(o.id, { fetch: f })
     expect(await prisma.payment.count({ where: { orderId: o.id } })).toBe(2)
     await prisma.order.update({ where: { id: o.id }, data: { paymentStatus: 'PAID' } })
@@ -69,7 +70,10 @@ describe('startCardPayment', () => {
   it('stops after 10 attempts', async () => {
     const o = await mkOrder()
     const { f } = octo()
-    for (let i = 0; i < 10; i++) await startCardPayment(o.id, { fetch: f })
+    for (let i = 0; i < 10; i++) {
+      await startCardPayment(o.id, { fetch: f })
+      await prisma.payment.updateMany({ where: { orderId: o.id }, data: { createdAt: new Date(Date.now() - 40 * 60_000) } })
+    }
     await expect(startCardPayment(o.id, { fetch: f })).rejects.toThrow('TOO_MANY_ATTEMPTS')
   })
 })
@@ -117,6 +121,7 @@ describe('settlePayment', () => {
   it('a late cancel of attempt 2 does not undo a paid attempt 1', async () => {
     const o = await mkOrder()
     await startCardPayment(o.id, { fetch: octo().f })
+    await prisma.payment.updateMany({ where: { orderId: o.id }, data: { createdAt: new Date(Date.now() - 40 * 60_000) } })
     await startCardPayment(o.id, { fetch: octo().f })
     const f = octo({ status: (tx) => (tx.endsWith('-1') ? paid()() : { status: 'canceled', total_sum: 1_500_000 }) }).f
     expect(await settlePayment(`zanko-${o.number}-1`, { fetch: f })).toBe('PAID')
@@ -168,5 +173,68 @@ describe('refundOrder', () => {
     const { f, calls } = octo()
     await expect(refundOrder(o.id, { fetch: f })).rejects.toThrow('NOT_PAID')
     expect(calls).toHaveLength(0)
+  })
+})
+
+describe('review fixes', () => {
+  it('I1: Pay now first settles open attempts — a stale tab cannot start a second charge', async () => {
+    const o = await mkOrder()
+    await startCardPayment(o.id, { fetch: octo().f })
+    const { f, calls } = octo({ status: paid() })
+    await expect(startCardPayment(o.id, { fetch: f })).rejects.toThrow('ALREADY_PAID')
+    expect(calls.some((c) => 'total_sum' in c.body)).toBe(false)
+    expect(await prisma.payment.count({ where: { orderId: o.id } })).toBe(1)
+  })
+  it('I1: a still-fresh open attempt is reused instead of opening a second payable link', async () => {
+    const o = await mkOrder()
+    const first = await startCardPayment(o.id, { fetch: octo().f })
+    const again = await startCardPayment(o.id, { fetch: octo().f })
+    expect(again.payUrl).toBe(first.payUrl)
+    expect(await prisma.payment.count({ where: { orderId: o.id } })).toBe(1)
+  })
+  it('I1: a second successful payment on an already-paid order raises an alert', async () => {
+    const o = await mkOrder()
+    await startCardPayment(o.id, { fetch: octo().f })
+    await prisma.payment.updateMany({ where: { orderId: o.id }, data: { createdAt: new Date(Date.now() - 40 * 60_000) } })
+    await startCardPayment(o.id, { fetch: octo().f })
+    const alert = vi.fn()
+    const f = octo({ status: paid() }).f
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await settlePayment(`zanko-${o.number}-1`, { fetch: f, alert })
+    await settlePayment(`zanko-${o.number}-2`, { fetch: f, alert })
+    expect(alert).toHaveBeenCalledTimes(1)
+    expect(alert.mock.calls[0][0]).toMatch(new RegExp(`#${o.number}.*TWICE.*zanko-${o.number}-2`))
+  })
+  it('I2: a cancelled or delivered order cannot be paid', async () => {
+    for (const status of ['CANCELLED', 'DELIVERED']) {
+      const o = await mkOrder({ status })
+      const { f, calls } = octo()
+      await expect(startCardPayment(o.id, { fetch: f })).rejects.toThrow('ORDER_CLOSED')
+      expect(calls).toHaveLength(0)
+    }
+  })
+  it('I3: the attempt records whether it was a test payment', async () => {
+    const o = await mkOrder()
+    await startCardPayment(o.id, { fetch: octo().f })
+    expect((await prisma.payment.findFirstOrThrow({ where: { orderId: o.id } })).test).toBe(true)
+    process.env.OCTO_TEST = '0'
+    const o2 = await mkOrder()
+    await startCardPayment(o2.id, { fetch: octo().f })
+    expect((await prisma.payment.findFirstOrThrow({ where: { orderId: o2.id } })).test).toBe(false)
+  })
+  it('M1: Octo failing at the first attempt leaves the order FAILED (Try again), not PENDING', async () => {
+    const o = await mkOrder()
+    const f = (async () => new Response(JSON.stringify({ error: 5, errMessage: 'down' }))) as unknown as typeof fetch
+    await expect(startCardPayment(o.id, { fetch: f })).rejects.toThrow('down')
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).paymentStatus).toBe('FAILED')
+  })
+  it('M2: an unknown Octo status keeps the attempt open (only canceled is final)', async () => {
+    const o = await mkOrder()
+    await startCardPayment(o.id, { fetch: octo().f })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await settlePayment(`zanko-${o.number}-1`, { fetch: octo({ status: () => ({ status: 'something_new', total_sum: 1_500_000 }) }).f })).toBe('PENDING')
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).paymentStatus).toBe('PENDING')
+    await settleOrder(o.id, { fetch: octo({ status: paid() }).f })
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).paymentStatus).toBe('PAID')
   })
 })

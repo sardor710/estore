@@ -46,7 +46,7 @@ describe('orderPaymentView', () => {
     await mk()
     const { f } = statusFetch({ status: 'succeeded', total_sum: 500_000, maskedPan: '986012** **** 0000', card_vendor: 'Humo' })
     expect(await orderPaymentView(2001, 't'.repeat(32), { fetch: f })).toEqual({
-      number: 2001, token: 't'.repeat(32), status: 'PAID', totalUzs: 500_000, cardVendor: 'Humo', maskedPan: '986012** **** 0000',
+      number: 2001, token: 't'.repeat(32), status: 'PAID', orderStatus: 'NEW', totalUzs: 500_000, cardVendor: 'Humo', maskedPan: '986012** **** 0000',
     })
   })
   it('stays PENDING while Octo says created; trusted view needs no token', async () => {

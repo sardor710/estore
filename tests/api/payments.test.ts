@@ -60,7 +60,7 @@ const req = (url: string, body: unknown) =>
   })
 async function placeCard() {
   const v = await mkVariant()
-  const res = await orderPOST(req('/api/orders', { ...form, payment: 'card', lines: [{ variantId: v.id, qty: 1 }] }) as never)
+  const res = await orderPOST(req('/api/orders', { ...form, payment: 'card', octoTest: true, lines: [{ variantId: v.id, qty: 1 }] }) as never)
   return { res, data: (await res.json()) as { number: number; token: string; payUrl?: string; payError?: boolean } }
 }
 
@@ -127,10 +127,16 @@ describe('POST /api/payments/octo/notify', () => {
 })
 
 describe('POST /api/payments/octo/pay', () => {
-  it('makes a new attempt with the right token', async () => {
+  it('with the right token returns the still-valid link (one payable link at a time)', async () => {
     const { data } = await placeCard()
     const res = await payPOST(req('/api/payments/octo/pay', { number: data.number, token: data.token }) as never)
     expect(res.status).toBe(200)
+    expect((await res.json()).payUrl).toBe(`https://pay2.octo.uz/pay/uuid-zanko-${data.number}-1`)
+  })
+  it('opens a new attempt once the previous link has expired', async () => {
+    const { data } = await placeCard()
+    await prisma.payment.updateMany({ data: { createdAt: new Date(Date.now() - 40 * 60_000) } })
+    const res = await payPOST(req('/api/payments/octo/pay', { number: data.number, token: data.token }) as never)
     expect((await res.json()).payUrl).toBe(`https://pay2.octo.uz/pay/uuid-zanko-${data.number}-2`)
   })
   it('404 with a wrong token', async () => {
@@ -144,6 +150,23 @@ describe('POST /api/payments/octo/pay', () => {
     await notifyPOST(req('/api/payments/octo/notify', { shop_transaction_id: `zanko-${data.number}-1` }) as never)
     const res = await payPOST(req('/api/payments/octo/pay', { number: data.number, token: data.token }) as never)
     expect(res.status).toBe(409)
+  })
+})
+
+describe('review fixes (routes)', () => {
+  it('I2: Pay now on a cancelled order -> 409 ORDER_CLOSED', async () => {
+    const { data } = await placeCard()
+    await prisma.order.update({ where: { number: data.number }, data: { status: 'CANCELLED' } })
+    const res = await payPOST(req('/api/payments/octo/pay', { number: data.number, token: data.token }) as never)
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('ORDER_CLOSED')
+  })
+  it('I3: in test mode a card order needs the explicit octoTest flag; without it -> CARD_UNAVAILABLE', async () => {
+    const v = await mkVariant()
+    const res = await orderPOST(req('/api/orders', { ...form, payment: 'card', lines: [{ variantId: v.id, qty: 1 }] }) as never)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('CARD_UNAVAILABLE')
+    expect(await prisma.order.count()).toBe(0)
   })
 })
 

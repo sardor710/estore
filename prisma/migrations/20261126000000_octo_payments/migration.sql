@@ -12,6 +12,7 @@ CREATE TABLE "Payment" (
     "octoPaymentId" TEXT,
     "status" TEXT NOT NULL DEFAULT 'created',
     "amountUzs" INTEGER NOT NULL,
+    "test" BOOLEAN NOT NULL DEFAULT false,
     "payUrl" TEXT,
     "maskedPan" TEXT,
     "cardVendor" TEXT,

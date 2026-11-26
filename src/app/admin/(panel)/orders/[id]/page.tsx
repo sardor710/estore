@@ -4,12 +4,12 @@ import { prisma } from '@/lib/db'
 import { allowedTransitions } from '@/lib/admin/orders'
 import { getRegion } from '@/lib/regions'
 import { formatUzs } from '@/lib/money'
-import { Badge, PageHeader, card, table, td, th } from '@/components/admin/ui'
+import { Badge, Notice, PageHeader, card, table, td, th } from '@/components/admin/ui'
 import BackLink from '@/components/admin/BackLink'
 import OrderStatusButtons from '@/components/admin/OrderStatusButtons'
 import OrderPaymentButtons from '@/components/admin/OrderPaymentButtons'
 import { settleOrder } from '@/lib/payments/service'
-import { notifyOrderPaid } from '@/lib/telegram'
+import { livePaymentDeps } from '@/lib/payments/live'
 import { requirePermission } from '@/lib/admin/session'
 
 export const metadata = { title: 'Order' }
@@ -21,7 +21,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const id = Number((await params).id)
   if (!Number.isInteger(id)) notFound()
   // A card order still waiting is re-checked with Octo first, so admin sees the real payment state.
-  await settleOrder(id, { notifyPaid: (oid) => notifyOrderPaid(oid) }).catch(() => {})
+  await settleOrder(id, livePaymentDeps).catch(() => {})
   const o = await prisma.order.findUnique({ where: { id }, include: { lines: { orderBy: { id: 'asc' } }, payments: { orderBy: { id: 'desc' } } } })
   if (!o) notFound()
   const region = getRegion(o.region)
@@ -109,7 +109,29 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     </div>
                   ))}
                 </dl>
+                {o.paymentStatus === 'PAID' && o.status === 'CANCELLED' && (
+                  <div className="mb-3">
+                    <Notice kind="error">This order is cancelled but was paid by card. Refund the payment.</Notice>
+                  </div>
+                )}
+                {o.payments.filter((p) => p.status === 'succeeded').length > 1 && (
+                  <div className="mb-3">
+                    <Notice kind="error">This order was paid more than once. Refund the extra payment in the Octo cabinet.</Notice>
+                  </div>
+                )}
                 <OrderPaymentButtons orderId={o.id} paymentStatus={o.paymentStatus} amountUzs={o.totalUzs} />
+                {o.payments.length > 0 && (
+                  <ul className="mt-4 space-y-1 border-t border-neutral-100 pt-3 text-xs text-neutral-600">
+                    {o.payments.map((p) => (
+                      <li key={p.id} className="flex flex-wrap gap-x-3">
+                        <span className="font-mono">{p.shopTransactionId}</span>
+                        <span className="font-semibold">{p.status}</span>
+                        {p.test && <span className="font-semibold text-amber-700">TEST</span>}
+                        <span>{p.createdAt.toISOString().slice(0, 16).replace('T', ' ')} UTC</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </>
             )}
           </section>

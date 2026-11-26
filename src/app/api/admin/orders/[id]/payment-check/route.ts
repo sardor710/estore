@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { adminApi } from '@/lib/admin/api'
 import { logActivity } from '@/lib/admin/activity'
 import { settleOrder } from '@/lib/payments/service'
-import { notifyOrderPaid } from '@/lib/telegram'
+import { livePaymentDeps } from '@/lib/payments/live'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export const POST = adminApi<{ params: Promise<{ id: string }> }>('orders', async (_req, ctx, staff) => {
   const id = Number((await ctx.params).id)
   if (!Number.isInteger(id)) return NextResponse.json({ error: 'BAD_REQUEST' }, { status: 400 })
-  await settleOrder(id, { notifyPaid: (oid) => notifyOrderPaid(oid) })
+  await settleOrder(id, livePaymentDeps)
   const o = await prisma.order.findUnique({ where: { id }, select: { paymentStatus: true } })
   if (!o) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
   await logActivity(staff, 'payment', 'order', id, `Checked card payment status: ${o.paymentStatus}`)

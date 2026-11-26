@@ -91,6 +91,21 @@ describe('payment method in Telegram messages', () => {
     expect(text).toMatch(/1\s500\s000/)
     expect(text).toContain('Visa 418451** **** 1111')
   })
+  it('notifyOrderPaid flags TEST payments and cancelled orders', async () => {
+    await updateSettings({ telegramBotToken: 'TOKEN', telegramChatId: '42' })
+    const o = await prisma.order.create({
+      data: {
+        number: 1043, name: 'Ali', phone: '+998901234567', region: 'tashkent-city', address: 'A', locale: 'uz', totalUzs: 100_000, status: 'CANCELLED',
+        payMethod: 'CARD', paymentStatus: 'PAID',
+        payments: { create: [{ shopTransactionId: 'zanko-1043-1', amountUzs: 100_000, status: 'succeeded', test: true }] },
+      },
+    })
+    const f = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    await notifyOrderPaid(o.id, f as unknown as typeof fetch)
+    const text = JSON.parse(f.mock.calls[0][1].body).text as string
+    expect(text).toContain('TEST payment')
+    expect(text).toContain('ORDER IS CANCELLED')
+  })
   it('notifyOrderPaid on an unknown order is skipped, no fetch', async () => {
     const f = vi.fn()
     expect(await notifyOrderPaid(999999, f as unknown as typeof fetch)).toBe('skipped')

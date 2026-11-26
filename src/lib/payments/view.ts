@@ -1,12 +1,14 @@
 import { timingSafeEqual } from 'node:crypto'
 import { prisma } from '@/lib/db'
 import { settleOrder, type PaymentDeps } from './service'
-import { notifyOrderPaid } from '@/lib/telegram'
+import { livePaymentDeps } from './live'
 
 export type OrderPaymentView = {
   number: number
   token: string
   status: string
+  /** Order status (NEW, CONFIRMED, ..., CANCELLED): a cancelled order offers no payment. */
+  orderStatus: string
   totalUzs: number
   cardVendor: string | null
   maskedPan: string | null
@@ -27,16 +29,17 @@ export async function orderPaymentView(
   const o = await prisma.order.findUnique({ where: { number }, select: { id: true, payMethod: true, payToken: true } })
   if (!o || o.payMethod !== 'CARD' || !o.payToken) return null
   if (!opts.trusted && !(token && same(o.payToken, token))) return null
-  await settleOrder(o.id, { fetch: opts.fetch, notifyPaid: opts.notifyPaid ?? ((id) => notifyOrderPaid(id)) })
+  await settleOrder(o.id, { ...livePaymentDeps, ...(opts.fetch ? { fetch: opts.fetch } : {}), ...(opts.notifyPaid ? { notifyPaid: opts.notifyPaid } : {}) })
   const fresh = await prisma.order.findUniqueOrThrow({
     where: { id: o.id },
-    select: { number: true, payToken: true, paymentStatus: true, totalUzs: true, payments: { where: { status: 'succeeded' }, orderBy: { id: 'desc' }, take: 1 } },
+    select: { number: true, status: true, payToken: true, paymentStatus: true, totalUzs: true, payments: { where: { status: 'succeeded' }, orderBy: { id: 'desc' }, take: 1 } },
   })
   const p = fresh.payments[0]
   return {
     number: fresh.number,
     token: fresh.payToken ?? '',
     status: fresh.paymentStatus,
+    orderStatus: fresh.status,
     totalUzs: fresh.totalUzs,
     cardVendor: p?.cardVendor ?? null,
     maskedPan: p?.maskedPan ?? null,

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { readJsonBody } from '@/lib/body-limit'
 import { settlePayment } from '@/lib/payments/service'
-import { notifyOrderPaid } from '@/lib/telegram'
+import { livePaymentDeps } from '@/lib/payments/live'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const b = body.ok ? (body.value as Record<string, unknown> | null) : null
     const tx = b && typeof b === 'object' && typeof b.shop_transaction_id === 'string' ? b.shop_transaction_id : ''
     if (/^zanko-\d{1,9}-\d{1,3}$/.test(tx)) {
-      await settlePayment(tx, { notifyPaid: (id) => notifyOrderPaid(id) })
+      await settlePayment(tx, livePaymentDeps)
     }
   } catch (e) {
     console.error('[octo] notify failed', e instanceof Error ? e.message : e)

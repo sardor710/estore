@@ -65,10 +65,13 @@ export async function notifyOrderPaid(orderId: number, fetchImpl: typeof fetch =
   const { prisma } = await import('@/lib/db')
   const o = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { number: true, totalUzs: true, payments: { where: { status: 'succeeded' }, orderBy: { id: 'desc' }, take: 1 } },
+    select: { number: true, status: true, totalUzs: true, payments: { where: { status: 'succeeded' }, orderBy: { id: 'desc' }, take: 1 } },
   })
   if (!o) return 'skipped'
   const p = o.payments[0]
   const card = p ? [p.cardVendor, p.maskedPan].filter(Boolean).join(' ') : ''
-  return sendTelegramText(`Order #${o.number} paid by card: ${formatUzs(o.totalUzs, 'uz')}${card ? ` (${card})` : ''}`, fetchImpl)
+  const lines = [`Order #${o.number} paid by card: ${formatUzs(o.totalUzs, 'uz')}${card ? ` (${card})` : ''}`]
+  if (p?.test) lines.push('TEST payment (Octo test mode): no real money was taken.')
+  if (o.status === 'CANCELLED') lines.push('⚠️ ORDER IS CANCELLED: refund this payment from the admin order page.')
+  return sendTelegramText(lines.join('\n'), fetchImpl)
 }

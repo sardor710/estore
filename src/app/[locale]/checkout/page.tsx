@@ -23,7 +23,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return { ...meta, robots: { index: false, follow: false } }
 }
 
-export default async function CheckoutPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function CheckoutPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>
+  searchParams: Promise<{ octo_test?: string | string[] }>
+}) {
   const { locale: raw } = await params
   setRequestLocale(raw)
   const locale = raw as Locale
@@ -48,6 +54,12 @@ export default async function CheckoutPage({ params }: { params: Promise<{ local
       }
     : null
 
+  // Card payments: shown when Octo is configured. In Octo test mode only on an explicit test checkout
+  // (/checkout?octo_test=1), so real customers never land on the test payment page.
+  const octo = octoConfig()
+  const octoTest = octo?.test === true && (await searchParams).octo_test === '1'
+  const cardPayments = octo !== null && (!octo.test || octoTest)
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <h1 className="text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">{t('title')}</h1>
@@ -57,7 +69,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ local
           <TgPhoneGate />
         </div>
       ) : (
-        <CheckoutForm locale={locale} regions={regions} account={account} telegram={telegram} cardPayments={octoConfig() !== null} />
+        <CheckoutForm locale={locale} regions={regions} account={account} telegram={telegram} cardPayments={cardPayments} octoTest={octoTest} />
       )}
     </div>
   )

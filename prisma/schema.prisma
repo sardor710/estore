@@ -390,6 +390,8 @@ model Payment {
   /// Octo status: created | wait_user_action | waiting_for_capture | succeeded | canceled
   status            String    @default("created")
   amountUzs         Int
+  /// Created while OCTO_TEST=1 (Octo test mode): never real money.
+  test              Boolean   @default(false)
   payUrl            String?
   maskedPan         String?
   cardVendor        String?
