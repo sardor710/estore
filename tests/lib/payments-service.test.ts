@@ -49,7 +49,7 @@ describe('startCardPayment', () => {
     expect(body.shop_transaction_id).toBe(`zanko-${o.number}-1`)
     expect(body.total_sum).toBe(1_500_000)
     expect(body.description).toBe(`Zanko order #${o.number}`)
-    expect(body.language).toBe('uz')
+    expect(body.language).toBe('oz') // Octo: oz = Uzbek Latin (the site's Uzbek), uz = Uzbek Cyrillic
     expect(String(body.return_url)).toMatch(new RegExp(`/uz/order/${o.number}\\?t=tok-${o.number}$`))
     expect(String(body.notify_url)).toMatch(/\/api\/payments\/octo\/notify$/)
     const pay = await prisma.payment.findUniqueOrThrow({ where: { shopTransactionId: `zanko-${o.number}-1` } })
