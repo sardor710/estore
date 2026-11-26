@@ -65,7 +65,8 @@ export type PrepareInput = {
   description: string
   returnUrl: string
   notifyUrl: string
-  language: 'uz' | 'ru' | 'en'
+  /** Octo page language: oz = Uzbek (Latin), uz = Uzbek (Cyrillic), ru, en. */
+  language: 'oz' | 'uz' | 'ru' | 'en'
   phone?: string
 }
 

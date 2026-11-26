@@ -61,7 +61,7 @@ export async function startCardPayment(orderId: number, deps: PaymentDeps = {}):
         description: `Zanko order #${order.number}`,
         returnUrl: `${SITE_URL}/${lang}/order/${order.number}?t=${order.payToken ?? ''}`,
         notifyUrl: `${SITE_URL}/api/payments/octo/notify`,
-        language: lang,
+        language: lang === 'uz' ? 'oz' : lang, // the site's Uzbek is Latin; Octo's "uz" is Cyrillic
       },
       deps.fetch,
     )
