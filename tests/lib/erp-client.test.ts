@@ -56,7 +56,7 @@ describe('erpRequest', () => {
 
   it('5xx is transient', async () => {
     respond(502, 'Bad gateway')
-    const e = await erpRequest('GET', '/api/method/ping').catch((x) => x)
+    const e = await erpRequest('GET', '/api/method/ping').catch((x: ErpError) => x)
     expect(e).toBeInstanceOf(ErpError)
     expect(e.transient).toBe(true)
     expect(e.status).toBe(502)
@@ -64,14 +64,14 @@ describe('erpRequest', () => {
 
   it('429 is transient', async () => {
     respond(429, {})
-    expect((await erpRequest('GET', '/api/method/ping').catch((x) => x)).transient).toBe(true)
+    expect((await erpRequest('GET', '/api/method/ping').catch((x: ErpError) => x)).transient).toBe(true)
   })
 
   it('a network failure is transient', async () => {
     setErpFetch((async () => {
       throw new TypeError('fetch failed')
     }) as unknown as typeof fetch)
-    const e = await erpRequest('GET', '/api/method/ping').catch((x) => x)
+    const e = await erpRequest('GET', '/api/method/ping').catch((x: ErpError) => x)
     expect(e).toBeInstanceOf(ErpError)
     expect(e.transient).toBe(true)
   })
@@ -81,7 +81,7 @@ describe('erpRequest', () => {
       exc_type: 'NegativeStockError',
       _server_messages: JSON.stringify([JSON.stringify({ message: '1 units of SKU-1 needed in Stores - Z' })]),
     })
-    const e = await erpRequest('POST', '/api/resource/Delivery Note', { body: {} }).catch((x) => x)
+    const e = await erpRequest('POST', '/api/resource/Delivery Note', { body: {} }).catch((x: ErpError) => x)
     expect(e.transient).toBe(false)
     expect(e.status).toBe(417)
     expect(e.message).toContain('1 units of SKU-1 needed')
@@ -90,14 +90,14 @@ describe('erpRequest', () => {
 
   it('404 is permanent', async () => {
     respond(404, { exc_type: 'DoesNotExistError' })
-    const e = await erpRequest('GET', '/api/resource/Item/NOPE').catch((x) => x)
+    const e = await erpRequest('GET', '/api/resource/Item/NOPE').catch((x: ErpError) => x)
     expect(e.transient).toBe(false)
     expect(e.status).toBe(404)
   })
 
   it('throws a permanent ErpError when not configured', async () => {
     delete process.env.ERP_API_KEY
-    const e = await erpRequest('GET', '/api/method/ping').catch((x) => x)
+    const e = await erpRequest('GET', '/api/method/ping').catch((x: ErpError) => x)
     expect(e).toBeInstanceOf(ErpError)
     expect(e.transient).toBe(false)
   })
