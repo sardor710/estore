@@ -414,7 +414,7 @@ model ErpOutbox {
   kind          String // DELIVER | RETURN | RECEIPT
   orderId       Int
   lines         Json // [{ sku, qty, rateUzs }]
-  status        String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  status        String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED | SKIPPED
   attempts      Int       @default(0)
   nextAttemptAt DateTime  @default(now())
   lockedUntil   DateTime?

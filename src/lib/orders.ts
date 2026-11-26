@@ -12,6 +12,8 @@ import { loadPricer } from '@/lib/promotions'
 import { upsertCustomerFromOrder } from '@/lib/customers'
 import { insertAddress } from '@/lib/account/addresses'
 import { cleanLatLng, mapLinks } from '@/lib/geo'
+import { enqueueForStatus, drainOutbox } from '@/lib/erp/outbox'
+import { runAfterResponse } from '@/lib/after-response'
 
 export type OrderStatus = 'NEW' | 'CONFIRMED' | 'SHIPPING' | 'DELIVERED' | 'CANCELLED'
 export type CreateOrderInput = {
@@ -255,8 +257,9 @@ export function allowedTransitions(from: string): OrderStatus[] {
 class Insufficient extends Error {}
 
 export async function setOrderStatus(orderId: number, to: OrderStatus): Promise<StatusResult> {
+  let erpQueued = false
   try {
-    return await prisma.$transaction(async (tx): Promise<StatusResult> => {
+    const r = await prisma.$transaction(async (tx): Promise<StatusResult> => {
       const order = await tx.order.findUnique({ where: { id: orderId }, include: { lines: true } })
       if (!order || !(TRANSITIONS[order.status] ?? []).includes(to)) return { ok: false, error: 'BAD_TRANSITION' }
 
@@ -278,8 +281,12 @@ export async function setOrderStatus(orderId: number, to: OrderStatus): Promise<
           await tx.variant.updateMany({ where: { id: variantId }, data: { stock: { increment: qty } } })
         }
       }
+      // ERP stock movement, committed together with the status change (pushed by the outbox).
+      erpQueued = await enqueueForStatus(tx, order, order.status, to)
       return { ok: true }
     })
+    if (erpQueued) runAfterResponse(() => drainOutbox())
+    return r
   } catch (e) {
     if (e instanceof Insufficient) return { ok: false, error: 'INSUFFICIENT_STOCK' }
     throw e
