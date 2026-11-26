@@ -11,7 +11,7 @@ import { ERP } from '../src/lib/erp/core'
 import { ensureErpItems } from '../src/lib/erp/items'
 import { fetchErpSnapshot } from '../src/lib/erp/snapshot'
 
-const OPENING_REMARK = 'zanko-opening-2026-11-26'
+const OPENING_REF = 'ZK-OPENING' // unique zanko_order_ref on the opening Stock Reconciliation
 
 async function diff() {
   const variants = await prisma.variant.findMany({ select: { sku: true, stock: true, priceUzs: true } })
@@ -29,7 +29,7 @@ async function main() {
   const dry = process.argv.includes('--dry-run')
   const variants = await prisma.variant.findMany({ select: { id: true, sku: true, stock: true } })
   const withStock = variants.filter((v) => v.stock > 0)
-  const opening = await erpList('Stock Reconciliation', [['remarks', '=', OPENING_REMARK], ['docstatus', '=', 1]])
+  const opening = await erpList('Stock Reconciliation', [['zanko_order_ref', '=', OPENING_REF], ['docstatus', '=', 1]])
 
   if (dry) {
     const snap = await fetchErpSnapshot(variants.map((v) => v.sku))
@@ -53,7 +53,8 @@ async function main() {
       company: ERP.company,
       purpose: 'Stock Reconciliation',
       set_warehouse: ERP.warehouse,
-      remarks: OPENING_REMARK,
+      zanko_order_ref: OPENING_REF,
+      remarks: 'Opening stock from zanko.uz (2026-11-26)',
       docstatus: 1,
       items: rows.map((v) => ({ item_code: v.sku, warehouse: ERP.warehouse, qty: v.stock, valuation_rate: 0, allow_zero_valuation_rate: 1 })),
     })

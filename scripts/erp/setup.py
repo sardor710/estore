@@ -101,6 +101,7 @@ def setup():
     # 4. Custom fields
     custom_field("Delivery Note", "zanko_order_ref", "zanko.uz order ref", "customer", unique=1, read_only=1, in_list_view=1, in_standard_filter=1, no_copy=1)
     custom_field("Stock Entry", "zanko_order_ref", "zanko.uz order ref", "stock_entry_type", unique=1, read_only=1, in_standard_filter=1, no_copy=1)
+    custom_field("Stock Reconciliation", "zanko_order_ref", "zanko.uz ref", "purpose", unique=1, read_only=1, no_copy=1)
     custom_field("Item", "zanko_url", "zanko.uz page", "item_group", read_only=1)
 
     frappe.db.commit()
