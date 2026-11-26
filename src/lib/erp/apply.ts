@@ -14,12 +14,14 @@ export async function refreshFromErp(skus?: string[]): Promise<RefreshResult> {
     select: { id: true, sku: true, stock: true, priceUzs: true },
   })
   const result: RefreshResult = { stockChanged: 0, priceChanged: 0, missingInErp: [], missingPrice: [] }
-  const snap = await fetchErpSnapshot(variants.map((v) => v.sku))
-  // Read after the variants: a confirmation landing in between changes stock, and the
-  // conditional write below then skips that variant (the next refresh picks it up).
+  // Order matters: variants, then pending pushes, then ERP. A push that finishes in between is then
+  // deducted twice (sells less for a moment; the drain refreshes those SKUs right after) instead
+  // of not at all (phantom stock). A confirm landing in between changes stock, so the conditional
+  // write below skips that variant until the next refresh.
   const pending = pendingBySku(
     await prisma.erpOutbox.findMany({ where: { status: { in: ['PENDING', 'RUNNING', 'FAILED'] } }, select: { kind: true, status: true, lines: true } }),
   )
+  const snap = await fetchErpSnapshot(variants.map((v) => v.sku))
 
   for (const v of variants) {
     if (!snap.items.has(v.sku)) {

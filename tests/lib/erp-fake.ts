@@ -10,7 +10,7 @@ export type FakeErp = {
   db: Map<string, Doc[]>
   calls: { method: string; path: string; body?: unknown }[]
   /** Return a Response to short-circuit a call (failure injection). */
-  intercept: ((method: string, path: string, body: unknown) => Response | null) | null
+  intercept: ((method: string, path: string, body: unknown) => Response | null | Promise<Response | null>) | null
   docs: (doctype: string) => Doc[]
   add: (doctype: string, doc: Record<string, unknown>) => Doc
 }
@@ -56,7 +56,7 @@ export function installFakeErp(): FakeErp {
     if (init.body instanceof FormData) body = Object.fromEntries(init.body.entries())
     else if (typeof init.body === 'string') body = JSON.parse(init.body)
     fake.calls.push({ method, path: path + u.search, body })
-    const hit = fake.intercept?.(method, path, body)
+    const hit = await fake.intercept?.(method, path, body)
     if (hit) return hit
 
     const res = path.match(/^\/api\/resource\/([^/]+)$/)

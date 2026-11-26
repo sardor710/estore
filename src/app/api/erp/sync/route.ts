@@ -14,12 +14,23 @@ const sameToken = (a: string, b: string) => a.length === b.length && timingSafeE
 
 let running: Promise<unknown> | null = null
 
+const step = async <T,>(name: string, f: () => Promise<T>): Promise<T | { error: string }> => {
+  try {
+    return await f()
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e)
+    console.error(`[erp] sync step ${name} failed:`, error)
+    return { error }
+  }
+}
+
+/** Each step stands alone: one failing (e.g. ERP refuses a new category) never blocks the others. */
 async function runSync(full: boolean) {
-  const outbox = await drainOutbox()
-  const items = await ensureErpItems({ withImages: true }) // new SKUs only
+  const outbox = await step('outbox', () => drainOutbox())
   const last = await prisma.setting.findUnique({ where: { key: 'erp.lastReconcileAt' } })
   const due = full || !last || Date.now() - new Date(last.value).getTime() >= RECONCILE_EVERY_MS
-  const reconcile = due ? await refreshFromErp() : null
+  const reconcile = due ? await step('reconcile', () => refreshFromErp()) : null
+  const items = await step('items', () => ensureErpItems({ withImages: true })) // new SKUs only; slow with photos, so last
   return { outbox, items, reconcile }
 }
 

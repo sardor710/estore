@@ -90,4 +90,23 @@ describe('refreshFromErp', () => {
     expect(s).not.toBeNull()
     expect(Date.now() - new Date(s!.value).getTime()).toBeLessThan(10_000)
   })
+
+  it('a delivery finishing while ERP is being read is not counted back (no phantom stock)', async () => {
+    await seed([{ sku: 'A', stock: 3, price: 100 }])
+    bin('A', 5) // ERP before the Delivery Note
+    price('A', 100)
+    const row = await prisma.erpOutbox.create({ data: { ref: 'ZK-1', kind: 'DELIVER', orderId: 1, lines: [{ sku: 'A', qty: 2, rateUzs: 100 }] } })
+    erp.intercept = (m, p) => {
+      if (m === 'GET' && p === '/api/resource/Bin') {
+        // a drain pushes the note and marks the row DONE in between
+        return (async () => {
+          await prisma.erpOutbox.update({ where: { id: row.id }, data: { status: 'DONE', erpDoc: 'DN-1' } })
+          return null
+        })()
+      }
+      return null
+    }
+    await refreshFromErp()
+    expect((await variant('A')).stock).toBeLessThanOrEqual(3)
+  })
 })

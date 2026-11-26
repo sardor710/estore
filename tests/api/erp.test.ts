@@ -71,7 +71,7 @@ describe('POST /api/erp/sync', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.outbox).toEqual({ done: 1, failed: 0, pending: 0 })
-    expect(body.reconcile).toMatchObject({ stockChanged: 1 })
+    expect(body.reconcile).not.toBeNull() // the drain already refreshed A right after its push
     // the fake ERP does not move Bins on a Delivery Note; with the DN pushed, site = ERP qty
     expect((await prisma.variant.findUniqueOrThrow({ where: { sku: 'A' } })).stock).toBe(4)
   })
@@ -84,5 +84,22 @@ describe('POST /api/erp/sync', () => {
   it('does nothing while the flag is off', async () => {
     delete process.env.ERP_ENABLED
     expect(await (await sync('Bearer synctok')).json()).toEqual({ ok: true, skipped: 'disabled' })
+  })
+  it('a failing item export does not stop the reconcile', async () => {
+    await linked('A', 9)
+    erp.add('Bin', { item_code: 'A', warehouse: 'Stores - Z', actual_qty: 4 })
+    const cat = await prisma.category.create({ data: { slug: 'newcat', name: { en: 'New cat' } } })
+    await prisma.product.create({
+      data: {
+        slug: 'p-new', categoryId: cat.id, title: { en: 'N' }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [],
+        inTheBox: [], faq: [], specs: [], images: [], reviewed: {},
+        variants: { create: [{ sku: 'NEW1', name: { en: 'n' }, priceUzs: 100, stock: 0 }] },
+      },
+    })
+    erp.intercept = (m, p) => (m === 'POST' && p === '/api/resource/Item Group' ? new Response(JSON.stringify({ exc_type: 'NameError' }), { status: 417 }) : null)
+    const body = await (await sync('Bearer synctok', '?full=1')).json()
+    expect(body.reconcile).toMatchObject({ stockChanged: 1 })
+    expect(body.items).toMatchObject({ error: expect.any(String) })
+    expect((await prisma.variant.findUniqueOrThrow({ where: { sku: 'A' } })).stock).toBe(4)
   })
 })

@@ -41,7 +41,7 @@ describe('drainOutbox', () => {
     expect((erp.docs('Delivery Note')[0].items as { qty: number }[])[0].qty).toBe(-2)
   })
 
-  it('RETURN waits while its DELIVER has not reached ERP yet', async () => {
+  it('RETURN waits while its DELIVER is being pushed right now', async () => {
     await mk({ ref: 'ZK-7', kind: 'DELIVER', status: 'RUNNING' })
     await prisma.erpOutbox.update({ where: { ref: 'ZK-7' }, data: { lockedUntil: new Date(Date.now() + 60_000) } })
     await mk({ ref: 'ZK-7-R', kind: 'RETURN' })
@@ -107,5 +107,64 @@ describe('drainOutbox', () => {
     await mk({ ref: 'ZK-7', kind: 'DELIVER' })
     expect(await drainOutbox()).toEqual({ done: 0, failed: 0, pending: 1 })
     expect(await prisma.erpOutbox.findUnique({ where: { ref: 'ZK-7' } })).toMatchObject({ status: 'PENDING', attempts: 0 })
+  })
+
+  it('RETURN whose DELIVER is not DONE but exists in ERP (earlier timeout): adopts it and returns', async () => {
+    await mk({ ref: 'ZK-7', kind: 'DELIVER' })
+    await prisma.erpOutbox.update({ where: { ref: 'ZK-7' }, data: { attempts: 1, nextAttemptAt: new Date(Date.now() + 3_600_000) } })
+    erp.add('Delivery Note', { name: 'DN-TIMEOUT', zanko_order_ref: 'ZK-7', docstatus: 1 })
+    await mk({ ref: 'ZK-7-R', kind: 'RETURN' })
+    await drainOutbox()
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: 'ZK-7' } })).toMatchObject({ status: 'DONE', erpDoc: 'DN-TIMEOUT' })
+    expect(erp.docs('Delivery Note').find((d) => d.zanko_order_ref === 'ZK-7-R')).toMatchObject({ return_against: 'DN-TIMEOUT' })
+  })
+
+  it('RETURN whose DELIVER never reached ERP (FAILED, not in ERP): both are skipped, nothing pushed', async () => {
+    await mk({ ref: 'ZK-7', kind: 'DELIVER', status: 'FAILED' })
+    await mk({ ref: 'ZK-7-R', kind: 'RETURN' })
+    await drainOutbox()
+    expect(erp.docs('Delivery Note')).toHaveLength(0)
+    expect((await prisma.erpOutbox.findMany({ orderBy: { id: 'asc' } })).map((r) => r.status)).toEqual(['SKIPPED', 'SKIPPED'])
+  })
+
+  it('an unexpected (non-ERP) error is retried, not marked FAILED', async () => {
+    await mk({ ref: 'ZK-7', kind: 'DELIVER' })
+    // the timeout fires while the body is being read (after ERP may have committed)
+    erp.intercept = () =>
+      ({ ok: true, status: 200, text: () => Promise.reject(new DOMException('The operation was aborted', 'AbortError')) }) as unknown as Response
+    await drainOutbox()
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: 'ZK-7' } })).toMatchObject({ status: 'PENDING', attempts: 1 })
+  })
+
+  it('a drain that lost its lock does not overwrite the newer result', async () => {
+    const row = await mk({ ref: 'ZK-7', kind: 'DELIVER' })
+    erp.intercept = (m, p) => {
+      if (m === 'POST' && p === '/api/resource/Delivery Note') {
+        // meanwhile another drain took over (after this lock expired) and finished the row
+        return (async () => {
+          await prisma.erpOutbox.update({ where: { id: row.id }, data: { status: 'DONE', erpDoc: 'DN-OTHER', lockedUntil: null } })
+          return new Response('slow', { status: 503 })
+        })()
+      }
+      return null
+    }
+    await drainOutbox()
+    expect(await prisma.erpOutbox.findUnique({ where: { id: row.id } })).toMatchObject({ status: 'DONE', erpDoc: 'DN-OTHER' })
+  })
+
+  it('after a push, the SKUs are refreshed from ERP right away', async () => {
+    const cat = await prisma.category.create({ data: { slug: 'c', name: { en: 'c' } } })
+    await prisma.product.create({
+      data: {
+        slug: 'p', categoryId: cat.id, title: { en: 'P' }, subtitle: {}, shortSpec: {}, descriptionHtml: {}, sections: [], highlights: [],
+        inTheBox: [], faq: [], specs: [], images: [], reviewed: {},
+        variants: { create: [{ sku: 'A1', name: { en: 'A1' }, priceUzs: 1000, stock: 3, erpLinkedAt: new Date() }] },
+      },
+    })
+    erp.add('Item', { name: 'A1', item_code: 'A1' })
+    erp.add('Bin', { item_code: 'A1', warehouse: 'Stores - Z', actual_qty: 1 }) // ERP after the DN
+    await mk({ ref: 'ZK-7', kind: 'DELIVER' })
+    await drainOutbox()
+    expect((await prisma.variant.findUniqueOrThrow({ where: { sku: 'A1' } })).stock).toBe(1)
   })
 })

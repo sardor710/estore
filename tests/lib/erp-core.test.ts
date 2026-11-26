@@ -47,6 +47,14 @@ describe('pendingBySku', () => {
     expect(m.get('B')).toEqual({ out: 1, back: 1 })
     expect(m.get('C')).toEqual({ out: 0, back: 4 })
   })
+  it('a FAILED return/receipt never adds stock (ERP may already hold it) — only a FAILED delivery keeps its deduction', () => {
+    const m = pendingBySku([
+      { kind: 'RETURN', status: 'FAILED', lines: [{ sku: 'A', qty: 2, rateUzs: 1 }] },
+      { kind: 'RECEIPT', status: 'FAILED', lines: [{ sku: 'A', qty: 1, rateUzs: 1 }] },
+      { kind: 'DELIVER', status: 'SKIPPED', lines: [{ sku: 'A', qty: 5, rateUzs: 1 }] },
+    ])
+    expect(m.get('A') ?? { out: 0, back: 0 }).toEqual({ out: 0, back: 0 })
+  })
   it('accepts lines stored as a JSON string (SQLite JSON columns)', () => {
     const m = pendingBySku([{ kind: 'DELIVER', status: 'PENDING', lines: '[{"sku":"A","qty":2,"rateUzs":5}]' }])
     expect(m.get('A')).toEqual({ out: 2, back: 0 })

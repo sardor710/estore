@@ -40,13 +40,16 @@ export function parseLines(lines: unknown): OutboxLine[] {
   return Array.isArray(raw) ? (raw as OutboxLine[]) : []
 }
 
-const UNDELIVERED = new Set(['PENDING', 'RUNNING', 'FAILED'])
-
-/** Units per SKU that the ERP has not been told about yet. */
+/**
+ * Units per SKU that the ERP has not been told about yet. Errs towards selling less: a FAILED
+ * delivery keeps its deduction, but a FAILED return/receipt adds nothing (ERP may already hold
+ * those units back, e.g. a Delivery Note cancelled by hand), so the site shows ERP's figure.
+ */
 export function pendingBySku(rows: { kind: string; status: string; lines: unknown }[]): Map<string, { out: number; back: number }> {
   const m = new Map<string, { out: number; back: number }>()
   for (const r of rows) {
-    if (!UNDELIVERED.has(r.status)) continue
+    const counts = r.status === 'PENDING' || r.status === 'RUNNING' || (r.status === 'FAILED' && r.kind === 'DELIVER')
+    if (!counts) continue
     for (const l of parseLines(r.lines)) {
       const cur = m.get(l.sku) ?? { out: 0, back: 0 }
       if (r.kind === 'DELIVER') cur.out += l.qty

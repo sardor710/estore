@@ -110,4 +110,38 @@ describe('ensureErpItems', () => {
     expect(erp.docs('Item Group').find((g) => g.name === 'Audio (Zanko)')).toMatchObject({ parent_item_group: 'Zanko' })
     expect(erp.docs('Item Group').find((g) => g.name === 'Earbuds')).toMatchObject({ parent_item_group: 'Audio (Zanko)' })
   })
+
+  it('linking a SKU that has stock on the site books that stock into ERP once (unless told not to)', async () => {
+    const p = await seed() // WF1000XM5/B has stock 4
+    await ensureErpItems({})
+    const se = erp.docs('Stock Entry')
+    expect(se).toHaveLength(1)
+    expect(se[0]).toMatchObject({ stock_entry_type: 'Material Receipt', company: 'Zanko', docstatus: 1, zanko_order_ref: `ZK-OPEN-${p.variants[0].id}` })
+    expect(se[0].items).toEqual([{ item_code: 'WF1000XM5/B', qty: 4, t_warehouse: 'Stores - Z', basic_rate: 0, allow_zero_valuation_rate: 1 }])
+    await prisma.variant.updateMany({ data: { erpLinkedAt: null } })
+    await ensureErpItems({})
+    expect(erp.docs('Stock Entry')).toHaveLength(1)
+  })
+
+  it('no opening receipt when ERP already holds stock for the item, or when the export does its own', async () => {
+    await seed()
+    erp.add('Bin', { item_code: 'WF1000XM5/B', warehouse: 'Stores - Z', actual_qty: 2 })
+    await ensureErpItems({})
+    expect(erp.docs('Stock Entry')).toHaveLength(0)
+  })
+
+  it('openingStock:false skips the receipt', async () => {
+    await seed()
+    await ensureErpItems({ openingStock: false })
+    expect(erp.docs('Stock Entry')).toHaveLength(0)
+  })
+
+  it('refuses to adopt an ERP item that belongs to another company (e.g. a Garmin code)', async () => {
+    await seed()
+    erp.add('Item', { name: 'WF1000XM5/B', item_code: 'WF1000XM5/B', item_group: 'Продукты', item_name: 'Garmin thing' })
+    const r = await ensureErpItems({})
+    expect(r.failed).toEqual([{ sku: 'WF1000XM5/B', error: expect.stringContaining('outside Zanko') }])
+    expect(erp.docs('Item').find((i) => i.name === 'WF1000XM5/B')!.item_name).toBe('Garmin thing')
+    expect((await prisma.variant.findUniqueOrThrow({ where: { sku: 'WF1000XM5/B' } })).erpLinkedAt).toBeNull()
+  })
 })

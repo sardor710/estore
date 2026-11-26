@@ -81,10 +81,31 @@ async function ensureBrand(name: string | null, seen: Set<string>): Promise<stri
   return name
 }
 
+/** Material Receipt for stock the site has but ERP does not (idempotent by ref). */
+async function bookOpeningStock(variantId: number, sku: string, qty: number): Promise<void> {
+  const ref = `ZK-OPEN-${variantId}`
+  if ((await erpList('Stock Entry', [['zanko_order_ref', '=', ref]])).length) return
+  const bins = await erpList<{ actual_qty: number }>('Bin', [['item_code', '=', sku], ['warehouse', '=', ERP.warehouse]], ['actual_qty'])
+  if (bins.some((b) => Number(b.actual_qty) !== 0)) return // ERP already counts this item: it wins
+  await erpInsert('Stock Entry', {
+    stock_entry_type: 'Material Receipt',
+    company: ERP.company,
+    docstatus: 1,
+    zanko_order_ref: ref,
+    remarks: `Opening stock of ${sku} from zanko.uz`,
+    items: [{ item_code: sku, qty, t_warehouse: ERP.warehouse, basic_rate: 0, allow_zero_valuation_rate: 1 }],
+  })
+}
+
 export type EnsureResult = { created: number; updated: number; failed: { sku: string; error: string }[] }
 
-/** Default: only variants not linked yet. `all`: every variant (full re-run). `variantIds`: just these. */
-export async function ensureErpItems(opts: { variantIds?: number[]; all?: boolean; withImages?: boolean } = {}): Promise<EnsureResult> {
+/**
+ * Default: only variants not linked yet. `all`: every variant (full re-run). `variantIds`: just these.
+ * `openingStock` (default true): when a variant with site stock gets linked and ERP holds none of it,
+ * book that stock into ERP (Material Receipt, ref ZK-OPEN-<variantId>) so the next reconcile does not
+ * wipe it. The first export turns it off and books everything in one Stock Reconciliation instead.
+ */
+export async function ensureErpItems(opts: { variantIds?: number[]; all?: boolean; withImages?: boolean; openingStock?: boolean } = {}): Promise<EnsureResult> {
   const variants = await prisma.variant.findMany({
     where: opts.variantIds ? { id: { in: opts.variantIds } } : opts.all ? {} : { erpLinkedAt: null },
     include: { product: { include: { brand: true } } },
@@ -94,6 +115,7 @@ export async function ensureErpItems(opts: { variantIds?: number[]; all?: boolea
   if (variants.length === 0) return result
 
   const groups = await syncGroups(new Set(variants.map((v) => v.product.categoryId)))
+  const ours = new Set<string>([ERP.itemGroupRoot, ...groups.values()])
   const brands = new Set<string>()
   const imageCache = new Map<string, Loaded | null>()
 
@@ -111,7 +133,11 @@ export async function ensureErpItems(opts: { variantIds?: number[]; all?: boolea
         description: en(p.shortSpec) || itemName,
         zanko_url: `https://zanko.uz/p/${p.slug}`,
       }
-      const existing = await erpList<{ name: string; image: string | null }>('Item', [['name', '=', v.sku]], ['name', 'image'])
+      const existing = await erpList<{ name: string; image: string | null; item_group: string }>('Item', [['name', '=', v.sku]], ['name', 'image', 'item_group'])
+      if (existing.length && !ours.has(existing[0].item_group)) {
+        // Same code as an item of another company (e.g. Garmin): never touch it.
+        throw new ErpError(`SKU ${v.sku} already exists in ERP outside Zanko (group "${existing[0].item_group}"); give the store variant a different SKU`, 0, false)
+      }
       if (existing.length === 0) {
         await erpInsert('Item', {
           item_code: v.sku,
@@ -163,6 +189,8 @@ export async function ensureErpItems(opts: { variantIds?: number[]; all?: boolea
       if (price.length === 0 && v.priceUzs > 0) {
         await erpInsert('Item Price', { item_code: v.sku, price_list: ERP.priceList, price_list_rate: v.priceUzs, currency: ERP.currency })
       }
+
+      if (opts.openingStock !== false && !v.erpLinkedAt && v.stock > 0) await bookOpeningStock(v.id, v.sku, v.stock)
 
       await prisma.variant.update({ where: { id: v.id }, data: { erpLinkedAt: new Date() } })
     } catch (e) {

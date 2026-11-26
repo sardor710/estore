@@ -83,12 +83,14 @@ async function send(path: string, init: RequestInit): Promise<unknown> {
   if (cfg.host) headers.set('Host', cfg.host)
   const f = fetchImpl ?? fetch
   let res: Response
+  let text: string
   try {
     res = await f(cfg.url + path, { ...init, headers, signal: AbortSignal.timeout(TIMEOUT_MS) })
+    // The timeout can also fire while the body is read: still transient (ERP may have committed).
+    text = await res.text()
   } catch (e) {
     throw new ErpError(`ERP unreachable: ${(e as Error).message}`, 0, true)
   }
-  const text = await res.text()
   let body: unknown = null
   try {
     body = text ? JSON.parse(text) : null
