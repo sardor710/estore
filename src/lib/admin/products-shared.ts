@@ -13,6 +13,8 @@ export type VariantInput = {
   stock: number
   colorHex: string | null
   imageIndex: number | null
+  /** Display only: stock, price and SKU are managed in ERPNext (ignored on save). */
+  erpManaged?: boolean
 }
 
 export type ProductInput = {

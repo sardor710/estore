@@ -120,7 +120,7 @@ export default function VariantEditor({
   const [samePrice, setSamePrice] = useState(() => allSamePrice(variants))
   const linked = several && samePrice
   const setPrice = (i: number, patch: Pick<Partial<VariantInput>, 'priceUzs' | 'compareAtUzs'>) =>
-    linked ? onChange(variants.map((v) => ({ ...v, ...patch }))) : set(i, patch)
+    linked ? onChange(variants.map((v) => (v.erpManaged ? v : { ...v, ...patch }))) : set(i, patch)
   const toggleSamePrice = (on: boolean) => {
     if (on && !allSamePrice(variants)) {
       const first = variants[0]
@@ -179,14 +179,23 @@ export default function VariantEditor({
                 </p>
               ) : null}
               <L10nField label="Name" hint={several && missingNames.length && name ? `missing: ${missingNames.join(', ')}` : undefined} value={v.name} onChange={(n) => set(i, { name: n })} />
+              {v.erpManaged ? (
+                <p className="rounded-md bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+                  SKU, price and stock are managed in ERP —{' '}
+                  <a className="font-semibold underline" href="https://erp2.zanko.uz/app/item" target="_blank" rel="noreferrer">
+                    erp2.zanko.uz
+                  </a>
+                  . Changes made there show up here within seconds.
+                </p>
+              ) : null}
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <label>
                   <Label>SKU</Label>
-                  <input className={`${input} font-mono`} value={v.sku} onChange={(e) => set(i, { sku: e.target.value })} />
+                  <input className={`${input} font-mono`} value={v.sku} readOnly={v.erpManaged} disabled={v.erpManaged} onChange={(e) => set(i, { sku: e.target.value })} />
                 </label>
                 <label>
                   <Label hint="UZS">Price</Label>
-                  <input className={input} inputMode="numeric" value={String(v.priceUzs)} onChange={(e) => setPrice(i, { priceUzs: toInt(e.target.value) })} />
+                  <input className={input} inputMode="numeric" value={String(v.priceUzs)} readOnly={v.erpManaged} disabled={v.erpManaged} onChange={(e) => setPrice(i, { priceUzs: toInt(e.target.value) })} />
                 </label>
                 <label>
                   <Label hint="UZS, optional">Compare-at</Label>
@@ -194,7 +203,7 @@ export default function VariantEditor({
                 </label>
                 <label>
                   <Label>Stock</Label>
-                  <input className={input} inputMode="numeric" value={String(v.stock)} onChange={(e) => set(i, { stock: toInt(e.target.value) })} />
+                  <input className={input} inputMode="numeric" value={String(v.stock)} readOnly={v.erpManaged} disabled={v.erpManaged} onChange={(e) => set(i, { stock: toInt(e.target.value) })} />
                 </label>
               </div>
               <div className="grid gap-3 md:grid-cols-[14rem_minmax(0,1fr)]">

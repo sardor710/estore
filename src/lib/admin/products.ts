@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { erpFlagOn } from '@/lib/erp/outbox'
 import { sanitizeHtml } from '@/lib/sanitize'
 import type { Prisma } from '@/generated/prisma/client'
 import { logActivity } from './activity'
@@ -79,16 +80,28 @@ function validBaseline(b: unknown): b is EditBaseline {
   return Boolean(b) && typeof (b as EditBaseline).updatedAt === 'string' && Boolean((b as EditBaseline).stock) && typeof (b as EditBaseline).stock === 'object'
 }
 
-export async function updateProduct(id: number, input: ProductInput, baseline: EditBaseline): Promise<UpdateResult> {
+export async function updateProduct(id: number, rawInput: ProductInput, baseline: EditBaseline): Promise<UpdateResult> {
   const errors: Record<string, string> = {}
   const existing = await prisma.product.findUnique({ where: { id }, include: { variants: true } })
   if (!existing) return { ok: false, errors: { _: 'Product not found.' } }
+  // ERP owns stock, price and SKU of linked variants: the editor's values for them are ignored, and
+  // a new variant starts with stock 0 (stock only ever comes from ERP).
+  const erp = erpFlagOn()
+  const linked = new Map(erp ? existing.variants.filter((v) => v.erpLinkedAt).map((v) => [v.id, v]) : [])
+  const input: ProductInput = !erp || !Array.isArray(rawInput.variants) ? rawInput : {
+    ...rawInput,
+    variants: rawInput.variants.map((v) => {
+      const e = v.id !== undefined ? linked.get(v.id) : undefined
+      if (e) return { ...v, sku: e.sku, priceUzs: e.priceUzs, stock: e.stock }
+      return v.id === undefined ? { ...v, stock: 0 } : v
+    }),
+  }
   if (!validBaseline(baseline) || existing.updatedAt.toISOString() !== baseline.updatedAt) return { ok: false, errors: { _: STALE_PRODUCT } }
   const baseStock = (vid: number): number | undefined => {
     const s = (baseline.stock as Record<string, unknown>)[String(vid)]
     return isInt(s) ? s : undefined
   }
-  if (existing.variants.some((v) => baseStock(v.id) !== v.stock)) return { ok: false, errors: { _: STALE_STOCK } }
+  if (existing.variants.some((v) => !linked.has(v.id) && baseStock(v.id) !== v.stock)) return { ok: false, errors: { _: STALE_STOCK } }
 
   const slug = str(input.slug).trim()
   if (!SLUG_RE.test(slug)) errors.slug = 'Slug may contain only a-z, 0-9 and single dashes.'
@@ -203,7 +216,7 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
       })
       if (moved.count !== 1) throw new Stale(STALE_PRODUCT)
       for (const r of removed) {
-        const gone = await tx.variant.deleteMany({ where: { id: r.id, stock: expectStock(r.id) } })
+        const gone = await tx.variant.deleteMany({ where: { id: r.id, ...(linked.has(r.id) ? {} : { stock: expectStock(r.id) }) } })
         if (gone.count !== 1) throw new Stale(STALE_STOCK)
       }
       // SKUs may be swapped between variants of this product: park changed ones first to dodge the unique index.
@@ -223,7 +236,12 @@ export async function updateProduct(id: number, input: ProductInput, baseline: E
           imageIndex: v.imageIndex,
           sortOrder: i,
         }
-        if (v.id !== undefined) {
+        if (v.id !== undefined && linked.has(v.id)) {
+          // ERP-managed: never write stock, price or SKU from the editor (ERP may change them meanwhile).
+          const { stock: _s, priceUzs: _p, sku: _k, ...rest } = data
+          const w = await tx.variant.updateMany({ where: { id: v.id, productId: id }, data: rest })
+          if (w.count !== 1) throw new Stale(STALE_STOCK)
+        } else if (v.id !== undefined) {
           // Absolute stock write only if nobody (e.g. an order confirm) changed it since the editor loaded.
           const w = await tx.variant.updateMany({ where: { id: v.id, productId: id, stock: baseStock(v.id) }, data })
           if (w.count !== 1) throw new Stale(STALE_STOCK)
@@ -387,6 +405,7 @@ export async function updateVariantInline(
   if (!Object.keys(data).length) return { ok: false, error: 'Nothing to change.' }
   const cur = await prisma.variant.findUnique({ where: { id: variantId }, include: { product: { select: { id: true, status: true } } } })
   if (!cur) return { ok: false, error: 'Variant not found.' }
+  if (cur.erpLinkedAt && erpFlagOn()) return { ok: false, error: 'ERP_MANAGED' }
   if (cur.product.status === 'PUBLISHED' && data.priceUzs === 0) return { ok: false, error: 'This product is live: every variant needs a price above 0.' }
   const guard: { priceUzs?: number; stock?: number } = {}
   for (const k of ['priceUzs', 'stock'] as const) {
