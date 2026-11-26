@@ -46,6 +46,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-neutral-900">#{o.number}</span>
                     <Badge tone={STATUS_TONE[o.status as keyof typeof STATUS_TONE] ?? 'neutral'}>{o.status}</Badge>
+                    {o.payMethod === 'CARD' && (
+                      <Badge tone={o.paymentStatus === 'PAID' ? 'green' : o.paymentStatus === 'REFUNDED' ? 'neutral' : o.paymentStatus === 'FAILED' ? 'red' : 'amber'}>
+                        {o.paymentStatus === 'PAID' ? 'Paid by card' : o.paymentStatus === 'REFUNDED' ? 'Refunded' : o.paymentStatus === 'FAILED' ? 'Card payment failed' : 'Awaiting card payment'}
+                      </Badge>
+                    )}
                   </div>
                   <div className="mt-1 truncate text-sm text-neutral-600">
                     {o.name} · {o.phone} · {o.lines.reduce((n, l) => n + l.qty, 0)} items

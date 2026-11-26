@@ -36,12 +36,18 @@ export default function CheckoutForm({
   regions,
   account = null,
   telegram = false,
+  cardPayments = false,
+  octoTest = false,
 }: {
   locale: Locale
   regions: { code: string; name: string }[]
   account?: CheckoutAccount | null
   /** Telegram Mini App: Telegram's MainButton places the order (the in-page submit button is hidden). */
   telegram?: boolean
+  /** Octo is configured: offer "Pay online by card" next to cash on delivery. */
+  cardPayments?: boolean
+  /** Octo test-mode checkout (?octo_test=1): the server only accepts card orders in test mode with this flag. */
+  octoTest?: boolean
 }) {
   const t = useTranslations('checkout')
   const tc = useTranslations('cart')
@@ -57,6 +63,7 @@ export default function CheckoutForm({
   // Saved address id, or 'new'. Choosing a saved address fills recipient (name), region and address.
   const [choice, setChoice] = useState<number | 'new'>(preselected ? preselected.id : 'new')
   const [saveNew, setSaveNew] = useState(false)
+  const [payment, setPayment] = useState<'cash' | 'card'>('cash')
   const [newLabel, setNewLabel] = useState('')
   const [values, setValues] = useState(() => ({
     name: preselected?.recipient ?? account?.name ?? '',
@@ -144,20 +151,26 @@ export default function CheckoutForm({
           ...values,
           locale,
           location: pin,
+          ...(cardPayments && payment === 'card' ? { payment: 'card', ...(octoTest ? { octoTest: true } : {}) } : {}),
           // Signed in: the server uses the account phone anyway; optionally keep the new address.
           ...(account && choice === 'new' && canSaveAddress && saveNew ? { saveAddress: { label: newLabel.trim() } } : {}),
         }),
       })
-      const data = (await res.json().catch(() => ({}))) as { number?: number; error?: string }
+      const data = (await res.json().catch(() => ({}))) as { number?: number; error?: string; token?: string; payUrl?: string }
       if (res.ok && typeof data.number === 'number') {
         clear()
-        router.replace(path(locale, `/order/${data.number}`))
+        // Card: off to Octo's payment page (also inside the Telegram Mini App webview); it returns to the order page.
+        if (data.payUrl) {
+          window.location.assign(data.payUrl)
+          return
+        }
+        router.replace(path(locale, `/order/${data.number}${data.token ? `?t=${encodeURIComponent(data.token)}` : ''}`))
         return // keep "submitting" so the empty-cart view does not flash
       }
-      const known = ['BELOW_MIN', 'OUT_OF_STOCK', 'INVALID', 'RATE_LIMITED', 'BLOCKED', 'SERVER'] as const
+      const known = ['BELOW_MIN', 'OUT_OF_STOCK', 'INVALID', 'RATE_LIMITED', 'BLOCKED', 'SERVER', 'CARD_UNAVAILABLE'] as const
       const code = known.find((k) => k === data.error) ?? (res.status >= 500 ? 'SERVER' : 'INVALID')
       setFormError(t(`errors.${code}`))
-      if (code !== 'RATE_LIMITED' && code !== 'SERVER' && code !== 'BLOCKED') reload()
+      if (code !== 'RATE_LIMITED' && code !== 'SERVER' && code !== 'BLOCKED' && code !== 'CARD_UNAVAILABLE') reload()
     } catch {
       setFormError(t('errors.NETWORK'))
     }
@@ -379,6 +392,35 @@ export default function CheckoutForm({
           </div>
         </dl>
 
+        {cardPayments && (
+          <fieldset className="mt-4 border-t border-neutral-200 pt-4">
+            <legend className="mb-2 text-sm font-semibold text-neutral-900">{t('payment')}</legend>
+            <div className="grid gap-2">
+              {(['cash', 'card'] as const).map((m) => (
+                <label
+                  key={m}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm ${payment === m ? 'border-neutral-900 bg-white' : 'border-neutral-200 bg-white/60'}`}
+                >
+                  <input type="radio" name="payment" value={m} checked={payment === m} onChange={() => setPayment(m)} className="mt-0.5 accent-neutral-900" />
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-neutral-900">{m === 'cash' ? t('payCash') : t('payCard')}</span>
+                    <span className="block text-xs text-neutral-500">{m === 'cash' ? t('payCashHint') : t('payCardHint')}</span>
+                    {m === 'card' && (
+                      <span className="mt-1.5 flex flex-wrap gap-1" aria-hidden>
+                        {['Uzcard', 'Humo', 'Visa', 'Mastercard'].map((b) => (
+                          <span key={b} className="rounded border border-neutral-300 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-neutral-600">
+                            {b}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
+
         {quoteError && (
           <p className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
             {tc('quoteError')}
@@ -406,7 +448,7 @@ export default function CheckoutForm({
           disabled={submitting || blocked}
           className="mt-4 w-full rounded-full bg-neutral-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
         >
-          {submitting ? t('submitting') : t('submit')}
+          {submitting ? t('submitting') : cardPayments && payment === 'card' ? t('submitCard') : t('submit')}
         </button>
         <p className="mt-3 text-xs text-neutral-500">{t('note')}</p>
         <p className="mt-2 text-xs text-neutral-500">

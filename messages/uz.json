@@ -181,7 +181,8 @@
       "NETWORK": "Buyurtmani yuborib boʻlmadi. Ulanishni tekshirib, qayta urinib koʻring.",
       "RATE_LIMITED": "Qisqa vaqt ichida tarmogʻingizdan juda koʻp buyurtma yuborildi. Bir necha daqiqa kutib, qayta urinib koʻring yoki bizga qoʻngʻiroq qiling.",
       "BLOCKED": "Bu buyurtmani onlayn qabul qila olmaymiz. Iltimos, bizga qoʻngʻiroq qiling.",
-      "SERVER": "Bizning tomonda xatolik yuz berdi. Birozdan soʻng qayta urinib koʻring."
+      "SERVER": "Bizning tomonda xatolik yuz berdi. Birozdan soʻng qayta urinib koʻring.",
+      "CARD_UNAVAILABLE": "Karta orqali toʻlov vaqtincha mavjud emas. Iltimos, naqd toʻlovni tanlang."
     },
     "fromAccount": "Hisobingizdan",
     "phoneLocked": "Buyurtma hisobingiz raqamiga rasmiylashtiriladi, shuning uchun u hisobingizda koʻrinadi.",
@@ -190,7 +191,13 @@
     "defaultAddress": "Asosiy",
     "saveAddress": "Manzillarimga saqlash",
     "addressLabel": "Manzil nomi (ixtiyoriy)",
-    "addressLabelPlaceholder": "Uy, ish…"
+    "addressLabelPlaceholder": "Uy, ish…",
+    "payment": "Toʻlov",
+    "payCash": "Yetkazib berilganda naqd",
+    "payCashHint": "Buyurtmani olganingizda kuryerga toʻlaysiz.",
+    "payCard": "Karta orqali onlayn toʻlash",
+    "payCardHint": "Uzcard, Humo, Visa yoki Mastercard — Octo xavfsiz toʻlov sahifasida.",
+    "submitCard": "Toʻlovga oʻtish"
   },
   "order": {
     "title": "Buyurtma qabul qilindi",
@@ -205,7 +212,20 @@
       "DELIVERED": "Yetkazib berildi",
       "CANCELLED": "Bekor qilindi"
     },
-    "backToShop": "Xaridni davom ettirish"
+    "backToShop": "Xaridni davom ettirish",
+    "payment": {
+      "titleAwaiting": "Buyurtma qabul qilindi — toʻlov kutilmoqda",
+      "paid": "Karta orqali toʻlangan",
+      "refunded": "Toʻlov kartangizga qaytarildi",
+      "pending": "Toʻlov kutilmoqda",
+      "pendingHint": "Buyurtmangiz saqlandi. Tasdiqlash uchun karta orqali toʻlovni yakunlang yoki biz sizga qoʻngʻiroq qilamiz.",
+      "failed": "Toʻlov amalga oshmadi",
+      "failedHint": "Pul yechilmadi. Shu yoki boshqa karta bilan qayta urinib koʻring.",
+      "payNow": "Toʻlash",
+      "tryAgain": "Qayta urinish",
+      "opening": "Toʻlov sahifasi ochilmoqda…",
+      "error": "Toʻlov sahifasini ochib boʻlmadi. Birozdan soʻng qayta urinib koʻring."
+    }
   },
   "seo": {
     "homeDescription": "Zaryadlovchi qurilmalar, quvvat banklari, audio va aqlli gadjetlar. Oʻzbekiston boʻylab yetkazib berish.",

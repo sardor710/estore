@@ -4,9 +4,12 @@ import { prisma } from '@/lib/db'
 import { allowedTransitions } from '@/lib/admin/orders'
 import { getRegion } from '@/lib/regions'
 import { formatUzs } from '@/lib/money'
-import { Badge, PageHeader, card, table, td, th } from '@/components/admin/ui'
+import { Badge, Notice, PageHeader, card, table, td, th } from '@/components/admin/ui'
 import BackLink from '@/components/admin/BackLink'
 import OrderStatusButtons from '@/components/admin/OrderStatusButtons'
+import OrderPaymentButtons from '@/components/admin/OrderPaymentButtons'
+import { settleOrder } from '@/lib/payments/service'
+import { livePaymentDeps } from '@/lib/payments/live'
 import { requirePermission } from '@/lib/admin/session'
 
 export const metadata = { title: 'Order' }
@@ -17,7 +20,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   await requirePermission('orders')
   const id = Number((await params).id)
   if (!Number.isInteger(id)) notFound()
-  const o = await prisma.order.findUnique({ where: { id }, include: { lines: { orderBy: { id: 'asc' } } } })
+  // A card order still waiting is re-checked with Octo first, so admin sees the real payment state.
+  await settleOrder(id, livePaymentDeps).catch(() => {})
+  const o = await prisma.order.findUnique({ where: { id }, include: { lines: { orderBy: { id: 'asc' } }, payments: { orderBy: { id: 'desc' } } } })
   if (!o) notFound()
   const region = getRegion(o.region)
 
@@ -40,7 +45,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               ['Comment', o.comment || '-'],
               ['Language', o.locale.toUpperCase()],
               ['Placed', `${o.createdAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`],
-              ['Payment', `${o.paymentStatus}${o.paymentProvider ? ` (${o.paymentProvider})` : ''}`],
             ].map(([k, v]) => (
               <div key={k} className="flex gap-3">
                 <dt className="w-24 shrink-0 text-neutral-500">{k}</dt>
@@ -74,6 +78,65 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <p className="mt-3 text-xs text-neutral-500">Confirming takes the ordered quantities out of stock; cancelling a confirmed order puts them back.</p>
         </section>
       </div>
+
+      {(() => {
+        const paid = o.payments.find((p) => p.status === 'succeeded')
+        const last = paid ?? o.payments[0]
+        const PAY_TONE = { PAID: 'green', PENDING: 'amber', FAILED: 'red', REFUNDED: 'neutral', UNPAID: 'neutral' } as const
+        return (
+          <section className={`${card} mt-4`} aria-labelledby="payment">
+            <h2 id="payment" className="mb-3 flex items-center gap-2 text-base font-semibold text-neutral-900">
+              Payment <Badge tone={PAY_TONE[o.paymentStatus as keyof typeof PAY_TONE] ?? 'neutral'}>{o.payMethod === 'CARD' ? o.paymentStatus : 'CASH ON DELIVERY'}</Badge>
+            </h2>
+            {o.payMethod !== 'CARD' ? (
+              <p className="text-sm text-neutral-600">The customer pays the courier on delivery.</p>
+            ) : (
+              <>
+                <dl className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
+                  {[
+                    ['Method', 'Card online (Octo)'],
+                    ['Amount', formatUzs(o.totalUzs, 'en')],
+                    ['Card', paid ? [paid.cardVendor, paid.maskedPan].filter(Boolean).join(' ') || '-' : '-'],
+                    ['Paid at', paid?.paidAt ? `${paid.paidAt.toISOString().slice(0, 16).replace('T', ' ')} UTC` : '-'],
+                    ['Octo payment', last?.octoPaymentId ?? '-'],
+                    ['Attempts', String(o.payments.length)],
+                    ...(paid && paid.refundedUzs > 0 ? [['Refunded', formatUzs(paid.refundedUzs, 'en')]] : []),
+                    ...(paid?.refundId && paid.refundedUzs === 0 ? [['Refund', `pending (${paid.refundId})`]] : []),
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex gap-3">
+                      <dt className="w-28 shrink-0 text-neutral-500">{k}</dt>
+                      <dd className="min-w-0 break-all text-neutral-900">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {o.paymentStatus === 'PAID' && o.status === 'CANCELLED' && (
+                  <div className="mb-3">
+                    <Notice kind="error">This order is cancelled but was paid by card. Refund the payment.</Notice>
+                  </div>
+                )}
+                {o.payments.filter((p) => p.status === 'succeeded').length > 1 && (
+                  <div className="mb-3">
+                    <Notice kind="error">This order was paid more than once. Refund the extra payment in the Octo cabinet.</Notice>
+                  </div>
+                )}
+                <OrderPaymentButtons orderId={o.id} paymentStatus={o.paymentStatus} amountUzs={o.totalUzs} />
+                {o.payments.length > 0 && (
+                  <ul className="mt-4 space-y-1 border-t border-neutral-100 pt-3 text-xs text-neutral-600">
+                    {o.payments.map((p) => (
+                      <li key={p.id} className="flex flex-wrap gap-x-3">
+                        <span className="font-mono">{p.shopTransactionId}</span>
+                        <span className="font-semibold">{p.status}</span>
+                        {p.test && <span className="font-semibold text-amber-700">TEST</span>}
+                        <span>{p.createdAt.toISOString().slice(0, 16).replace('T', ' ')} UTC</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </section>
+        )
+      })()}
 
       <section className={`${card} mt-4 !p-0`} aria-labelledby="lines">
         <h2 id="lines" className="px-4 pb-3 pt-4 text-base font-semibold text-neutral-900 sm:px-5 sm:pt-5">

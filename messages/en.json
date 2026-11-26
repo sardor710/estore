@@ -181,7 +181,8 @@
       "NETWORK": "Could not send the order. Check your connection and try again.",
       "RATE_LIMITED": "Too many orders from your network in a short time. Please wait a few minutes and try again, or call us.",
       "BLOCKED": "We can't accept this order online. Please call us.",
-      "SERVER": "Something went wrong on our side. Please try again in a moment."
+      "SERVER": "Something went wrong on our side. Please try again in a moment.",
+      "CARD_UNAVAILABLE": "Card payment is temporarily unavailable. Please choose cash on delivery."
     },
     "fromAccount": "From your account",
     "phoneLocked": "Orders are placed with your account number so they appear in your account.",
@@ -190,7 +191,13 @@
     "defaultAddress": "Default",
     "saveAddress": "Save to my addresses",
     "addressLabel": "Address name (optional)",
-    "addressLabelPlaceholder": "Home, Work…"
+    "addressLabelPlaceholder": "Home, Work…",
+    "payment": "Payment",
+    "payCash": "Cash on delivery",
+    "payCashHint": "Pay the courier when you receive your order.",
+    "payCard": "Pay online by card",
+    "payCardHint": "Uzcard, Humo, Visa or Mastercard on the secure Octo payment page.",
+    "submitCard": "Proceed to payment"
   },
   "order": {
     "title": "Order received",
@@ -205,7 +212,20 @@
       "DELIVERED": "Delivered",
       "CANCELLED": "Cancelled"
     },
-    "backToShop": "Continue shopping"
+    "backToShop": "Continue shopping",
+    "payment": {
+      "titleAwaiting": "Order received — awaiting payment",
+      "paid": "Paid by card",
+      "refunded": "Payment refunded to your card",
+      "pending": "Waiting for payment",
+      "pendingHint": "Your order is saved. Complete the card payment to confirm it, or we will call you.",
+      "failed": "Payment did not go through",
+      "failedHint": "No money was taken. You can try again with the same or another card.",
+      "payNow": "Pay now",
+      "tryAgain": "Try again",
+      "opening": "Opening payment page…",
+      "error": "Could not open the payment page. Please try again in a moment."
+    }
   },
   "seo": {
     "homeDescription": "Chargers, power banks, audio and smart gadgets. Delivery across Uzbekistan.",

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { prisma } from '@/lib/db'
 import { isSellable } from '@/lib/visibility'
 import { getSettings } from '@/lib/settings'
@@ -27,8 +28,10 @@ export type CreateOrderInput = {
   saveAddress?: { label: string } | null
   /** Optional delivery pin from Telegram location sharing / geolocation; validated by cleanLatLng. */
   location?: { lat?: unknown; lng?: unknown } | null
+  /** CASH (default, pay on delivery) or CARD (online via Octo: payment PENDING + a secret payToken for the order link). */
+  payMethod?: 'CASH' | 'CARD'
 }
-export type CreateOrderResult = { ok: true; number: number } | { ok: false; error: 'INVALID' | 'OUT_OF_STOCK' | 'BELOW_MIN' | 'BLOCKED' }
+export type CreateOrderResult = { ok: true; number: number; id: number; payToken: string | null } | { ok: false; error: 'INVALID' | 'OUT_OF_STOCK' | 'BELOW_MIN' | 'BLOCKED' }
 export type StatusResult = { ok: true } | { ok: false; error: 'INSUFFICIENT_STOCK' | 'BAD_TRANSITION' }
 
 export { MAX_LINE_QTY }
@@ -162,6 +165,7 @@ export async function createOrder(
         const max = await tx.order.aggregate({ _max: { number: true } })
         const number = Math.max(max._max.number ?? 0, FIRST_ORDER_NUMBER - 1) + 1
         await upsertCustomerFromOrder(tx, { phone, name, region: region.code })
+        const card = input.payMethod === 'CARD'
         return tx.order.create({
           data: {
             number,
@@ -174,6 +178,7 @@ export async function createOrder(
             totalUzs: total,
             lat: pin?.lat ?? null,
             lng: pin?.lng ?? null,
+            ...(card ? { payMethod: 'CARD', paymentStatus: 'PENDING', payToken: randomBytes(24).toString('base64url') } : {}),
             lines: { create: snap },
             events: { create: [{ status: 'NEW' }] },
           },
@@ -196,13 +201,14 @@ export async function createOrder(
         totalUzs: order.totalUzs,
         lines: order.lines,
         mapUrl: pin ? mapLinks(pin.lat, pin.lng).google : null,
+        payMethod: order.payMethod === 'CARD' ? 'CARD' : 'CASH',
       }
       try {
         Promise.resolve((deps.notify ?? notifyNewOrder)(payload)).catch(() => {})
       } catch {
         // notifier must never break order creation
       }
-      return { ok: true, number: order.number }
+      return { ok: true, number: order.number, id: order.id, payToken: order.payToken }
     } catch (e) {
       if (e instanceof Rollback) return { ok: false, error: e.code }
       if (isUniqueViolation(e) && attempt < 4) continue // number race: retry with a fresh max

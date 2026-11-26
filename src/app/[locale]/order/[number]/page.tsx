@@ -9,6 +9,8 @@ import { CheckCircle2 } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
 import { prisma } from '@/lib/db'
 import { path } from '@/lib/paths'
+import { orderPaymentView } from '@/lib/payments/view'
+import OrderPaymentPanel from '@/components/store/OrderPaymentPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,20 +23,30 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return { ...meta, robots: { index: false, follow: false } }
 }
 
-export default async function OrderPage({ params }: { params: Promise<{ locale: string; number: string }> }) {
+export default async function OrderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string; number: string }>
+  searchParams: Promise<{ t?: string | string[] }>
+}) {
   const { locale: raw, number: rawNumber } = await params
+  const sp = await searchParams
   setRequestLocale(raw)
   const locale = raw as Locale
   if (!/^\d{1,9}$/.test(rawNumber)) notFound()
   const order = await prisma.order.findUnique({ where: { number: Number(rawNumber) }, select: { number: true, status: true } })
   if (!order) notFound()
   const t = await getTranslations({ locale, namespace: 'order' })
+  // Card orders: payment state only with the secret token from the order link (number alone reveals nothing).
+  const payment = await orderPaymentView(order.number, typeof sp.t === 'string' ? sp.t : null).catch(() => null)
+  const awaiting = payment != null && payment.status !== 'PAID' && payment.status !== 'REFUNDED'
   const known = ['NEW', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'CANCELLED'].includes(order.status)
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">
       <CheckCircle2 size={56} className="mx-auto text-emerald-600" aria-hidden />
-      <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-neutral-900">{t('title')}</h1>
+      <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-neutral-900">{awaiting ? t('payment.titleAwaiting') : t('title')}</h1>
       <p className="mt-2 text-neutral-600">{t('thanks')}</p>
       <div className="mt-8 rounded-2xl bg-neutral-50 px-6 py-6">
         <p className="text-sm text-neutral-500">{t('number')}</p>
@@ -45,6 +57,7 @@ export default async function OrderPage({ params }: { params: Promise<{ locale: 
           </p>
         )}
       </div>
+      {payment && <OrderPaymentPanel view={payment} />}
       <p className="mt-6 text-neutral-700">{t('callText')}</p>
       <Link href={path(locale)} className="mt-8 inline-block rounded-full bg-neutral-900 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-700">
         {t('backToShop')}
