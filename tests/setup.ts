@@ -22,6 +22,7 @@ beforeEach(async () => {
   await prisma.customer.deleteMany()
   await prisma.promotion.deleteMany()
   await prisma.adminUser.deleteMany()
+  await prisma.erpOutbox.deleteMany()
   await prisma.orderStatusEvent.deleteMany()
   await prisma.orderLine.deleteMany()
   await prisma.order.deleteMany()

@@ -142,3 +142,28 @@ export async function erpUploadFile(
   if (!url) throw new ErpError('upload_file returned no file_url', 200, false)
   return url
 }
+
+type Filter = [string, '=' | '!=' | 'in', unknown]
+
+/**
+ * Lists documents by filters (never by name in the URL path: some SKUs contain "/").
+ * pageLength 0 = all rows.
+ */
+export async function erpList<T = Record<string, unknown>>(
+  doctype: string,
+  filters: Filter[],
+  fields: string[] = ['name'],
+  pageLength = 0,
+): Promise<T[]> {
+  return erpRequest<T[]>('GET', `/api/resource/${doctype}`, {
+    query: { filters: JSON.stringify(filters), fields: JSON.stringify(fields), limit_page_length: pageLength },
+  })
+}
+
+export async function erpInsert<T = Record<string, unknown> & { name: string }>(doctype: string, doc: Record<string, unknown>): Promise<T> {
+  return erpRequest<T>('POST', `/api/resource/${doctype}`, { body: doc })
+}
+
+export async function erpSetValue(doctype: string, name: string, values: Record<string, unknown>): Promise<void> {
+  await erpRequest('POST', '/api/method/frappe.client.set_value', { body: { doctype, name, fieldname: values } })
+}

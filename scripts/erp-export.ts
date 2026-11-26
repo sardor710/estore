@@ -1,0 +1,67 @@
+/**
+ * One-time export of every store SKU into ERPNext (company Zanko), safe to re-run.
+ *   tsx scripts/erp-export.ts --dry-run   # what would happen, nothing written
+ *   tsx scripts/erp-export.ts             # items + photos + prices, opening stock, diff report
+ * Exit code 1 when the final diff shows any mismatch.
+ */
+import 'dotenv/config'
+import { prisma } from '../src/lib/db'
+import { erpConfig, erpInsert, erpList } from '../src/lib/erp/client'
+import { ERP } from '../src/lib/erp/core'
+import { ensureErpItems } from '../src/lib/erp/items'
+import { fetchErpSnapshot } from '../src/lib/erp/snapshot'
+
+const OPENING_REMARK = 'zanko-opening-2026-11-26'
+
+async function diff() {
+  const variants = await prisma.variant.findMany({ select: { sku: true, stock: true, priceUzs: true } })
+  const snap = await fetchErpSnapshot(variants.map((v) => v.sku))
+  const missing = variants.filter((v) => !snap.items.has(v.sku)).map((v) => v.sku)
+  const price = variants.filter((v) => snap.items.has(v.sku) && snap.price.get(v.sku) !== v.priceUzs).map((v) => `${v.sku}: site ${v.priceUzs} / erp ${snap.price.get(v.sku) ?? '—'}`)
+  const stock = variants.filter((v) => snap.items.has(v.sku) && (snap.stock.get(v.sku) ?? 0) !== v.stock).map((v) => `${v.sku}: site ${v.stock} / erp ${snap.stock.get(v.sku) ?? 0}`)
+  const units = variants.reduce((a, v) => a + (snap.stock.get(v.sku) ?? 0), 0)
+  console.log(JSON.stringify({ skus: variants.length, inErp: snap.items.size, erpUnits: units, missing, priceMismatch: price, stockMismatch: stock }, null, 2))
+  return missing.length + price.length + stock.length
+}
+
+async function main() {
+  if (!erpConfig()) throw new Error('ERP_URL / ERP_API_KEY / ERP_API_SECRET missing')
+  const dry = process.argv.includes('--dry-run')
+  const variants = await prisma.variant.findMany({ select: { id: true, sku: true, stock: true } })
+  const withStock = variants.filter((v) => v.stock > 0)
+  const opening = await erpList('Stock Reconciliation', [['remarks', '=', OPENING_REMARK], ['docstatus', '=', 1]])
+
+  if (dry) {
+    const snap = await fetchErpSnapshot(variants.map((v) => v.sku))
+    console.log(JSON.stringify({
+      skus: variants.length,
+      alreadyInErp: snap.items.size,
+      toCreate: variants.length - snap.items.size,
+      openingStock: opening.length ? 'already done' : { skus: withStock.length, units: withStock.reduce((a, v) => a + v.stock, 0) },
+    }, null, 2))
+    return 0
+  }
+
+  const r = await ensureErpItems({ all: true, withImages: true })
+  console.log('items:', JSON.stringify(r))
+  if (r.failed.length) console.error('FAILED ITEMS — fix and re-run:', r.failed)
+
+  if (opening.length === 0 && withStock.length) {
+    const snap = await fetchErpSnapshot(withStock.map((v) => v.sku))
+    const rows = withStock.filter((v) => snap.items.has(v.sku))
+    const doc = await erpInsert('Stock Reconciliation', {
+      company: ERP.company,
+      purpose: 'Stock Reconciliation',
+      set_warehouse: ERP.warehouse,
+      remarks: OPENING_REMARK,
+      docstatus: 1,
+      items: rows.map((v) => ({ item_code: v.sku, warehouse: ERP.warehouse, qty: v.stock, valuation_rate: 0, allow_zero_valuation_rate: 1 })),
+    })
+    console.log('opening stock:', doc.name, `${rows.length} SKUs`)
+  } else {
+    console.log('opening stock:', opening.length ? `already done (${opening[0].name})` : 'nothing in stock')
+  }
+  return (await diff()) === 0 && r.failed.length === 0 ? 0 : 1
+}
+
+main().then((code) => process.exit(code), (e) => { console.error(e); process.exit(1) })
