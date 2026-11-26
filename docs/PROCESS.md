@@ -140,6 +140,10 @@ Live in **test mode**. Verified on the live site: checkout choice, redirect to O
   - R50i and R60i are sold in the US as P20i and P31i NC.
   - "360 sound" = Motion 300 (owner's choice).
   - Boom 2 SE is priced from the UK.
+- **Sony batch:** 8 products (#47–54): WF-1000XM5, WF-1000XM6, WH-1000XM5, WH-1000XM6, WH-CH520, WH-CH530, WH-CH720N, WH-CH730N. New brand Sony. Translated, SEO refreshed, published by the owner from admin. Tooling and data in `/home/nick/zanko-data/import-sony-2026-11-26/`; backup `backups/zanko-pre-sony-2026-11-26.db`.
+  - Sony's sites (electronics.sony.com, sony.co.uk and others) return 403 to this server and to WebFetch. Prices are Sony's official US launch prices from its press releases, not the current store price. Images come from sony.jp, scene7 and Sony's PR Newswire press photos, at low resolution (about 400–1280 px).
+  - "WH-CH720" = WH-CH720N (there is no model without the N). Some colour SKUs are inferred from Sony's colour codes; each JSON file's `notes` field lists which.
+  - WH-1000XM6 Sand Pink and Sandstone are 459.99 USD; the other colours are 449.99 USD.
 - **Octo card payments** (plan `docs/plans/2026-11-26-octo-payments-xl.md`): built test-first, independent review with fixes, deployed in test mode, live test-mode round trip. Octo key rotated twice by the owner; notification URL set in the Octo profile.
 - **GitHub:** server `main` pushed (`709de74`, then `263d4a9` with `scripts/translate-images.ts`).
 
