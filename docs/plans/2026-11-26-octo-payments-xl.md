@@ -5,7 +5,7 @@
 ## Progress
 | Status | Wave | Done | Last updated | Next action |
 |---|---|---|---|---|
-| Draft – plan | – | 0/9 | 2026-11-26 | Await plan approval |
+| Executing | 4 | 7/9 | 2026-11-26 | T8 review + deploy |
 
 Status values: `Draft – requirement` → `Draft – plan` → `Executing` → `Done` | `Done – partial` | `Blocked`
 Markers: `[ ]` pending · `[~]` in progress · `[x]` done (+evidence) · `[!]` blocked (+reason) · `[-]` dropped
@@ -108,7 +108,7 @@ Waves (run serially by the lead: modules share `orders.ts` and `messages/*.json`
 5. Octo down / error on prepare → order still created, customer lands on the order page with "Try again"; cash flow unaffected (T3).
 
 ### M1 — Payments core (wave 1)
-- [ ] **T1: Schema + Octo client.**
+- [x] **T1: Schema + Octo client.** _Evidence: payments-octo.test.ts 8/8; migration diff vs schema empty; commit 5ab9250._
   Migration `prisma/migrations/20261126000000_octo_payments/migration.sql` (additive): `Order.payMethod TEXT NOT NULL DEFAULT 'CASH'` (`CASH`|`CARD`); `Order.payToken TEXT` unique; table `Payment` (`id`, `orderId` → Order cascade, `provider` default `octo`, `shopTransactionId` unique, `octoPaymentId`, `status` default `created`, `amountUzs` Int, `payUrl`, `maskedPan`, `cardVendor`, `paidAt`, `refundedUzs` Int default 0, `refundId`, `createdAt`, `updatedAt`; index on `orderId`). `Order.paymentStatus` values: `UNPAID` (cash) · `PENDING` · `PAID` · `FAILED` · `REFUNDED`.
   `src/lib/payments/octo.ts`:
   - `octoConfig(): { shopId: number; secret: string; test: boolean } | null` (env `OCTO_SHOP_ID`, `OCTO_SECRET`, `OCTO_TEST=1`)
@@ -122,7 +122,7 @@ Waves (run serially by the lead: modules share `orders.ts` and `messages/*.json`
   - `octoConfig()` is `null` when either env var is missing
 
   Verify: `npx vitest run tests/lib/payments-octo.test.ts` passes, and the migration applies on the test DB.
-- [ ] **T2: Payment service** `src/lib/payments/service.ts` (injectable deps `{ fetch?, notifyPaid?(orderId) }`):
+- [x] **T2: Payment service** _Evidence: payments-service.test.ts 14/14 (race → 1 notify, amount mismatch stays PENDING, late cancel keeps PAID); commit fb0809d._ `src/lib/payments/service.ts` (injectable deps `{ fetch?, notifyPaid?(orderId) }`):
   - `startCardPayment(orderId): Promise<{ payUrl }>`
     - Throws `'ALREADY_PAID'`, `'TOO_MANY_ATTEMPTS'` (max 10) or `OctoError`.
     - Creates a new `Payment` with `shopTransactionId = zanko-<number>-<attempt>`; the order gets `paymentStatus PENDING` and `paymentProvider 'octo'`.
@@ -151,7 +151,7 @@ Waves (run serially by the lead: modules share `orders.ts` and `messages/*.json`
   Verify: the test file passes. Commit M1.
 
 ### M2 — APIs (wave 2)
-- [ ] **T3: Order API + payment routes.**
+- [x] **T3: Order API + payment routes.** _Evidence: payments.test.ts 12/12 (forged callback ignored, payError keeps order, wrong token 404, paid 409, refund needs admin); commit dee46f6._
   - **`createOrder`:** input gains `payMethod?: 'CASH' | 'CARD'`. Card orders store `payMethod CARD`, `paymentStatus PENDING`, and a `payToken` of 24 random bytes (base64url).
   - **`POST /api/orders`:**
     - reads `body.payment === 'card'`
@@ -176,7 +176,7 @@ Waves (run serially by the lead: modules share `orders.ts` and `messages/*.json`
   Verify: `npx vitest run tests/api/payments.test.ts tests/api/public-orders.test.ts` passes. Commit.
 
 ### M3 — Storefront (wave 3)
-- [ ] **T4: Checkout choice.**
+- [x] **T4: Checkout choice.** _Evidence: tsc clean; commit 1109b36 (UI verified live in T9)._
   - `CheckoutForm` gets the prop `cardPayments: boolean`, set by `checkout/page.tsx` as `octoConfig() !== null`.
   - Under the address block, two radio cards:
     - **Cash on delivery** (the default)
@@ -186,7 +186,7 @@ Waves (run serially by the lead: modules share `orders.ts` and `messages/*.json`
   - New `checkout.*` keys in uz/ru/en: `payment`, `payCash`, `payCashHint`, `payCard`, `payCardHint`, `submitCard`, `errors.CARD_UNAVAILABLE`.
 
   Verify: `npx tsc --noEmit` and the existing checkout tests pass.
-- [ ] **T5: Order page payment panel.**
+- [x] **T5: Order page payment panel.** _Evidence: payments-view.test.ts 4/4 (no token → null, settles before showing); commit af1080a._
   - A new helper `orderPaymentView(number, token)` in `src/lib/payments/view.ts` checks the token, settles the order if it is PENDING, and returns the view.
   - `/order/[number]` reads `searchParams.t`. With a valid token on a card order it shows one of four panels:
     - **Paid**: card vendor and masked number
@@ -201,13 +201,13 @@ Waves (run serially by the lead: modules share `orders.ts` and `messages/*.json`
   Verify: vitest for `orderPaymentView` (wrong token gives null; the PENDING path calls settle), and `npx tsc --noEmit`. Commit M3.
 
 ### M4 — Admin + Telegram (wave 3)
-- [ ] **T6: Admin.**
+- [x] **T6: Admin.** _Evidence: tsc clean, admin-guard 29/29; commit 31bc135._
   - The order page gets a payment block: method, status badge, card vendor and masked number, Octo payment id, paid time, refunded amount.
   - Buttons **Check status** and **Refund** live in `src/components/admin/OrderPaymentButtons.tsx`. Refund shows only for PAID orders and asks for confirmation, showing the amount.
   - The orders list shows a `Paid` / `Awaiting payment` badge next to the status.
 
   Verify: `npx tsc --noEmit` and the admin guard tests pass.
-- [ ] **T7: Telegram.**
+- [x] **T7: Telegram.** _Evidence: telegram.test.ts 10/10 (built inside T3, see ledger ruling); commit dee46f6._
   - `NotifyOrder` gains `payMethod`. The summary line reads "💵 Cash on delivery" or "💳 Card (Octo) — awaiting payment".
   - `notifyOrderPaid(orderNumber)` sends "✅ Order #N paid by card: <amount> (<vendor> <maskedPan>)", wired in as the service's `notifyPaid`.
 
@@ -245,6 +245,7 @@ All changes are additive.
 
 ## Revisions
 - 2026-11-26: requirement approved (fiscal receipts out of scope for now).
+- 2026-11-26: plan approved; executing inline on branch `feat/octo-payments` (worktree /home/nick/zanko-octo).
 
 ## Result
 Delivered: · Checks run: · Gaps: · Follow-ups:
