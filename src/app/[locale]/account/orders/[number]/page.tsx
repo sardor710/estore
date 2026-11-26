@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { orderPaymentView } from '@/lib/payments/view'
+import OrderPaymentPanel from '@/components/store/OrderPaymentPanel'
 import { ArrowLeft } from 'lucide-react'
 import type { Locale } from '@/i18n/routing'
 import { requireAccountCustomer } from '@/lib/account/session'
@@ -41,6 +43,8 @@ export default async function AccountOrderPage({ params }: { params: Params }) {
     getTranslations({ locale, namespace: 'account.statuses' }),
   ])
   const statusLabel = (s: string) => (isOrderStatus(s) ? tStatus(s) : s)
+  // The signed-in owner sees the card payment state without the link token.
+  const payment = await orderPaymentView(order.number, null, { trusted: true }).catch(() => null)
   const section = 'rounded-2xl border border-neutral-100 bg-white p-5 sm:p-6'
   const sectionTitle = 'text-xs font-bold uppercase tracking-widest text-neutral-500'
 
@@ -59,6 +63,11 @@ export default async function AccountOrderPage({ params }: { params: Params }) {
         <StatusBadge status={order.status} label={statusLabel(order.status)} />
       </div>
       <p className="mt-2 text-sm text-neutral-500">{tOrders('placed', { date: formatDay(order.createdAt, locale) })}</p>
+      {payment && (
+        <div className="max-w-xl">
+          <OrderPaymentPanel view={payment} />
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section aria-labelledby="od-items" className={section}>

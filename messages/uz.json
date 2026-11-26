@@ -212,7 +212,20 @@
       "DELIVERED": "Yetkazib berildi",
       "CANCELLED": "Bekor qilindi"
     },
-    "backToShop": "Xaridni davom ettirish"
+    "backToShop": "Xaridni davom ettirish",
+    "payment": {
+      "titleAwaiting": "Buyurtma qabul qilindi — toʻlov kutilmoqda",
+      "paid": "Karta orqali toʻlangan",
+      "refunded": "Toʻlov kartangizga qaytarildi",
+      "pending": "Toʻlov kutilmoqda",
+      "pendingHint": "Buyurtmangiz saqlandi. Tasdiqlash uchun karta orqali toʻlovni yakunlang yoki biz sizga qoʻngʻiroq qilamiz.",
+      "failed": "Toʻlov amalga oshmadi",
+      "failedHint": "Pul yechilmadi. Shu yoki boshqa karta bilan qayta urinib koʻring.",
+      "payNow": "Toʻlash",
+      "tryAgain": "Qayta urinish",
+      "opening": "Toʻlov sahifasi ochilmoqda…",
+      "error": "Toʻlov sahifasini ochib boʻlmadi. Birozdan soʻng qayta urinib koʻring."
+    }
   },
   "seo": {
     "homeDescription": "Zaryadlovchi qurilmalar, quvvat banklari, audio va aqlli gadjetlar. Oʻzbekiston boʻylab yetkazib berish.",
