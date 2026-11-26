@@ -144,6 +144,7 @@ Live in **test mode**. Verified on the live site: checkout choice, redirect to O
   - Sony's sites (electronics.sony.com, sony.co.uk and others) return 403 to this server and to WebFetch. Prices are Sony's official US launch prices from its press releases, not the current store price. Images come from sony.jp, scene7 and Sony's PR Newswire press photos, at low resolution (about 400–1280 px).
   - "WH-CH720" = WH-CH720N (there is no model without the N). Some colour SKUs are inferred from Sony's colour codes; each JSON file's `notes` field lists which.
   - WH-1000XM6 Sand Pink and Sandstone are 459.99 USD; the other colours are 449.99 USD.
+- **Homepage banners:** 5 slides (#1–5), images stored as uploads (WebP, separate mobile images): Anker Laptop Charger Pro, Anker Nano Smart Display (A121D), soundcore Liberty 5 Pro (from anker.com MEA), Sony WF-1000XM6 (Sony press photo, widened on the left for the text), Anker chargers → /c/chargers. Images are Anker's own homepage heroes (no baked-in text). Script and local copies: `/home/nick/zanko-data/banners-2026-11-26/make-banners.mts`; backup `backups/zanko-pre-banners-2026-11-26.db`. Shopify's CDN returns 403 to Node `fetch`; download with curl.
 - **Octo card payments** (plan `docs/plans/2026-11-26-octo-payments-xl.md`): built test-first, independent review with fixes, deployed in test mode, live test-mode round trip. Octo key rotated twice by the owner; notification URL set in the Octo profile.
 - **GitHub:** server `main` pushed (`709de74`, then `263d4a9` with `scripts/translate-images.ts`).
 
