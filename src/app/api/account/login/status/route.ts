@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { collectLogin } from '@/lib/account/login'
 import { issueCustomerSession, setCustomerCookie } from '@/lib/account/session'
-import { json, rateLimited, statusLimiter, statusKey, parseLoginCookie, LOGIN_COOKIE, LOGIN_COOKIE_OPTIONS } from '../../_lib'
+import { json, rateLimited, statusLimiter, statusKey, parseLoginCookie, stampSignIn, LOGIN_COOKIE, LOGIN_COOKIE_OPTIONS } from '../../_lib'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     if (r === 'expired') return clear(json({ state: 'expired' }))
     const token = await issueCustomerSession(r.customerId)
     if (!token) return clear(json({ state: 'expired' }))
+    await stampSignIn(r.customerId)
     const res = clear(json({ state: 'done' }))
     await setCustomerCookie(res.cookies, token)
     return res

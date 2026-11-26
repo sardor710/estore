@@ -146,6 +146,7 @@ describe('GET /api/account/login/status', () => {
 
     expect(await (await poll()).json()).toEqual({ state: 'expired' })
     expect(await (await poll(loginCookie)).json()).toEqual({ state: 'pending' })
+    expect((await prisma.customer.findUnique({ where: { id: c.id } }))?.lastLoginAt).toBeNull()
 
     // bot side: returning user opens the link and picks the right code
     expect(await loginForTelegramUser(token, 'tg1')).toMatchObject({ checkCode: body.checkCode })
@@ -156,8 +157,14 @@ describe('GET /api/account/login/status', () => {
     expect(await thief.json()).toEqual({ state: 'denied' })
     expect(cookieOf(thief, CUSTOMER_COOKIE)).toBeUndefined()
 
+    const before = Date.now()
     const done = await poll(loginCookie)
     expect(await done.json()).toEqual({ state: 'done' })
+    // the sign-in is stamped on the customer (dashboard "Recent sign-ins")
+    const stamped = await prisma.customer.findUnique({ where: { id: c.id }, select: { lastLoginAt: true, lastSeenAt: true } })
+    expect(stamped!.lastLoginAt!.getTime()).toBeGreaterThanOrEqual(before)
+    expect(stamped!.lastLoginAt!.getTime()).toBeLessThanOrEqual(Date.now())
+    expect(stamped!.lastSeenAt).toEqual(stamped!.lastLoginAt)
     const session = cookieOf(done, CUSTOMER_COOKIE)!
     expect(session).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/' })
     expect((await customerFromToken(session.value))?.id).toBe(c.id)
@@ -220,13 +227,33 @@ describe('code sign-in', () => {
   it('happy path: code -> verify sets the session cookie; code is single-use', async () => {
     const c = await mkAccount()
     expect((await code(PHONE)).status).toBe(200)
+    const before = Date.now()
     const res = await verify(PHONE, lastCode())
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true })
+    const stamped = (await prisma.customer.findUnique({ where: { id: c.id } }))!.lastLoginAt!
+    expect(stamped.getTime()).toBeGreaterThanOrEqual(before)
+    expect(stamped.getTime()).toBeLessThanOrEqual(Date.now())
     expect((await customerFromToken(cookieOf(res, CUSTOMER_COOKIE)!.value))?.id).toBe(c.id)
     const again = await verify(PHONE, lastCode())
     expect(again.status).toBe(400)
     expect(cookieOf(again, CUSTOMER_COOKIE)).toBeUndefined()
+  })
+
+  it('a failing sign-in stamp does not fail the sign-in', async () => {
+    const c = await mkAccount()
+    await code(PHONE)
+    const spy = vi.spyOn(prisma.customer, 'updateMany').mockRejectedValueOnce(new Error('db busy') as never)
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const res = await verify(PHONE, lastCode())
+      expect(res.status).toBe(200)
+      expect((await customerFromToken(cookieOf(res, CUSTOMER_COOKIE)!.value))?.id).toBe(c.id)
+      expect(spy).toHaveBeenCalled()
+    } finally {
+      spy.mockRestore()
+      errors.mockRestore()
+    }
   })
 
   it('5 wrong codes -> too_many_attempts, even the right code is then refused', async () => {
@@ -240,6 +267,7 @@ describe('code sign-in', () => {
     expect(locked.status).toBe(400)
     expect(await locked.json()).toEqual({ error: 'invalid' })
     expect(cookieOf(locked, CUSTOMER_COOKIE)).toBeUndefined()
+    expect((await prisma.customer.findFirst({ where: { phone: PHONE } }))?.lastLoginAt).toBeNull() // a failed sign-in is not a sign-in
   })
 
   it('verify: expired, unknown and malformed codes all answer 400 { error: "invalid" }', async () => {

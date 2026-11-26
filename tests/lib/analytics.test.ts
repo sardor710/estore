@@ -132,3 +132,33 @@ describe('recordPageView caps and housekeeping', () => {
     expect(await prisma.dailyTraffic.count()).toBe(0)
   })
 })
+
+describe('recordPageView account', () => {
+  const NOW = new Date('2026-12-05T08:00:00Z')
+  const view = (over: Partial<import('@/lib/analytics/record').PageViewInput> = {}) =>
+    import('@/lib/analytics/record').then((m) => m.recordPageView({ path: '/uz', locale: 'uz', referrer: '', ip: '1.2.3.4', ua: DESKTOP, now: NOW, ...over }))
+  const only = async () => (await prisma.pageView.findMany())[0]
+
+  it('a signed-in view stores the flag and the profile region', async () => {
+    expect(await view({ account: { id: 1, region: 'samarkand' } })).toBe(true)
+    expect(await only()).toMatchObject({ signedIn: true, region: 'samarkand' })
+  })
+  it('a guest view stores signedIn false and no region', async () => {
+    await view({ account: null })
+    expect(await only()).toMatchObject({ signedIn: false, region: null })
+  })
+  it('a view without account information is unknown, not guest', async () => {
+    await view()
+    expect(await only()).toMatchObject({ signedIn: null, region: null })
+  })
+  it('a region code the shop does not know is dropped', async () => {
+    await view({ account: { id: 1, region: 'nowhere' } })
+    expect(await only()).toMatchObject({ signedIn: true, region: null })
+  })
+  it('never stores who the customer is', async () => {
+    await view({ account: { id: 4242, region: 'samarkand' } })
+    const row = await only()
+    expect(Object.keys(row).filter((k) => /customer|phone|name/i.test(k))).toEqual([])
+    expect(Object.values(row)).not.toContain(4242)
+  })
+})

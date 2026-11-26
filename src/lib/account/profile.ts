@@ -56,6 +56,8 @@ export async function deleteAccount(cid: number): Promise<boolean> {
         accountLocale: null,
         notifyTelegram: true,
         accountCreatedAt: null,
+        lastLoginAt: null,
+        lastSeenAt: null,
         sessionVersion: { increment: 1 },
       },
     })

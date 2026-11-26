@@ -8,26 +8,9 @@ import { clientKey } from '@/lib/rate-limit'
 import { orderLimiter } from '@/lib/order-throttle'
 import { runAfterResponse } from '@/lib/after-response'
 import { isJsonContentType, isSameOrigin } from '@/lib/admin/csrf'
-import { CUSTOMER_COOKIE, customerFromToken } from '@/lib/account/session'
+import { CUSTOMER_COOKIE, customerFromToken, readCookie } from '@/lib/account/session'
 
 export const dynamic = 'force-dynamic'
-
-/** One cookie from the raw header (works for plain Request objects too). */
-function readCookie(req: Request, name: string): string | null {
-  const header = req.headers.get('cookie')
-  if (!header) return null
-  for (const part of header.split(';')) {
-    const i = part.indexOf('=')
-    if (i > 0 && part.slice(0, i).trim() === name) {
-      try {
-        return decodeURIComponent(part.slice(i + 1).trim())
-      } catch {
-        return null
-      }
-    }
-  }
-  return null
-}
 
 export async function POST(req: Request) {
   // The Telegram Mini App session cookie is SameSite=None: refuse cross-site requests and non-JSON (form) posts.

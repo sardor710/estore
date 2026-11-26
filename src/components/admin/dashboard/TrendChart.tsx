@@ -8,9 +8,6 @@ const spaced = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d)
 const compact = (n: number) => (n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${+(n / 1000).toFixed(1)}k` : String(n))
 const shortDay = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}`
 
-// Palette slots 1-3 (validated, light surface). One entity keeps one colour on every chart.
-export const SERIES_COLOR = { revenue: '#2a78d6', orders: '#eb6834', visitors: '#1baf7a' } as const
-
 /**
  * One measure, one axis (never dual-axis): revenue as bars (baseline zero), counts as a line.
  * The collapsed table is the accessible view of the same numbers.

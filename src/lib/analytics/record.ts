@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { getRegion } from '@/lib/regions'
 import { rollupAndPrune } from './rollup'
 import { deviceOf, isBot, tashkentDay, visitorHash } from './visitor'
 
@@ -11,6 +12,11 @@ export type PageViewInput = {
   now: Date
   /** Hostnames that count as "ourselves" (the request's own host and SITE_URL's host). */
   ownHosts?: string[]
+  /**
+   * Who is looking: the signed-in customer, `null` for a guest, `undefined` when it could not be determined.
+   * Only a yes/no flag and the region code are stored; the id is never written to the page view.
+   */
+  account?: { id: number; region: string } | null
 }
 
 const STOREFRONT_PATH = /^\/(uz|ru|en)(\/|$)/
@@ -126,6 +132,8 @@ export async function recordPageView(i: PageViewInput): Promise<boolean> {
         referrerHost: host && !own.includes(host) ? host : null,
         device: deviceOf(i.ua),
         visitorHash: hash,
+        signedIn: i.account === undefined ? null : i.account !== null,
+        region: i.account && getRegion(i.account.region) ? i.account.region : null,
         createdAt: i.now,
       },
     })

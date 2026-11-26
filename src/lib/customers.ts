@@ -157,7 +157,13 @@ export async function listCustomers(
 }
 
 export type CustomerOrder = { id: number; number: number; status: string; totalUzs: number; createdAt: Date }
-export type CustomerDetail = CustomerRow & { history: CustomerOrder[] }
+export type CustomerDetail = CustomerRow & {
+  history: CustomerOrder[]
+  /** Latest website sign-in (Telegram link or code); null when never. */
+  lastLoginAt: Date | null
+  /** Latest page view while signed in (website or Mini App), at most 5 minutes behind; null when never. */
+  lastSeenAt: Date | null
+}
 
 export async function getCustomer(id: number, now: Date = new Date()): Promise<CustomerDetail | null> {
   const c = await prisma.customer.findUnique({ where: { id } })
@@ -184,7 +190,7 @@ export async function getCustomer(id: number, now: Date = new Date()): Promise<C
   const s = { orders, spentUzs, lastOrderAt }
   return {
     id: c.id, phone: c.phone, name: c.name, region: c.region, notes: c.notes, tags: toTags(c.tags), blocked: c.blocked, accountCreatedAt: c.accountCreatedAt, createdAt: c.createdAt,
-    ...s, segment: segmentOf(s, settings.vipThresholdUzs, now), history,
+    ...s, segment: segmentOf(s, settings.vipThresholdUzs, now), history, lastLoginAt: c.lastLoginAt, lastSeenAt: c.lastSeenAt,
   }
 }
 

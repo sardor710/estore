@@ -4,7 +4,7 @@ import { clientKey } from '@/lib/rate-limit'
 import { readJsonBody } from '@/lib/body-limit'
 import { verifyLoginCode } from '@/lib/account/codes'
 import { issueCustomerSession, setCustomerCookie } from '@/lib/account/session'
-import { json, forbidden, rateLimited, verifyLimiter } from '../../_lib'
+import { json, forbidden, rateLimited, stampSignIn, verifyLimiter } from '../../_lib'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     if (typeof r === 'string') return json({ error: 'invalid' }, 400)
     const token = await issueCustomerSession(r.customerId)
     if (!token) return json({ error: 'invalid' }, 400)
+    await stampSignIn(r.customerId)
     const res = json({ ok: true })
     await setCustomerCookie(res.cookies, token)
     return res

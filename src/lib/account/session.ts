@@ -78,11 +78,43 @@ const toLocale = (v: string | null): Locale | null => ((locales as readonly stri
  * bumped sessionVersion (sign out everywhere, relink to another Telegram user) -> null on the very next request.
  */
 export async function customerFromToken(token: string | null | undefined): Promise<AccountCustomer | null> {
+  const c = await accountRow(token)
+  return c ? { id: c.id, phone: c.phone, name: c.name, locale: toLocale(c.accountLocale), notifyTelegram: c.notifyTelegram, blocked: c.blocked } : null
+}
+
+/** The Customer row behind a valid session token; the single place that decides whether a token is still good. */
+async function accountRow(token: string | null | undefined) {
   const claims = await readCustomerSession(token)
   if (!claims) return null
   const c = await prisma.customer.findUnique({ where: { id: claims.cid } })
   if (!c || !c.accountCreatedAt || c.sessionVersion !== claims.sv) return null
-  return { id: c.id, phone: c.phone, name: c.name, locale: toLocale(c.accountLocale), notifyTelegram: c.notifyTelegram, blocked: c.blocked }
+  return c
+}
+
+/**
+ * For visit analytics only: the signed-in account's id and profile region (same validity rules as
+ * customerFromToken). Kept apart from AccountCustomer, which goes to account pages and stays minimal.
+ */
+export async function visitorAccountFromToken(token: string | null | undefined): Promise<{ id: number; region: string; lastSeenAt: Date | null } | null> {
+  const c = await accountRow(token)
+  return c ? { id: c.id, region: c.region, lastSeenAt: c.lastSeenAt } : null
+}
+
+/** One cookie from the raw header (works for plain Request objects too). */
+export function readCookie(req: Request, name: string): string | null {
+  const header = req.headers.get('cookie')
+  if (!header) return null
+  for (const part of header.split(';')) {
+    const i = part.indexOf('=')
+    if (i > 0 && part.slice(0, i).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(i + 1).trim())
+      } catch {
+        return null
+      }
+    }
+  }
+  return null
 }
 
 /** Fresh session token for an account (current sessionVersion), or null when the customer has no account. */
