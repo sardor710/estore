@@ -5,7 +5,7 @@
 ## Progress
 | Status | Wave | Done | Last updated | Next action |
 |---|---|---|---|---|
-| Executing | 4 | 7/9 | 2026-11-26 | T8 review + deploy |
+| Done – partial | 4 | 8/9 (+T9 partial) | 2026-11-26 | Owner: send Octo support message; after test cards → finish T9; then set OCTO_TEST=0 |
 
 Status values: `Draft – requirement` → `Draft – plan` → `Executing` → `Done` | `Done – partial` | `Blocked`
 Markers: `[ ]` pending · `[~]` in progress · `[x]` done (+evidence) · `[!]` blocked (+reason) · `[-]` dropped
@@ -214,13 +214,13 @@ Waves (run serially by the lead: modules share `orders.ts` and `messages/*.json`
   Verify: extend the telegram tests and run them. Commit M4.
 
 ### M5 — Ship + prove (wave 4)
-- [ ] **T8: Review + deploy.**
+- [x] **T8: Review + deploy.** _Evidence: code-reviewer (opus): 0 Critical, 3 Important + 2 regraded → fixed test-first (suite 965/965 → 966 after language fix), 8 minors deferred (ledger); merged to main ce97f52 + language fix; db:deploy applied 20261126000000_octo_payments; build ok; secret in .next/static: 0 files; zanko.service active._
   - A `code-reviewer` subagent reviews the diff, focused on secret handling, PAID only via the status check, idempotency and the token check. Fix its findings.
   - Run the full `npx vitest run`, `npx tsc --noEmit` and `npm run build`.
   - Back up `zanko.db`, then add `OCTO_SHOP_ID=43297`, `OCTO_SECRET` and `OCTO_TEST=1` to the production `.env`.
   - Run `npm run db:deploy` and restart the service.
   - Grep `.next/static` for the secret: there must be no match.
-- [ ] **T9: Live test-mode round trip + handover.**
+- [~] **T9: Live test-mode round trip + handover.** _Evidence (live zanko.uz, test mode): /checkout?octo_test=1 shows Cash/Card, normal /checkout shows none; card order #1011 → redirected to pay2.octo.uz test page "Zanko order #1011", UZS 90000 (shots/octo-1-checkout.png, octo-2-octo-page.png, octo-4-form.png); forged callback claiming succeeded → 200, order stays PENDING (real Octo status = created); order page with token shows Waiting for payment + Pay now, without token unchanged; Pay now wrong token 404, after cancel 409 ORDER_CLOSED. **Not verified:** a successful payment, real Octo callback delivery, refund — Octo publishes no test cards (fake 8600… rejected as invalid). Octo support message drafted: /home/nick/zanko-data/octo-support-message.md. Test order #1011 cancelled._
   - In the headless browser on zanko.uz: add a product, check out with card, land on the `pay2.octo.uz` test page (screenshot), and try to complete it with a test card.
   - Confirm the callback arrives (server log) and the order page shows Paid.
   - If that's impossible, say plainly that the success path was proven only by mocked tests plus a real status check returning `created`.
@@ -248,7 +248,10 @@ All changes are additive.
 - 2026-11-26: plan approved; executing inline on branch `feat/octo-payments` (worktree /home/nick/zanko-octo).
 
 ## Result
-Delivered: · Checks run: · Gaps: · Follow-ups:
+Delivered: Octo card payments (Uzcard, Humo, Visa, Mastercard) on zanko.uz in **test mode**: checkout choice, Octo hosted page, verified-by-status settlement, order-page panel with Pay now/Try again, admin payment block with Check status/Refund and attempts list, Telegram "paid" message + double-payment/cancelled-order alerts, test-mode gating.
+Checks run: full vitest 966 tests green, tsc clean, build ok, independent review (fixes applied), live test-mode run (see T9).
+Gaps: successful payment / callback / refund not proven live (needs Octo test cards); Apple Pay & Google Pay need Octo to enable them; fiscal receipts out of scope (owner).
+Follow-ups: send octo-support-message.md; when test cards arrive run /checkout?octo_test=1 end-to-end incl. refund; then set OCTO_TEST=0 in /home/nick/zanko/.env and restart (go live). Deferred minors M3–M10 in the ledger list.
 
 ## Handoff
-Plan written, awaiting owner approval. Credentials verified with a test-mode prepare_payment (shop 43297). Nothing built yet.
+Live on zanko.uz in Octo TEST mode (OCTO_TEST=1 in /home/nick/zanko/.env); card option only on /checkout?octo_test=1. Code: src/lib/payments/{octo,service,view,live}.ts, routes under src/app/api/payments/octo and admin orders/[id]/{refund,payment-check}. Branch feat/octo-payments merged into main (not pushed). Next: owner sends the Octo support message; with test cards finish T9 (success + refund), then OCTO_TEST=0 + restart to go live. Disable instantly by removing OCTO_SECRET and restarting.
