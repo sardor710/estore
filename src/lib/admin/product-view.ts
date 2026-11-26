@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { erpFlagOn } from '@/lib/erp/outbox'
 import type { L10n } from '@/lib/localized'
 import type { FaqItem, Highlight, Section, SpecGroup } from '@/lib/catalog'
 import { categoryAncestry } from '@/lib/promotions'
@@ -23,7 +24,7 @@ export function rowToInput(p: {
   slug: string; categoryId: number; templateOverride: string | null; brandId: number | null; badge: string | null
   title: unknown; subtitle: unknown; shortSpec: unknown; descriptionHtml: unknown; sections: unknown; highlights: unknown
   inTheBox: unknown; faq: unknown; specs: unknown; images: unknown; reviewed: unknown; seoTitle?: unknown; seoDescription?: unknown
-  variants: { id: number; sku: string; name: unknown; priceUzs: number; compareAtUzs: number | null; stock: number; colorHex: string | null; imageIndex: number | null; sortOrder: number }[]
+  variants: { id: number; sku: string; name: unknown; priceUzs: number; compareAtUzs: number | null; stock: number; colorHex: string | null; imageIndex: number | null; sortOrder: number; erpLinkedAt?: Date | null }[]
 }): ProductInput {
   const rev = (p.reviewed && typeof p.reviewed === 'object' ? p.reviewed : {}) as { uz?: boolean; ru?: boolean }
   return {
@@ -47,7 +48,7 @@ export function rowToInput(p: {
     seoDescription: l10n(p.seoDescription),
     variants: [...p.variants]
       .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
-      .map((v) => ({ id: v.id, sku: v.sku, name: l10n(v.name), priceUzs: v.priceUzs, compareAtUzs: v.compareAtUzs, stock: v.stock, colorHex: v.colorHex, imageIndex: v.imageIndex })),
+      .map((v) => ({ id: v.id, sku: v.sku, name: l10n(v.name), priceUzs: v.priceUzs, compareAtUzs: v.compareAtUzs, stock: v.stock, colorHex: v.colorHex, imageIndex: v.imageIndex, erpManaged: erpFlagOn() && Boolean(v.erpLinkedAt) })),
   }
 }
 

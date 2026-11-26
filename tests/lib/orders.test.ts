@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { prisma } from '@/lib/db'
 import { createOrder, setOrderStatus, quoteCart } from '@/lib/orders'
 import { updateSettings } from '@/lib/settings'
@@ -298,5 +298,141 @@ describe('status events and account options', () => {
     })
     expect(await createOrder({ ...base, lines: [{ variantId: v.id, qty: 1 }], accountCustomerId: other.id, saveAddress: { label: 'x' } })).toMatchObject({ ok: true })
     expect(await prisma.customerAddress.count()).toBe(0)
+  })
+})
+
+describe('setOrderStatus → ERP outbox', () => {
+  const saved = process.env.ERP_ENABLED
+  afterEach(() => {
+    if (saved === undefined) delete process.env.ERP_ENABLED
+    else process.env.ERP_ENABLED = saved
+  })
+  async function confirmed(sku: string, qty: number, stock = 5, link = true) {
+    const v = await mkVariant({ sku, price: 1000, stock })
+    if (link) await prisma.variant.update({ where: { id: v.id }, data: { erpLinkedAt: new Date() } })
+    const r = await createOrder({ ...base, lines: [{ variantId: v.id, qty }] })
+    if (!r.ok) throw new Error('setup')
+    const o = (await prisma.order.findUnique({ where: { number: r.number } }))!
+    return { v, o }
+  }
+
+  it('confirm writes a DELIVER row in the same transaction', async () => {
+    process.env.ERP_ENABLED = '1'
+    const { o } = await confirmed('E1', 2)
+    expect(await setOrderStatus(o.id, 'CONFIRMED')).toEqual({ ok: true })
+    const rows = await prisma.erpOutbox.findMany()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ ref: `ZK-${o.id}`, kind: 'DELIVER', orderId: o.id, status: 'PENDING' })
+    expect(rows[0].lines).toEqual([{ sku: 'E1', qty: 2, rateUzs: 1000 }])
+  })
+
+  it('flag off: no rows', async () => {
+    delete process.env.ERP_ENABLED
+    const { o } = await confirmed('E2', 1)
+    await setOrderStatus(o.id, 'CONFIRMED')
+    expect(await prisma.erpOutbox.count()).toBe(0)
+  })
+
+  it('a refused confirm writes nothing', async () => {
+    process.env.ERP_ENABLED = '1'
+    const { o } = await confirmed('E3', 3, 3)
+    await prisma.variant.updateMany({ where: { sku: 'E3' }, data: { stock: 1 } })
+    expect(await setOrderStatus(o.id, 'CONFIRMED')).toEqual({ ok: false, error: 'INSUFFICIENT_STOCK' })
+    expect(await prisma.erpOutbox.count()).toBe(0)
+  })
+
+  it('cancel after the delivery reached ERP writes a RETURN row', async () => {
+    process.env.ERP_ENABLED = '1'
+    const { o } = await confirmed('E4', 1)
+    await setOrderStatus(o.id, 'CONFIRMED')
+    await prisma.erpOutbox.update({ where: { ref: `ZK-${o.id}` }, data: { status: 'DONE', erpDoc: 'DN-1' } })
+    expect(await setOrderStatus(o.id, 'CANCELLED')).toEqual({ ok: true })
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o.id}-R` } })).toMatchObject({ kind: 'RETURN', status: 'PENDING' })
+  })
+
+  it('cancel before the delivery was ever sent skips it instead of returning', async () => {
+    process.env.ERP_ENABLED = '1'
+    const { o } = await confirmed('E5', 1)
+    await setOrderStatus(o.id, 'CONFIRMED')
+    expect(await setOrderStatus(o.id, 'CANCELLED')).toEqual({ ok: true })
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o.id}` } })).toMatchObject({ status: 'SKIPPED' })
+    expect(await prisma.erpOutbox.count()).toBe(1)
+  })
+
+  it('cancel of an order confirmed before the ERP switch-over writes a RECEIPT row', async () => {
+    delete process.env.ERP_ENABLED
+    const { o } = await confirmed('E6', 2)
+    await setOrderStatus(o.id, 'CONFIRMED')
+    process.env.ERP_ENABLED = '1'
+    expect(await setOrderStatus(o.id, 'CANCELLED')).toEqual({ ok: true })
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o.id}-R` } })).toMatchObject({ kind: 'RECEIPT', status: 'PENDING' })
+  })
+})
+
+describe('setOrderStatus → ERP outbox (review fixes)', () => {
+  const saved = process.env.ERP_ENABLED
+  afterEach(() => {
+    if (saved === undefined) delete process.env.ERP_ENABLED
+    else process.env.ERP_ENABLED = saved
+  })
+  async function order(lines: { sku: string; linked: boolean }[]) {
+    const ids: number[] = []
+    for (const l of lines) {
+      const v = await mkVariant({ sku: l.sku, price: 500, stock: 5 })
+      if (l.linked) await prisma.variant.update({ where: { id: v.id }, data: { erpLinkedAt: new Date() } })
+      ids.push(v.id)
+    }
+    const r = await createOrder({ ...base, lines: ids.map((variantId) => ({ variantId, qty: 1 })) })
+    if (!r.ok) throw new Error('setup')
+    return (await prisma.order.findUnique({ where: { number: r.number } }))!
+  }
+
+  it('a DELIVER that was already attempted is not skipped on cancel (ERP may have it): a RETURN is queued', async () => {
+    process.env.ERP_ENABLED = '1'
+    const o = await order([{ sku: 'R1', linked: true }])
+    await setOrderStatus(o.id, 'CONFIRMED')
+    await prisma.erpOutbox.update({ where: { ref: `ZK-${o.id}` }, data: { attempts: 1, lastError: 'timeout' } })
+    await setOrderStatus(o.id, 'CANCELLED')
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o.id}` } })).toMatchObject({ status: 'PENDING' })
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o.id}-R` } })).toMatchObject({ kind: 'RETURN' })
+  })
+
+  it('a FAILED DELIVER is not skipped on cancel either', async () => {
+    process.env.ERP_ENABLED = '1'
+    const o = await order([{ sku: 'R2', linked: true }])
+    await setOrderStatus(o.id, 'CONFIRMED')
+    await prisma.erpOutbox.update({ where: { ref: `ZK-${o.id}` }, data: { status: 'FAILED', attempts: 1 } })
+    await setOrderStatus(o.id, 'CANCELLED')
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o.id}-R` } })).toMatchObject({ kind: 'RETURN' })
+  })
+
+  it('only ERP-linked SKUs go into the push; an order with none queues nothing', async () => {
+    process.env.ERP_ENABLED = '1'
+    const o = await order([{ sku: 'L1x', linked: true }, { sku: 'U1x', linked: false }])
+    await setOrderStatus(o.id, 'CONFIRMED')
+    expect((await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o.id}` } }))!.lines).toEqual([{ sku: 'L1x', qty: 1, rateUzs: 500 }])
+    const o2 = await order([{ sku: 'U2x', linked: false }])
+    await setOrderStatus(o2.id, 'CONFIRMED')
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o2.id}` } })).toBeNull()
+  })
+
+  it('cancel of an order confirmed AFTER the cutover while the flag was off pushes nothing (ERP never saw it)', async () => {
+    await prisma.setting.create({ data: { key: 'erp.cutoverAt', value: new Date(Date.now() - 60_000).toISOString() } })
+    delete process.env.ERP_ENABLED
+    const o = await order([{ sku: 'C1x', linked: true }])
+    await setOrderStatus(o.id, 'CONFIRMED')
+    process.env.ERP_ENABLED = '1'
+    expect(await setOrderStatus(o.id, 'CANCELLED')).toEqual({ ok: true })
+    expect(await prisma.erpOutbox.count()).toBe(0)
+  })
+
+  it('cancel of an order confirmed BEFORE the cutover pushes a RECEIPT', async () => {
+    delete process.env.ERP_ENABLED
+    const o = await order([{ sku: 'C2x', linked: true }])
+    await setOrderStatus(o.id, 'CONFIRMED')
+    await prisma.setting.create({ data: { key: 'erp.cutoverAt', value: new Date(Date.now() + 1000).toISOString() } })
+    process.env.ERP_ENABLED = '1'
+    await setOrderStatus(o.id, 'CANCELLED')
+    expect(await prisma.erpOutbox.findUnique({ where: { ref: `ZK-${o.id}-R` } })).toMatchObject({ kind: 'RECEIPT' })
   })
 })

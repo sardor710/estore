@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { prisma } from '@/lib/db'
 import { publishProduct, unpublishProduct, updateProduct as rawUpdate, checkPublishable, baselineOf, bulkAction, duplicateProduct, updateVariantInline, completeness, type ProductInput } from '@/lib/admin/products'
 import type { Staff } from '@/lib/admin/session'
@@ -412,5 +412,64 @@ describe('updateVariantInline: stale baseline', () => {
     const id = p.variants[0].id
     expect(await updateVariantInline(id, { priceUzs: 200 }, actor, { priceUzs: 999 })).toEqual({ ok: false, error: 'STALE' })
     expect((await prisma.variant.findUniqueOrThrow({ where: { id } })).priceUzs).toBe(100)
+  })
+})
+
+describe('ERP-managed variants (ERP_ENABLED=1)', () => {
+  const saved = process.env.ERP_ENABLED
+  afterEach(() => {
+    if (saved === undefined) delete process.env.ERP_ENABLED
+    else process.env.ERP_ENABLED = saved
+  })
+  async function linkedProduct() {
+    const p = await mk('erp-p', [{ sku: 'L1', price: 100, stock: 5 }, { sku: 'U1', price: 200, stock: 1 }])
+    await prisma.variant.update({ where: { id: p.variants[0].id }, data: { erpLinkedAt: new Date() } })
+    return prisma.product.findUniqueOrThrow({ where: { id: p.id }, include: { variants: { orderBy: { sortOrder: 'asc' } } } })
+  }
+
+  it('saving keeps stock, price and SKU of a linked variant as they are in the DB', async () => {
+    process.env.ERP_ENABLED = '1'
+    const p = await linkedProduct()
+    const input = inputOf(p)
+    input.variants[0] = { ...input.variants[0], sku: 'CHANGED', priceUzs: 1, stock: 99, name: { en: 'Renamed' } }
+    expect(await updateProduct(p.id, input)).toEqual({ ok: true })
+    const v = await prisma.variant.findUniqueOrThrow({ where: { id: p.variants[0].id } })
+    expect(v).toMatchObject({ sku: 'L1', priceUzs: 100, stock: 5, name: { en: 'Renamed' } })
+  })
+
+  it('stock changed by ERP after the editor opened does not make the save stale', async () => {
+    process.env.ERP_ENABLED = '1'
+    const p = await linkedProduct()
+    const baseline = await baselineOf(p.id)
+    await prisma.variant.update({ where: { id: p.variants[0].id }, data: { stock: 2 } }) // webhook
+    expect(await rawUpdate(p.id, inputOf(p), baseline)).toEqual({ ok: true })
+    expect((await prisma.variant.findUniqueOrThrow({ where: { id: p.variants[0].id } })).stock).toBe(2)
+  })
+
+  it('unlinked variants stay editable; a new variant starts with stock 0', async () => {
+    process.env.ERP_ENABLED = '1'
+    const p = await linkedProduct()
+    const input = inputOf(p)
+    input.variants[1] = { ...input.variants[1], priceUzs: 250, stock: 3 }
+    input.variants.push({ sku: 'N1', name: { en: 'New' }, priceUzs: 300, compareAtUzs: null, stock: 7, colorHex: null, imageIndex: null })
+    expect(await updateProduct(p.id, input)).toEqual({ ok: true })
+    expect(await prisma.variant.findUniqueOrThrow({ where: { sku: 'U1' } })).toMatchObject({ priceUzs: 250, stock: 3 })
+    expect(await prisma.variant.findUniqueOrThrow({ where: { sku: 'N1' } })).toMatchObject({ priceUzs: 300, stock: 0, erpLinkedAt: null })
+  })
+
+  it('inline edit of a linked variant is refused', async () => {
+    process.env.ERP_ENABLED = '1'
+    const p = await linkedProduct()
+    expect(await updateVariantInline(p.variants[0].id, { stock: 9 }, actor)).toEqual({ ok: false, error: 'ERP_MANAGED' })
+    expect((await updateVariantInline(p.variants[1].id, { stock: 9 }, actor)).ok).toBe(true)
+  })
+
+  it('flag off: linked variants are editable as before', async () => {
+    delete process.env.ERP_ENABLED
+    const p = await linkedProduct()
+    const input = inputOf(p)
+    input.variants[0] = { ...input.variants[0], priceUzs: 111, stock: 9 }
+    expect(await updateProduct(p.id, input)).toEqual({ ok: true })
+    expect(await prisma.variant.findUniqueOrThrow({ where: { id: p.variants[0].id } })).toMatchObject({ priceUzs: 111, stock: 9 })
   })
 })

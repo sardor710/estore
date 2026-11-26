@@ -13,6 +13,8 @@ import RankList from '@/components/admin/dashboard/RankList'
 import TrafficSection from '@/components/admin/dashboard/TrafficSection'
 import TrendChart from '@/components/admin/dashboard/TrendChart'
 import { SERIES_COLOR } from '@/components/admin/dashboard/series-colors'
+import ErpSyncCard from '@/components/admin/erp/ErpSyncCard'
+import { getErpStatus } from '@/lib/erp/status'
 
 export const metadata = { title: 'Dashboard' }
 export const dynamic = 'force-dynamic'
@@ -38,7 +40,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   } catch (e) {
     console.error('[dashboard] rollup failed', e) // housekeeping must never take the page down
   }
-  const [d, traffic] = await Promise.all([getDashboard(range, now), getTraffic(range)])
+  const [d, traffic, erp] = await Promise.all([getDashboard(range, now), getTraffic(range), getErpStatus()])
   const first = range.days[0]
   const last = range.days[range.days.length - 1]
   const lowStockLabel = (v: { title: string; variant: string }) => (v.variant && v.variant !== v.title ? `${v.title} / ${v.variant}` : v.title)
@@ -54,6 +56,8 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         }
       />
       <RangePicker active={key === 'custom' ? 'custom' : key} from={first} to={last} maxDay={tashkentDay(now)} />
+
+      {erp.enabled ? <ErpSyncCard s={erp} now={now} /> : null}
 
       {process.env.TRUST_PROXY !== '1' ? (
         <div className="mb-4">

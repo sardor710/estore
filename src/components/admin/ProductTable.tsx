@@ -165,8 +165,19 @@ export default function ProductTable({
                                 {v.name !== v.sku ? <div className="truncate font-mono text-[10px] text-neutral-500">{v.sku}</div> : null}
                               </div>
                             </div>
-                            <InlineVariantCell variantId={v.id} field="priceUzs" value={v.priceUzs} label={`Price of ${who}`} />
-                            <InlineVariantCell variantId={v.id} field="stock" value={v.stock} label={`Stock of ${who}`} low={v.stock <= lowStockThreshold} />
+                            {v.erpManaged ? (
+                              <>
+                                <span className="text-right text-xs tabular-nums text-neutral-700" title="Managed in ERP (erp2.zanko.uz)">{v.priceUzs.toLocaleString('en-US')}</span>
+                                <span className={`text-right text-xs tabular-nums ${v.stock <= lowStockThreshold ? 'font-semibold text-amber-700' : 'text-neutral-700'}`} title="Managed in ERP (erp2.zanko.uz)">
+                                  {v.stock} <span className="text-[10px] font-semibold text-indigo-600">ERP</span>
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <InlineVariantCell variantId={v.id} field="priceUzs" value={v.priceUzs} label={`Price of ${who}`} />
+                                <InlineVariantCell variantId={v.id} field="stock" value={v.stock} label={`Stock of ${who}`} low={v.stock <= lowStockThreshold} />
+                              </>
+                            )}
                           </div>
                         )
                       })}

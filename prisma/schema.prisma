@@ -63,6 +63,8 @@ model Variant {
   compareAtUzs Int?
   stock        Int     @default(0)
   sortOrder    Int     @default(0)
+  /// Set once the SKU exists as an Item in ERPNext; from then on ERP owns stock, price and the SKU.
+  erpLinkedAt  DateTime?
 }
 
 model SpecLabel {
@@ -402,4 +404,24 @@ model Payment {
   updatedAt         DateTime  @updatedAt
 
   @@index([orderId])
+}
+
+/// A stock movement waiting to be pushed to ERPNext (one per order event).
+/// Written in the same transaction as the order status change; drained by src/lib/erp/outbox.ts.
+model ErpOutbox {
+  id            Int       @id @default(autoincrement())
+  ref           String    @unique // ZK-<orderId> (DELIVER) or ZK-<orderId>-R (RETURN | RECEIPT)
+  kind          String // DELIVER | RETURN | RECEIPT
+  orderId       Int
+  lines         Json // [{ sku, qty, rateUzs }]
+  status        String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED | SKIPPED
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lockedUntil   DateTime?
+  lastError     String?
+  erpDoc        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, nextAttemptAt])
 }

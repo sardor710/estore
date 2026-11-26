@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { erpFlagOn } from '@/lib/erp/outbox'
 import { getSettings } from '@/lib/settings'
 import { bestPrice } from '@/lib/pricing'
 import { categoryAncestry, loadActiveRules, priceTargetFor } from '@/lib/promotions'
@@ -30,7 +31,7 @@ export type ProductListParams = {
   page?: number
 }
 
-export type ProductRowVariant = { id: number; sku: string; name: string; priceUzs: number; stock: number; colorHex: string | null; image: string | null }
+export type ProductRowVariant = { id: number; sku: string; name: string; priceUzs: number; stock: number; colorHex: string | null; image: string | null; erpManaged?: boolean }
 
 export type ProductRow = {
   id: number
@@ -127,6 +128,7 @@ const defaultDir = (s: ProductSort): 'asc' | 'desc' => (s === 'title' ? 'asc' : 
 /** Every product matching the filters, sorted (no paging). */
 async function matching(p: ProductListParams): Promise<ProductRow[]> {
   const now = new Date()
+  const erpOn = erpFlagOn()
   const [rows, settings, rules, ancestry] = await Promise.all([
     prisma.product.findMany({
       where: {
@@ -178,7 +180,7 @@ async function matching(p: ProductListParams): Promise<ProductRow[]> {
       image: images[0] ?? null,
       category: display(r.category.name, r.category.slug),
       brand: r.brand?.name ?? null,
-      variants: r.variants.map((v) => ({ id: v.id, sku: v.sku, name: display(v.name, v.sku), priceUzs: v.priceUzs, stock: v.stock, colorHex: v.colorHex, image: variantThumb(images, v.imageIndex) })),
+      variants: r.variants.map((v) => ({ id: v.id, sku: v.sku, name: display(v.name, v.sku), priceUzs: v.priceUzs, stock: v.stock, colorHex: v.colorHex, image: variantThumb(images, v.imageIndex), erpManaged: erpOn && Boolean(v.erpLinkedAt) })),
       minPrice: prices.length ? Math.min(...prices) : 0,
       maxPrice: prices.length ? Math.max(...prices) : 0,
       totalStock,
