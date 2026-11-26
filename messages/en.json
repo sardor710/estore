@@ -181,7 +181,8 @@
       "NETWORK": "Could not send the order. Check your connection and try again.",
       "RATE_LIMITED": "Too many orders from your network in a short time. Please wait a few minutes and try again, or call us.",
       "BLOCKED": "We can't accept this order online. Please call us.",
-      "SERVER": "Something went wrong on our side. Please try again in a moment."
+      "SERVER": "Something went wrong on our side. Please try again in a moment.",
+      "CARD_UNAVAILABLE": "Card payment is temporarily unavailable. Please choose cash on delivery."
     },
     "fromAccount": "From your account",
     "phoneLocked": "Orders are placed with your account number so they appear in your account.",
@@ -190,7 +191,13 @@
     "defaultAddress": "Default",
     "saveAddress": "Save to my addresses",
     "addressLabel": "Address name (optional)",
-    "addressLabelPlaceholder": "Home, Work…"
+    "addressLabelPlaceholder": "Home, Work…",
+    "payment": "Payment",
+    "payCash": "Cash on delivery",
+    "payCashHint": "Pay the courier when you receive your order.",
+    "payCard": "Pay online by card",
+    "payCardHint": "Uzcard, Humo, Visa or Mastercard on the secure Octo payment page.",
+    "submitCard": "Proceed to payment"
   },
   "order": {
     "title": "Order received",

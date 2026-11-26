@@ -7,6 +7,7 @@ import type { Locale } from '@/i18n/routing'
 import { REGIONS } from '@/lib/regions'
 import { t as l10n } from '@/lib/localized'
 import CheckoutForm, { type CheckoutAccount } from '@/components/store/CheckoutForm'
+import { octoConfig } from '@/lib/payments/octo'
 import { getAccountCustomer } from '@/lib/account/session'
 import { listAddresses } from '@/lib/account/addresses'
 import { isTelegramMode } from '@/lib/tg/mode'
@@ -56,7 +57,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ local
           <TgPhoneGate />
         </div>
       ) : (
-        <CheckoutForm locale={locale} regions={regions} account={account} telegram={telegram} />
+        <CheckoutForm locale={locale} regions={regions} account={account} telegram={telegram} cardPayments={octoConfig() !== null} />
       )}
     </div>
   )
