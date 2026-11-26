@@ -154,8 +154,8 @@ export const MAX_BANNERS = 40
 /** Components that are not overview media (or are read elsewhere). */
 const NON_OVERVIEW = /^(reviews|faq|htmlContainer|productSpecs|variantsMetafields)(_\d+)?$/
 const VIDEO_RE = /\.(mp4|webm|mov|m3u8)$/i
-const DESKTOP_KEYS = ['src', 'img', 'image', 'pcImg']
-const MOBILE_KEYS = ['srcMb', 'mobImg', 'imageMob', 'mobileImg', 'mbImg']
+const DESKTOP_KEYS = ['src', 'img', 'image', 'pcImg', 'imageUrl']
+const MOBILE_KEYS = ['srcMb', 'mobImg', 'imageMob', 'mobileImg', 'mbImg', 'mobileImageUrl']
 const POSTER_KEYS = ['poster', 'cover', 'posterImg']
 
 const plain = (v: unknown): string => {
@@ -213,6 +213,10 @@ export function parseOverview(components: unknown): { banners: ImportedBanner[];
       }
       if (used && heading === blockTitle) blockTitle = ''
     }
+    // Amazon A+ style carousels (aplusNavCarousel__N): { blocks: [{ navigation, imageUrl, mobileImageUrl }] }
+    for (const item of Array.isArray(block.blocks) ? block.blocks : []) {
+      if (isObj(item)) push(item, firstText(item.navigation, item.title), firstText(item.desc, item.subTitle))
+    }
   }
 
   const faqBlock = components.faq
@@ -259,7 +263,7 @@ export function parseAnkerHtml(html: string, url: string): ImportedProduct {
   const product = pageProps && isObj(pageProps.product) ? pageProps.product : null
   if (!pageProps || !product) throw new ImportError('PARSE_FAILED', 'Product data not found on page')
 
-  const title = asStr(product.title).trim()
+  const title = textOf(asStr(product.title))
   if (!title) throw new ImportError('PARSE_FAILED', 'Product title missing')
 
   // JSON-LD (image fallback)
@@ -306,8 +310,11 @@ export function parseAnkerHtml(html: string, url: string): ImportedProduct {
   for (const rv of rawVariants) {
     if (!isObj(rv)) continue
     const sku = asStr(rv.sku).trim()
-    const priceUsd = priceOf(rv.price) ?? priceOf(product.price)
-    if (!sku || priceUsd === null) continue
+    const selling = priceOf(rv.price) ?? priceOf(product.price)
+    if (!sku || selling === null) continue
+    // Official price = list price (MSRP) when anker.com shows one above the selling (sale) price
+    const list = priceOf(rv.listPrice) ?? priceOf(rv.compareAtPrice)
+    const priceUsd = list !== null && list > selling ? list : selling
     // Every option's chosen value, in order (e.g. Color + Bundle Choice -> "Space Black / Power Bank + Charger",
     // as anker.com names it); blanks and repeats are skipped. Using only the first option made bundles indistinguishable.
     const opts = Array.isArray(rv.options) ? rv.options : []

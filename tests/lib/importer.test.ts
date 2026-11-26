@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { prisma } from '@/lib/db'
-import { parseAnkerHtml, normalizeAnkerUrl, ImportError, MAX_BANNERS } from '@/lib/importer/anker-parse'
+import { parseAnkerHtml, parseOverview, normalizeAnkerUrl, ImportError, MAX_BANNERS } from '@/lib/importer/anker-parse'
 import { importAnkerProduct, refreshAnkerProduct, fetchAnkerHtml } from '@/lib/importer/anker'
 
 const fixture = readFileSync(join(__dirname, '..', 'fixtures', 'anker-a120f.html'), 'utf8')
@@ -525,5 +525,52 @@ describe('fetchAnkerHtml', () => {
     } finally {
       globalThis.fetch = orig
     }
+  })
+})
+
+describe('Amazon A+ overview blocks and list price (2026-11 anker.com layout)', () => {
+  it('reads aplusFullImage and aplusNavCarousel blocks as banners (navigation text as heading)', () => {
+    const { banners } = parseOverview({
+      aplusFullImage__0: { imageUrl: 'https://cdn.example/a/full0.jpg?v=1', mobileImageUrl: 'https://cdn.example/a/full0-m.jpg?v=1' },
+      aplusNavCarousel__1: {
+        blocks: [
+          { navigation: 'HD Multi-Display Cable', imageUrl: 'https://cdn.example/a/nav1.jpg', mobileImageUrl: 'https://cdn.example/a/nav1-m.jpg' },
+          { navigation: 'Daisy Chain Compatible', imageUrl: 'https://cdn.example/a/nav2.jpg' },
+        ],
+      },
+    })
+    expect(banners.map((b) => [b.heading, urlKey(b.image), b.imageMobile ? urlKey(b.imageMobile) : undefined])).toEqual([
+      ['', 'https://cdn.example/a/full0.jpg', 'https://cdn.example/a/full0-m.jpg'],
+      ['HD Multi-Display Cable', 'https://cdn.example/a/nav1.jpg', 'https://cdn.example/a/nav1-m.jpg'],
+      ['Daisy Chain Compatible', 'https://cdn.example/a/nav2.jpg', undefined],
+    ])
+    expect(new Set(banners.map((b) => b.sourceKey)).size).toBe(3)
+  })
+
+  const withProduct = (edit: (prod: Record<string, any>) => void) => {
+    const m = fixture.match(NEXT_RE)!
+    const next = JSON.parse(m[2])
+    edit(next.props.pageProps.product)
+    return fixture.replace(m[0], () => m[1] + JSON.stringify(next).split('<').join(String.fromCharCode(92) + 'u003c') + m[3])
+  }
+  it('uses the list price (MSRP) when it is above the selling price', () => {
+    const html = withProduct((prod) => {
+      prod.variants = [
+        { ...prod.variants[0], sku: 'SALE', price: { amount: '39.99' }, listPrice: { amount: '59.99' } },
+        { ...prod.variants[0], sku: 'NOLIST', price: { amount: '45.99' }, listPrice: null },
+        { ...prod.variants[0], sku: 'LOWLIST', price: { amount: '45.99' }, listPrice: { amount: '0' } },
+      ]
+    })
+    expect(parseAnkerHtml(html, URL_A120F).variants.map((v) => [v.sku, v.priceUsd])).toEqual([
+      ['SALE', 59.99],
+      ['NOLIST', 45.99],
+      ['LOWLIST', 45.99],
+    ])
+  })
+  it('strips HTML tags from the title', () => {
+    const html = withProduct((prod) => {
+      prod.title = 'Anker <b>715</b> Charger (Nano II 65W)'
+    })
+    expect(parseAnkerHtml(html, URL_A120F).title).toBe('Anker 715 Charger (Nano II 65W)')
   })
 })
