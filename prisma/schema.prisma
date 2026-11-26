@@ -81,8 +81,14 @@ model Order {
   comment         String?
   locale          String
   totalUzs        Int
+  /// UNPAID (cash) | PENDING | PAID | FAILED | REFUNDED
   paymentStatus   String             @default("UNPAID")
   paymentProvider String?
+  /// CASH (on delivery) | CARD (online via Octo)
+  payMethod       String             @default("CASH")
+  /// Random secret in the customer's order link; unlocks payment details and "Pay now" on the public order page.
+  payToken        String?            @unique
+  payments        Payment[]
   /// Optional delivery pin (Telegram location / geolocation), both or neither.
   lat             Float?
   lng             Float?
@@ -370,4 +376,28 @@ model ImageTranslation {
 
   @@unique([sourceUrl, locale])
   @@index([status])
+}
+
+/// One online payment attempt (Octo hosted page). An order can have several attempts ("Pay now" again).
+model Payment {
+  id                Int       @id @default(autoincrement())
+  orderId           Int
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider          String    @default("octo")
+  /// Our id sent to Octo as shop_transaction_id: zanko-<orderNumber>-<attempt>
+  shopTransactionId String    @unique
+  octoPaymentId     String?
+  /// Octo status: created | wait_user_action | waiting_for_capture | succeeded | canceled
+  status            String    @default("created")
+  amountUzs         Int
+  payUrl            String?
+  maskedPan         String?
+  cardVendor        String?
+  paidAt            DateTime?
+  refundedUzs       Int       @default(0)
+  refundId          String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([orderId])
 }
